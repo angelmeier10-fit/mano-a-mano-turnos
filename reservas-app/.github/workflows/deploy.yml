@@ -1,0 +1,70 @@
+name: Deploy a GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias de Agenda
+        run: npm install
+        working-directory: agenda-app
+
+      - name: Compilar Agenda
+        run: npm run build
+        working-directory: agenda-app
+
+      - name: Instalar dependencias de Reservas
+        run: npm install
+        working-directory: reservas-app
+
+      - name: Compilar Reservas
+        run: npm run build
+        working-directory: reservas-app
+
+      - name: Armar carpeta de publicación
+        run: |
+          mkdir -p public-site/mano-a-mano-agenda
+          mkdir -p public-site/mano-a-mano-reservas
+          cp -r agenda-app/dist/* public-site/mano-a-mano-agenda/
+          cp -r reservas-app/dist/* public-site/mano-a-mano-reservas/
+          echo "<!doctype html><html><head><meta charset='utf-8'><title>Mano a Mano</title></head><body><h1>Mano a Mano</h1><p><a href='./mano-a-mano-agenda/'>Agenda (privada)</a></p><p><a href='./mano-a-mano-reservas/'>Reservar turno (clientes)</a></p></body></html>" > public-site/index.html
+
+      - name: Preparar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir archivos para publicar
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
