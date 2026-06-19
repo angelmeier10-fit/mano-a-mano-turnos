@@ -1,0 +1,14 @@
+{
+  "name": "mano-a-mano",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:agenda": "npm --prefix agenda-app run dev",
+    "dev:reservas": "npm --prefix reservas-app run dev",
+    "build:agenda": "npm --prefix agenda-app run build",
+    "build:reservas": "npm --prefix reservas-app run build",
+    "build": "npm run build:agenda && npm run build:reservas",
+    "install:all": "npm install --prefix agenda-app && npm install --prefix reservas-app",
+    "deploy": "npm run build && firebase deploy"
+  }
+}

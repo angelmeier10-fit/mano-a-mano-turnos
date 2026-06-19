@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Solo el dueño autenticado puede leer/escribir servicios, disponibilidad y notas de clientes.
+    // Cualquiera (incluso sin login) puede LEER disponibilidad y servicios, para poder reservar.
+    // Cualquiera puede CREAR un turno (reservar), pero no editar ni borrar turnos existentes,
+    // ni leer la lista completa de turnos/clientes (eso es privado, solo para vos).
+
+    function isOwner() {
+      return request.auth != null && request.auth.uid == resource.data.ownerId;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /availability/{slotId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /appointments/{apptId} {
+      // cualquiera puede crear una reserva (vía la app pública)
+      allow create: if request.resource.data.status == "confirmado"
+                    && request.resource.data.clientName is string
+                    && request.resource.data.clientName.size() > 0;
+      // solo vos (logueado) podés leer la lista completa, editar o borrar
+      allow read, update, delete: if isSignedIn();
+    }
+
+    match /clients/{clientId} {
+      // los datos de clientes son privados: solo vos los leés/editás
+      allow read, write: if isSignedIn();
+    }
+
+    match /businessInfo/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+  }
+}

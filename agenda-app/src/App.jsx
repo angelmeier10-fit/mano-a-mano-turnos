@@ -1,0 +1,143 @@
+import React, { useState, useEffect } from "react";
+import { auth, watchAuthState, logout } from "./auth";
+import LoginScreen from "./LoginScreen";
+import Header from "./Header";
+import { AgendaView } from "./AgendaComponents";
+import { ClientesView, ServiciosView } from "./ClientesServiciosViews";
+import NegocioView from "./NegocioView";
+import {
+  listenServices, addService, deleteService,
+  listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
+  listenAppointments, createAppointment, updateAppointment, deleteAppointment,
+  listenClients, upsertClientByName, updateClient, deleteClient,
+  listenBusinessInfo, setBusinessInfo,
+} from "../../shared/firestoreApi";
+import { DEFAULT_SERVICES, DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
+import styles from "../../shared/styles";
+
+function GoogleFontsLoader() {
+  useEffect(() => {
+    const link = document.createElement("link");
+    link.href = GoogleFontsHref();
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+    return () => document.head.removeChild(link);
+  }, []);
+  return null;
+}
+
+export default function App() {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState(null);
+
+  const [view, setView] = useState("agenda");
+  const [services, setServices] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [availability, setAvailability] = useState([]);
+  const [businessInfo, setBusinessInfoState] = useState(DEFAULT_BUSINESS_INFO);
+  const [dataLoaded, setDataLoaded] = useState(false);
+
+  useEffect(() => {
+    const unsub = watchAuthState((u) => {
+      setUser(u);
+      setAuthChecked(true);
+    });
+    return unsub;
+  }, []);
+
+  // Suscripciones en tiempo real a Firestore, solo cuando hay sesión iniciada
+  useEffect(() => {
+    if (!user) return;
+    const unsubServices = listenServices(setServices);
+    const unsubAppts = listenAppointments(setAppointments);
+    const unsubClients = listenClients(setClients);
+    const unsubAvail = listenAvailability(setAvailability);
+    const unsubBiz = listenBusinessInfo((data) => {
+      if (data) setBusinessInfoState(data);
+      setDataLoaded(true);
+    });
+    return () => {
+      unsubServices(); unsubAppts(); unsubClients(); unsubAvail(); unsubBiz();
+    };
+  }, [user]);
+
+  // Primera vez: si no hay servicios cargados en Firestore, precargamos los por defecto
+  useEffect(() => {
+    if (!user || !dataLoaded) return;
+    if (services.length === 0) {
+      DEFAULT_SERVICES.forEach(s => {
+        const { id, ...rest } = s;
+        addService(rest);
+      });
+    }
+  }, [user, dataLoaded, services.length]);
+
+  if (!authChecked) {
+    return (
+      <div style={styles.loadingScreen}>
+        <div style={styles.loadingMark} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <GoogleFontsLoader />
+        <LoginScreen />
+      </>
+    );
+  }
+
+  return (
+    <div style={styles.app}>
+      <GoogleFontsLoader />
+      <Header view={view} setView={setView} onLogout={logout} />
+      <main style={styles.main}>
+        {view === "agenda" && (
+          <AgendaView
+            services={services}
+            appointments={appointments}
+            availability={availability}
+            clients={clients}
+            businessInfo={businessInfo}
+            onCreateAppt={createAppointment}
+            onUpdateAppt={updateAppointment}
+            onDeleteAppt={deleteAppointment}
+            onAddSlot={addAvailabilitySlot}
+            onRemoveSlot={removeAvailabilitySlot}
+            onCloseDay={removeAvailabilitySlotsByIds}
+            onAddSlotsBatch={addAvailabilitySlotsBatch}
+            upsertClientByName={upsertClientByName}
+          />
+        )}
+        {view === "clientes" && (
+          <ClientesView
+            clients={clients}
+            appointments={appointments}
+            services={services}
+            onUpdateClient={updateClient}
+            onDeleteClient={deleteClient}
+          />
+        )}
+        {view === "servicios" && (
+          <ServiciosView
+            services={services}
+            onAddService={addService}
+            onDeleteService={deleteService}
+          />
+        )}
+        {view === "negocio" && (
+          <NegocioView
+            businessInfo={businessInfo}
+            onSave={setBusinessInfo}
+            appointments={appointments}
+            clients={clients}
+            services={services}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
