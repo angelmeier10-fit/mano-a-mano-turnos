@@ -1,4 +1,4 @@
-name: Deploy a GitHub Pages
+﻿name: Deploy a GitHub Pages
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Descargar el código
+      - name: Descargar el codigo
         uses: actions/checkout@v4
 
       - name: Instalar Node.js
@@ -42,7 +42,7 @@ jobs:
         run: npm run build
         working-directory: reservas-app
 
-      - name: Armar carpeta de publicación
+      - name: Armar carpeta de publicacion
         run: |
           mkdir -p public-site/mano-a-mano-agenda
           mkdir -p public-site/mano-a-mano-reservas
