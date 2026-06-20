@@ -23,6 +23,11 @@ service cloud.firestore {
     match /availability/{slotId} {
       allow read: if true;
       allow write: if isSignedIn();
+      // La app pública puede marcar un cupo como reservado (booked: true),
+      // pero solo si todavía no lo estaba, y sin poder tocar ningún otro campo.
+      allow update: if !resource.data.get('booked', false)
+                    && request.resource.data.booked == true
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['booked']);
     }
 
     match /appointments/{apptId} {
