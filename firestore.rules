@@ -23,10 +23,13 @@ service cloud.firestore {
     match /availability/{slotId} {
       allow read: if true;
       allow write: if isSignedIn();
-      // La app pública puede marcar un cupo como reservado (booked: true),
-      // pero solo si todavía no lo estaba, y sin poder tocar ningún otro campo.
+      // App pública: marcar un cupo como reservado al confirmar turno.
       allow update: if !resource.data.get('booked', false)
                     && request.resource.data.booked == true
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['booked']);
+      // App pública: liberar un cupo al cancelar o reprogramar un turno.
+      allow update: if resource.data.get('booked', false)
+                    && request.resource.data.booked == false
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['booked']);
     }
 
@@ -37,6 +40,14 @@ service cloud.firestore {
                     && request.resource.data.clientName.size() > 0;
       // solo vos (logueado) podés leer la lista completa, editar o borrar
       allow read, update, delete: if isSignedIn();
+      // Cliente sin login puede cancelar su propio turno si demuestra que conoce el cancelToken.
+      // El cliente envía el token en el campo cancelProof; se compara contra cancelToken almacenado.
+      // Solo se permite cambiar status y cancelProof, y únicamente si el turno está confirmado.
+      allow update: if !isSignedIn()
+                    && resource.data.cancelToken != null
+                    && resource.data.status == "confirmado"
+                    && request.resource.data.cancelProof == resource.data.cancelToken
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelProof']);
     }
 
     match /clients/{clientId} {
@@ -58,6 +69,12 @@ service cloud.firestore {
       allow read: if true;
       allow create: if true;
       allow update, delete: if isSignedIn();
+    }
+
+    // Índice de reservas por teléfono: permite al cliente ver y gestionar sus turnos sin login.
+    // No almacena cancelToken (ese solo vive en localStorage del cliente).
+    match /phoneIndex/{phoneDigitsId}/bookings/{apptId} {
+      allow read, write: if true;
     }
   }
 }

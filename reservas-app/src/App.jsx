@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
 import ReservarView from "./ReservarView";
+import MiTurnoView from "./MiTurnoView";
 import {
   listenServices,
   listenAvailability,
   bookSlotAtomic,
   createClientPublic,
   listenBusinessInfo,
+  getMyBookingRefs,
+  cancelAppointmentPublic,
+  rescheduleAppointmentPublic,
 } from "../../shared/firestoreApi";
 import { DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
 import styles from "../../shared/styles";
@@ -26,6 +30,8 @@ export default function App() {
   const [availability, setAvailability] = useState([]);
   const [businessInfo, setBusinessInfo] = useState(DEFAULT_BUSINESS_INFO);
   const [loaded, setLoaded] = useState(false);
+  const [currentView, setCurrentView] = useState("reservar");
+  const [miturnoInitPhone, setMiturnoInitPhone] = useState("");
 
   useEffect(() => {
     const unsubServices = listenServices(setServices);
@@ -42,6 +48,11 @@ export default function App() {
     );
   }
 
+  function navigateToMiTurno(phone = "") {
+    setMiturnoInitPhone(phone);
+    setCurrentView("miturno");
+  }
+
   return (
     <div style={styles.app}>
       <GoogleFontsLoader />
@@ -56,15 +67,42 @@ export default function App() {
           </div>
           <h1 style={styles.brandName}>{businessInfo?.name || "Mano a Mano"}</h1>
         </div>
+        <nav style={styles.tabBar}>
+          <button
+            style={{ ...styles.tabBtn, ...(currentView === "reservar" ? styles.tabBtnActive : {}) }}
+            onClick={() => setCurrentView("reservar")}
+          >
+            Reservar
+          </button>
+          <button
+            style={{ ...styles.tabBtn, ...(currentView === "miturno" ? styles.tabBtnActive : {}) }}
+            onClick={() => navigateToMiTurno()}
+          >
+            Mis turnos
+          </button>
+        </nav>
       </header>
       <main style={styles.main}>
-        <ReservarView
-          services={services}
-          availability={availability}
-          businessInfo={businessInfo}
-          onBookSlot={bookSlotAtomic}
-          onUpsertClient={createClientPublic}
-        />
+        {currentView === "reservar" ? (
+          <ReservarView
+            services={services}
+            availability={availability}
+            businessInfo={businessInfo}
+            onBookSlot={bookSlotAtomic}
+            onUpsertClient={createClientPublic}
+            onNavigateToMiTurno={navigateToMiTurno}
+          />
+        ) : (
+          <MiTurnoView
+            services={services}
+            availability={availability}
+            businessInfo={businessInfo}
+            onGetMyBookings={getMyBookingRefs}
+            onCancelAppointment={cancelAppointmentPublic}
+            onReschedule={rescheduleAppointmentPublic}
+            initialPhone={miturnoInitPhone}
+          />
+        )}
       </main>
     </div>
   );

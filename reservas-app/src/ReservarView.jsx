@@ -7,7 +7,18 @@ import {
 import { MiniCalendar } from "../../shared/MiniCalendar";
 import styles from "../../shared/styles";
 
-export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient }) {
+const LS_KEY = "mam_bookings";
+
+function saveBookingToLocalStorage(apptId, cancelToken, appt, serviceName) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
+    const filtered = stored.filter(b => b.apptId !== apptId);
+    filtered.push({ apptId, cancelToken, dateKey: appt.dateKey, start: appt.start, end: appt.end, serviceName });
+    localStorage.setItem(LS_KEY, JSON.stringify(filtered.slice(-20)));
+  } catch {}
+}
+
+export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno }) {
   const availabilityByDate = useMemo(() => {
     const map = {};
     availability.forEach(slot => {
@@ -80,15 +91,18 @@ export default function ReservarView({ services, availability, businessInfo, onB
       fromAvailabilityId: slot.id,
       ...(clientId ? { clientId } : {}),
     };
+    let result;
     try {
-      await onBookSlot(appt);
+      result = await onBookSlot(appt);
     } catch (err) {
       console.error(err);
       alert("Hubo un problema al reservar. Probá de nuevo, puede que alguien haya tomado ese horario.");
       setBooking(false);
       return;
     }
-    setConfirmed(appt);
+    const confirmedAppt = { ...appt, apptId: result.apptId, cancelToken: result.cancelToken };
+    saveBookingToLocalStorage(result.apptId, result.cancelToken, appt, svc?.name || "");
+    setConfirmed(confirmedAppt);
     setBooking(false);
   }
 
@@ -116,6 +130,14 @@ export default function ReservarView({ services, availability, businessInfo, onB
           <button style={{ ...styles.saveBtn, marginTop: 16 }} onClick={() => { setConfirmed(null); setClientName(""); setClientPhone(""); }}>
             Reservar otro turno
           </button>
+          {onNavigateToMiTurno && (
+            <button
+              style={{ ...styles.cancelBtn, marginTop: 8 }}
+              onClick={() => onNavigateToMiTurno(confirmed.clientPhone)}
+            >
+              Modificar mi turno
+            </button>
+          )}
         </div>
       </div>
     );

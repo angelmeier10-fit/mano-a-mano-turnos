@@ -84,24 +84,147 @@ export async function removeAvailabilitySlotsByIds(ids) {
 
 // ---------- Turnos ----------
 
+function generateCancelToken() {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    const arr = new Uint8Array(18);
+    crypto.getRandomValues(arr);
+    return Array.from(arr, b => b.toString(16).padStart(2, "0")).join("");
+  }
+  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
 // Reserva atómica: lee el cupo, verifica que no esté ocupado, lo marca booked:true
 // y crea el turno en una sola transacción. Previene que dos personas reserven el
 // mismo horario simultáneamente.
+// Devuelve { apptId, cancelToken } para que la app pública lo guarde en localStorage.
 export async function bookSlotAtomic(appt) {
+  const cancelToken = generateCancelToken();
   const slotId = appt.fromAvailabilityId;
+
   if (!slotId) {
-    return createAppointment(appt);
+    const ref = await addDoc(collection(db, "appointments"), {
+      ...appt, cancelToken, cancelProof: null, createdAt: Date.now(),
+    });
+    return { apptId: ref.id, cancelToken };
   }
+
   const slotRef = doc(db, "availability", slotId);
-  return runTransaction(db, async (transaction) => {
+  let apptId;
+  await runTransaction(db, async (transaction) => {
     const slotSnap = await transaction.get(slotRef);
     if (!slotSnap.exists() || slotSnap.data().booked) {
       throw new Error("Este horario ya fue reservado. Por favor elegí otro.");
     }
     transaction.update(slotRef, { booked: true });
     const apptRef = doc(collection(db, "appointments"));
-    transaction.set(apptRef, { ...appt, createdAt: Date.now() });
+    apptId = apptRef.id;
+    transaction.set(apptRef, { ...appt, cancelToken, cancelProof: null, createdAt: Date.now() });
   });
+
+  // Guardar referencia en phoneIndex/bookings (best-effort, no bloquea la reserva)
+  const phoneDigits = normalizePhone(appt.clientPhone);
+  if (phoneDigits && apptId) {
+    try {
+      await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), {
+        dateKey: appt.dateKey,
+        start: appt.start,
+        end: appt.end,
+        serviceId: appt.serviceId || null,
+        fromAvailabilityId: slotId,
+        clientName: appt.clientName || "",
+        clientId: appt.clientId || null,
+        status: "confirmado",
+      });
+    } catch (e) {
+      console.error("[phoneIndex/bookings] No se pudo guardar la referencia:", e);
+    }
+  }
+
+  return { apptId, cancelToken };
+}
+
+// Devuelve las referencias de reservas del cliente a partir de su teléfono.
+// No contiene cancelToken; ese vive solo en localStorage del cliente.
+export async function getMyBookingRefs(phone) {
+  const phoneDigits = normalizePhone(phone);
+  if (!phoneDigits) return [];
+  try {
+    const snap = await getDocs(collection(db, "phoneIndex", phoneDigits, "bookings"));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.error("[phoneIndex/bookings] No se pudo leer las reservas:", e);
+    return [];
+  }
+}
+
+// Cancela un turno desde la app pública. El cliente debe proveer el cancelToken
+// que recibió al reservar (se envía como cancelProof para que Firestore lo valide).
+export async function cancelAppointmentPublic(apptId, cancelToken, availabilitySlotId, phone) {
+  await updateDoc(doc(db, "appointments", apptId), {
+    status: "cancelado",
+    cancelProof: cancelToken,
+  });
+  if (availabilitySlotId) {
+    try {
+      await updateDoc(doc(db, "availability", availabilitySlotId), { booked: false });
+    } catch (e) {
+      console.error("[availability] No se pudo liberar el cupo:", e);
+    }
+  }
+  const phoneDigits = normalizePhone(phone);
+  if (phoneDigits) {
+    try {
+      await updateDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "cancelado" });
+    } catch {}
+  }
+}
+
+// Reprograma un turno: cancela el viejo (atómico) y crea uno nuevo.
+// Devuelve { apptId, cancelToken } del nuevo turno.
+export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, oldSlotId, newAppt, phone }) {
+  const newCancelToken = generateCancelToken();
+  const oldApptRef = doc(db, "appointments", oldApptId);
+  const newSlotRef = doc(db, "availability", newAppt.fromAvailabilityId);
+  const newApptRef = doc(collection(db, "appointments"));
+  const newApptId = newApptRef.id;
+
+  await runTransaction(db, async (t) => {
+    const newSlotSnap = await t.get(newSlotRef);
+    if (!newSlotSnap.exists() || newSlotSnap.data().booked) {
+      throw new Error("Este horario ya fue tomado. Por favor elegí otro.");
+    }
+    t.update(oldApptRef, { status: "cancelado", cancelProof: oldCancelToken });
+    if (oldSlotId) {
+      t.update(doc(db, "availability", oldSlotId), { booked: false });
+    }
+    t.update(newSlotRef, { booked: true });
+    t.set(newApptRef, {
+      ...newAppt,
+      cancelToken: newCancelToken,
+      cancelProof: null,
+      status: "confirmado",
+      createdAt: Date.now(),
+    });
+  });
+
+  const phoneDigits = normalizePhone(phone);
+  if (phoneDigits) {
+    try {
+      await deleteDoc(doc(db, "phoneIndex", phoneDigits, "bookings", oldApptId));
+      await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", newApptId), {
+        dateKey: newAppt.dateKey,
+        start: newAppt.start,
+        end: newAppt.end,
+        serviceId: newAppt.serviceId || null,
+        fromAvailabilityId: newAppt.fromAvailabilityId,
+        clientName: newAppt.clientName || "",
+        clientId: newAppt.clientId || null,
+        status: "confirmado",
+      });
+    } catch {}
+  }
+
+  return { apptId: newApptId, cancelToken: newCancelToken };
 }
 
 export function listenAppointments(callback) {
