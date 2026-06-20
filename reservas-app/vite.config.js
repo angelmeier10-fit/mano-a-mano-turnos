@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       firebase: path.resolve(__dirname, "node_modules/firebase"),
+      "lucide-react": path.resolve(__dirname, "node_modules/lucide-react"),
     },
   },
   optimizeDeps: {

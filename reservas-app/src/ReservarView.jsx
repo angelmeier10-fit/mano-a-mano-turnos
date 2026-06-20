@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Calendar, Clock, Check, MessageCircle } from "lucide-react";
+import { Calendar, Clock, Check, MessageCircle, CalendarDays, List } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
-  formatPrice, formatDateLong, DAY_NAMES,
+  formatPrice, formatDateLong, formatDateShort, DAY_NAMES,
 } from "../../shared/helpers";
+import { MiniCalendar } from "../../shared/MiniCalendar";
 import styles from "../../shared/styles";
 
 export default function ReservarView({ services, appointments, availability, businessInfo, onBookSlot, onUpsertClient }) {
@@ -23,12 +24,15 @@ export default function ReservarView({ services, appointments, availability, bus
       .sort();
   }, [availabilityByDate]);
 
+  const availableDatesSet = useMemo(() => new Set(availableDates), [availableDates]);
+
   const [selectedDate, setSelectedDate] = useState(null);
   const [serviceId, setServiceId] = useState(services[0]?.id || "");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [confirmed, setConfirmed] = useState(null);
   const [booking, setBooking] = useState(false);
+  const [dateViewMode, setDateViewMode] = useState("list");
 
   useEffect(() => {
     if (!selectedDate && availableDates.length > 0) setSelectedDate(availableDates[0]);
@@ -45,7 +49,7 @@ export default function ReservarView({ services, appointments, availability, bus
     const dayAppts = appointments.filter(a => a.dateKey === selectedDate && a.status !== "cancelado");
     const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
     return (availabilityByDate[selectedDate] || [])
-      .filter(s => !bookedSlotIds.has(s.id))
+      .filter(s => !bookedSlotIds.has(s.id) && !s.booked)
       .filter(s => !isPastSlot(selectedDate, s.start))
       .filter(s => timeToMinutes(s.end) - timeToMinutes(s.start) >= svc.duration)
       .sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
@@ -95,12 +99,17 @@ export default function ReservarView({ services, appointments, availability, bus
           <p style={styles.confirmDetail}>{cSvc?.name} · {confirmed.start} a {confirmed.end}</p>
           {cSvc?.price && <p style={styles.confirmPrice}>{formatPrice(cSvc.price)}</p>}
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
-          <p style={{ marginTop: 10 }}>{businessInfo?.address}</p>
-          {businessInfo?.whatsapp ? (
-            <a href={"https://wa.me/549" + businessInfo.whatsapp.replace(/[^0-9]/g, "")} target="_blank" rel="noopener noreferrer" style={{ ...styles.businessWaBtn, marginTop: 14 }}>
+          <p style={{ ...styles.confirmDetail, marginTop: 10 }}>{businessInfo?.address}</p>
+          {businessInfo?.whatsapp && (
+            <a
+              href={`https://wa.me/549${businessInfo.whatsapp.replace(/[^\d]/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ ...styles.businessWaBtn, marginTop: 14 }}
+            >
               <MessageCircle size={14} /> Cualquier duda, escribime por WhatsApp
             </a>
-          ) : null}
+          )}
           <button style={{ ...styles.saveBtn, marginTop: 16 }} onClick={() => { setConfirmed(null); setClientName(""); setClientPhone(""); }}>
             Reservar otro turno
           </button>
@@ -121,11 +130,16 @@ export default function ReservarView({ services, appointments, availability, bus
           <Calendar size={14} color="#8A8275" />
           <span>{businessInfo?.address} <span style={{ color: "#8A8275" }}>· {businessInfo?.addressDetail}</span></span>
         </div>
-        {businessInfo?.whatsapp ? (
-          <a href={"https://wa.me/549" + businessInfo.whatsapp.replace(/[^0-9]/g, "")} target="_blank" rel="noopener noreferrer" style={styles.businessWaBtn}>
+        {businessInfo?.whatsapp && (
+          <a
+            href={`https://wa.me/549${businessInfo.whatsapp.replace(/[^\d]/g, "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={styles.businessWaBtn}
+          >
             <MessageCircle size={14} /> Escribime por WhatsApp ante cualquier duda
           </a>
-        ) : null}
+        )}
       </div>
 
       <label style={styles.fieldLabel}>Tipo de masaje</label>
@@ -141,7 +155,7 @@ export default function ReservarView({ services, appointments, availability, bus
           >
             <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
             <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
-              {s.duration} min{s.price ? " · " + formatPrice(s.price) : ""}
+              {s.duration} min{s.price ? ` · ${formatPrice(s.price)}` : ""}
             </span>
           </button>
         ))}
@@ -151,23 +165,57 @@ export default function ReservarView({ services, appointments, availability, bus
         <p style={styles.emptyMsg}>Por ahora no hay turnos abiertos. Escribime directamente y vemos un horario.</p>
       ) : (
         <>
-          <label style={styles.fieldLabel}>Elegí el día</label>
-          <div style={styles.dateScroller}>
-            {availableDates.map(dKey => {
-              const d = new Date(dKey + "T00:00:00");
-              const active = dKey === selectedDate;
-              return (
-                <button
-                  key={dKey}
-                  onClick={() => setSelectedDate(dKey)}
-                  style={{ ...styles.dateChip, ...(active ? styles.dateChipActive : {}) }}
-                >
-                  <span style={styles.dateChipDay}>{DAY_NAMES[d.getDay()]}</span>
-                  <span style={styles.dateChipNum}>{d.getDate()}</span>
-                </button>
-              );
-            })}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14, marginBottom: 6 }}>
+            <label style={{ ...styles.fieldLabel, margin: 0 }}>Elegí el día</label>
+            <div style={styles.dateViewToggle}>
+              <button
+                type="button"
+                style={{ ...styles.dateViewToggleBtn, ...(dateViewMode === "list" ? styles.dateViewToggleBtnActive : {}) }}
+                onClick={() => setDateViewMode("list")}
+                title="Ver como lista"
+              >
+                <List size={14} />
+              </button>
+              <button
+                type="button"
+                style={{ ...styles.dateViewToggleBtn, ...(dateViewMode === "calendar" ? styles.dateViewToggleBtnActive : {}) }}
+                onClick={() => setDateViewMode("calendar")}
+                title="Ver como calendario"
+              >
+                <CalendarDays size={14} />
+              </button>
+            </div>
           </div>
+
+          {dateViewMode === "calendar" ? (
+            <MiniCalendar
+              selectedDateKey={selectedDate}
+              onSelectDate={(dKey) => setSelectedDate(dKey)}
+              markedDateKeys={availableDatesSet}
+              isDaySelectable={(dKey) => availableDatesSet.has(dKey)}
+            />
+          ) : (
+            <div style={styles.dateScroller}>
+              {availableDates.map(dKey => {
+                const d = new Date(dKey + "T00:00:00");
+                const active = dKey === selectedDate;
+                return (
+                  <button
+                    key={dKey}
+                    onClick={() => setSelectedDate(dKey)}
+                    style={{ ...styles.dateChip, ...(active ? styles.dateChipActive : {}) }}
+                  >
+                    <span style={{ ...styles.dateChipDay, ...(active ? styles.dateChipDayActive : {}) }}>{DAY_NAMES[d.getDay()]}</span>
+                    <span style={{ ...styles.dateChipNum, ...(active ? styles.dateChipNumActive : {}) }}>{d.getDate()}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {selectedDate && (
+            <p style={styles.selectedDateLabel}>{formatDateShort(selectedDate)}</p>
+          )}
 
           <label style={styles.fieldLabel}>Horarios disponibles</label>
           {slotsForSelectedDate.length === 0 ? (
@@ -192,7 +240,7 @@ export default function ReservarView({ services, appointments, availability, bus
           <input id="client-name-input" style={styles.input} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre y apellido" />
           <label style={styles.fieldLabel}>Teléfono (WhatsApp)</label>
           <input style={styles.input} value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder="11 1234 5678" />
-          <p style={{ marginTop: 4 }}>Tocá un horario arriba para confirmar tu turno al instante.</p>
+          <p style={{ ...styles.helperText, marginTop: 4 }}>Tocá un horario arriba para confirmar tu turno al instante.</p>
         </>
       )}
     </div>

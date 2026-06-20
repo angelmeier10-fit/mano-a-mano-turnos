@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
-  formatPrice, formatDateLong, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys,
+  formatPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
@@ -14,7 +14,7 @@ export function AgendaView({
   upsertClientByName,
 }) {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
-  const [calendarView, setCalendarView] = useState("week"); // "week" | "month"
+  const [calendarView, setCalendarView] = useState("week");
   const [monthDate, setMonthDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [showApptForm, setShowApptForm] = useState(false);
   const [editingAppt, setEditingAppt] = useState(null);
@@ -235,7 +235,7 @@ export function AgendaView({
               const dayAppts = apptsForDay(d);
               const dayAvail = (availabilityByDate[dKey] || []).slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
               const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
-              const openSlots = dayAvail.filter(s => !bookedSlotIds.has(s.id));
+              const openSlots = dayAvail.filter(s => !bookedSlotIds.has(s.id) && !s.booked);
 
               return (
                 <div key={i} style={{ ...styles.dayCol, ...(isToday ? styles.dayColToday : {}) }}>
@@ -346,18 +346,26 @@ export function AgendaView({
   );
 }
 
-// ---------- Modal: abrir cupos de un día ----------
 function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose, onAdd, onRemove, onCloseDay }) {
   const [start, setStart] = useState("10:00");
   const [end, setEnd] = useState("11:00");
+  const [overlapError, setOverlapError] = useState(null);
 
   function handleAdd(e) {
     e.preventDefault();
-    if (timeToMinutes(end) <= timeToMinutes(start)) return;
+    const newStart = timeToMinutes(start);
+    const newEnd = timeToMinutes(end);
+    if (newEnd <= newStart) return;
+    const overlap = existing.find(s => newStart < timeToMinutes(s.end) && timeToMinutes(s.start) < newEnd);
+    if (overlap) {
+      setOverlapError(`Se superpone con el cupo ${overlap.start}–${overlap.end}.`);
+      return;
+    }
+    setOverlapError(null);
     onAdd({ start, end });
     setStart(end);
-    const newEnd = minutesToTime(Math.min(timeToMinutes(end) + 60, 23*60+45));
-    setEnd(newEnd);
+    const next = minutesToTime(Math.min(newEnd + 60, 23*60+45));
+    setEnd(next);
   }
 
   const sorted = existing.slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
@@ -416,13 +424,16 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
           <div style={styles.fieldRow}>
             <div style={{ flex: 1 }}>
               <label style={styles.fieldLabel}>Desde</label>
-              <input type="time" style={styles.input} value={start} onChange={e => setStart(e.target.value)} required />
+              <input type="time" style={styles.input} value={start} onChange={e => { setStart(e.target.value); setOverlapError(null); }} required />
             </div>
             <div style={{ flex: 1 }}>
               <label style={styles.fieldLabel}>Hasta</label>
-              <input type="time" style={styles.input} value={end} onChange={e => setEnd(e.target.value)} required />
+              <input type="time" style={styles.input} value={end} onChange={e => { setEnd(e.target.value); setOverlapError(null); }} required />
             </div>
           </div>
+          {overlapError && (
+            <p style={{ fontSize: 12, color: "#A6483A", margin: "6px 0 0", fontWeight: 600 }}>{overlapError}</p>
+          )}
           <div style={styles.modalActions}>
             <div style={{ flex: 1 }} />
             <button type="button" style={styles.cancelBtn} onClick={onClose}>Listo</button>
@@ -434,10 +445,8 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
   );
 }
 
-
-// ---------- Modal: cargar disponibilidad recurrente (ej: "todos los lunes 10-14") ----------
 function RecurringAvailabilityModal({ onClose, onConfirm }) {
-  const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]); // lun-vie por defecto
+  const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
   const [start, setStart] = useState("10:00");
   const [end, setEnd] = useState("14:00");
   const [slotLength, setSlotLength] = useState(60);
@@ -552,7 +561,6 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
   );
 }
 
-
 function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, onDelete, onStatusChange, businessInfo }) {
   const base = initial || {
     dateKey: prefill?.dateKey || dateKey(new Date()),
@@ -659,7 +667,7 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
               style={{ ...styles.input, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
               onClick={() => setShowDateCalendar(v => !v)}
             >
-              <span>{formatDateLong(dateVal)}</span>
+              <span>{formatDateShort(dateVal)}</span>
               <CalendarPlus size={15} color="#8A8275" />
             </button>
           </div>

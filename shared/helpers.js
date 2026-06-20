@@ -3,9 +3,6 @@
 export const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 export const MONTH_NAMES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
-// Datos por defecto, solo se usan la primera vez (cuando Firestore está vacío)
-// y se cargan automáticamente desde la app de Agenda. Después, todo se edita
-// desde la pestaña "Servicios" y se guarda en Firestore.
 export const DEFAULT_SERVICES = [
   { id: "medio-torso", name: "Medio torso", duration: 40, color: "#B5654A", price: 20000 },
   { id: "medio-torso-ventosas", name: "Medio torso + ventosas", duration: 40, color: "#8B4226", price: 30000 },
@@ -39,6 +36,11 @@ export function formatPrice(n) { return (n || 0).toLocaleString("es-AR", { style
 export function formatDateLong(dKey) {
   return new Date(dKey + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
 }
+export function formatDateShort(dKey) {
+  const d = new Date(dKey + "T00:00:00");
+  const dayName = DAY_NAMES[d.getDay()];
+  return `${dayName} ${d.getDate()}/${d.getMonth() + 1}`;
+}
 export function isPastSlot(dKey, time) {
   const now = new Date();
   if (dKey > dateKey(now)) return false;
@@ -50,8 +52,6 @@ export function GoogleFontsHref() {
   return "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap";
 }
 
-// Dado un set de días de semana (0=domingo...6=sábado) y una cantidad de semanas,
-// devuelve los dateKey de cada ocurrencia, empezando desde hoy.
 export function getRecurringDateKeys(weekdays, weeksCount) {
   const result = [];
   const today = new Date();
@@ -67,9 +67,6 @@ export function getRecurringDateKeys(weekdays, weeksCount) {
 export function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 export function addMonths(d, n) { return new Date(d.getFullYear(), d.getMonth() + n, 1); }
 
-// Devuelve un array de arrays (semanas), cada una con 7 fechas (Date), cubriendo
-// el mes completo con días de relleno del mes anterior/siguiente para completar
-// semanas enteras. Útil para pintar una grilla de calendario mensual.
 export function getMonthGrid(d) {
   const first = startOfMonth(d);
   const gridStart = addDays(first, -first.getDay());

@@ -1,68 +1,11 @@
-import React, { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useMemo } from "react";
 import {
-  dateKey, addDays, addMonths, getMonthGrid,
-  DAY_NAMES, MONTH_NAMES, STATUS,
+  dateKey, getMonthGrid, DAY_NAMES,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
-// ---------- Mini-calendario reutilizable (selector visual de fecha) ----------
-// Usado tanto en el modal de turno (elegir fecha) como base de la vista mensual.
-export function MiniCalendar({ selectedDateKey, onSelectDate, markedDateKeys, highlightToday = true }) {
-  const initial = selectedDateKey ? new Date(selectedDateKey + "T00:00:00") : new Date();
-  const [viewMonth, setViewMonth] = useState(new Date(initial.getFullYear(), initial.getMonth(), 1));
+export { MiniCalendar } from "../../shared/MiniCalendar";
 
-  const weeks = useMemo(() => getMonthGrid(viewMonth), [viewMonth]);
-  const todayKey = dateKey(new Date());
-  const markedSet = markedDateKeys || new Set();
-
-  return (
-    <div style={styles.miniCalendar}>
-      <div style={styles.miniCalHeader}>
-        <button type="button" style={styles.miniCalNavBtn} onClick={() => setViewMonth(addMonths(viewMonth, -1))}>
-          <ChevronLeft size={16} />
-        </button>
-        <span style={styles.miniCalTitle}>{MONTH_NAMES[viewMonth.getMonth()]} {viewMonth.getFullYear()}</span>
-        <button type="button" style={styles.miniCalNavBtn} onClick={() => setViewMonth(addMonths(viewMonth, 1))}>
-          <ChevronRight size={16} />
-        </button>
-      </div>
-      <div style={styles.miniCalWeekDays}>
-        {DAY_NAMES.map(d => <span key={d} style={styles.miniCalWeekDay}>{d}</span>)}
-      </div>
-      {weeks.map((week, wi) => (
-        <div key={wi} style={styles.miniCalRow}>
-          {week.map((d, di) => {
-            const dKey = dateKey(d);
-            const inMonth = d.getMonth() === viewMonth.getMonth();
-            const isToday = highlightToday && dKey === todayKey;
-            const isSelected = dKey === selectedDateKey;
-            const hasMark = markedSet.has(dKey);
-            return (
-              <button
-                type="button"
-                key={di}
-                onClick={() => onSelectDate(dKey)}
-                style={{
-                  ...styles.miniCalDay,
-                  ...(inMonth ? {} : styles.miniCalDayOutMonth),
-                  ...(isToday ? styles.miniCalDayToday : {}),
-                  ...(isSelected ? styles.miniCalDaySelected : {}),
-                }}
-              >
-                {d.getDate()}
-                {hasMark && <span style={styles.miniCalDot} />}
-              </button>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ---------- Vista mensual de la Agenda ----------
-// Calendario de mes completo, de solo lectura: al tocar un día navega a esa semana.
 export function MonthView({ appointments, monthDate, onSelectDay }) {
   const weeks = useMemo(() => getMonthGrid(monthDate), [monthDate]);
   const todayKey = dateKey(new Date());

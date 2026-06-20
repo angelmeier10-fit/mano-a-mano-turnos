@@ -4,7 +4,7 @@ import {
   listenServices,
   listenAvailability,
   listenAppointments,
-  createAppointment,
+  bookSlotAtomic,
   createClientPublic,
   listenBusinessInfo,
 } from "../../shared/firestoreApi";
@@ -66,7 +66,7 @@ export default function App() {
           appointments={appointments}
           availability={availability}
           businessInfo={businessInfo}
-          onBookSlot={createAppointment}
+          onBookSlot={bookSlotAtomic}
           onUpsertClient={createClientPublic}
         />
       </main>

@@ -295,6 +295,14 @@ const styles = {
     background: "none", border: "none", fontSize: 13.5, cursor: "pointer", color: "#2A2622",
   },
 
+  dateViewToggle: { display: "flex", gap: 4, background: "#fff", border: "1px solid #DCD4C4", borderRadius: 8, padding: 2 },
+  dateViewToggleBtn: {
+    width: 28, height: 26, display: "flex", alignItems: "center", justifyContent: "center",
+    border: "none", background: "none", borderRadius: 6, cursor: "pointer", color: "#8A8275",
+  },
+  dateViewToggleBtnActive: { background: "#2A2622", color: "#EFE9DF" },
+  selectedDateLabel: { fontSize: 12.5, color: "#6E6555", margin: "6px 0 2px", fontWeight: 600 },
+
   dateScroller: { display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 },
   dateChip: {
     minWidth: 50, display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
@@ -303,7 +311,9 @@ const styles = {
   },
   dateChipActive: { background: "#2A2622", borderColor: "#2A2622" },
   dateChipDay: { fontSize: 10.5, color: "#8A8275", fontWeight: 600, textTransform: "uppercase" },
+  dateChipDayActive: { color: "#C9BFA8" },
   dateChipNum: { fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: "#2A2622" },
+  dateChipNumActive: { color: "#EFE9DF" },
 
   slotsGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 },
   slotBtn: {
@@ -403,7 +413,6 @@ const styles = {
     cursor: "pointer", fontFamily: "'Inter', sans-serif",
   },
 
-  // ---- Toggle Semana/Mes ----
   viewToggle: {
     display: "flex", background: "#fff", borderRadius: 10, border: "1px solid #DCD4C4",
     padding: 3, marginBottom: 14, gap: 2,
@@ -417,7 +426,6 @@ const styles = {
     background: "#2A2622", color: "#EFE9DF",
   },
 
-  // ---- Mini-calendario (selector de fecha reutilizable) ----
   miniCalendar: {
     background: "#fff", border: "1px solid #DCD4C4", borderRadius: 12, padding: "10px 12px",
   },
@@ -447,7 +455,6 @@ const styles = {
     position: "absolute", bottom: 3, width: 4, height: 4, borderRadius: "50%", background: "#6E7F5C",
   },
 
-  // ---- Vista mensual de la Agenda ----
   monthGrid: {
     background: "#fff", border: "1px solid #E3DBCB", borderRadius: 14, padding: "10px 8px", marginBottom: 14,
   },

@@ -18,6 +18,7 @@ import {
   setDoc,
   getDocs,
   writeBatch,
+  runTransaction,
 } from "firebase/firestore";
 import { firebaseConfig } from "./firebaseConfig";
 
@@ -81,6 +82,27 @@ export async function removeAvailabilitySlotsByIds(ids) {
 }
 
 // ---------- Turnos ----------
+
+// Reserva atómica: lee el cupo, verifica que no esté ocupado, lo marca booked:true
+// y crea el turno en una sola transacción. Previene que dos personas reserven el
+// mismo horario simultáneamente.
+export async function bookSlotAtomic(appt) {
+  const slotId = appt.fromAvailabilityId;
+  if (!slotId) {
+    return createAppointment(appt);
+  }
+  const slotRef = doc(db, "availability", slotId);
+  return runTransaction(db, async (transaction) => {
+    const slotSnap = await transaction.get(slotRef);
+    if (!slotSnap.exists() || slotSnap.data().booked) {
+      throw new Error("Este horario ya fue reservado. Por favor elegí otro.");
+    }
+    transaction.update(slotRef, { booked: true });
+    const apptRef = doc(collection(db, "appointments"));
+    transaction.set(apptRef, { ...appt, createdAt: Date.now() });
+  });
+}
+
 export function listenAppointments(callback) {
   return onSnapshot(collection(db, "appointments"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -103,40 +125,73 @@ export function listenClients(callback) {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
-// Uso desde la Agenda (vos, logueado): busca si el cliente ya existe y actualiza
+function normalizePhone(phone) {
+  return (phone || "").replace(/[^\d]/g, "");
+}
+
+// Uso desde la Agenda (vos, logueado): deduplica primero por teléfono (dígitos),
+// después por nombre. Guarda phoneDigits para que las búsquedas futuras funcionen.
 export async function upsertClientByName(name, phone) {
   const trimmedName = name.trim();
-  const q = query(collection(db, "clients"), where("name", "==", trimmedName));
-  const snap = await getDocs(q);
-  if (!snap.empty) {
-    const existing = snap.docs[0];
-    if (phone) await updateDoc(doc(db, "clients", existing.id), { phone });
+  const phoneDigits = normalizePhone(phone);
+
+  if (phoneDigits) {
+    const qPhone = query(collection(db, "clients"), where("phoneDigits", "==", phoneDigits));
+    const snapPhone = await getDocs(qPhone);
+    if (!snapPhone.empty) {
+      const existing = snapPhone.docs[0];
+      await updateDoc(doc(db, "clients", existing.id), { phone: phone || existing.data().phone });
+      return existing.id;
+    }
+  }
+
+  const qName = query(collection(db, "clients"), where("name", "==", trimmedName));
+  const snapName = await getDocs(qName);
+  if (!snapName.empty) {
+    const existing = snapName.docs[0];
+    const updates = {};
+    if (phone) updates.phone = phone;
+    if (phoneDigits) updates.phoneDigits = phoneDigits;
+    if (Object.keys(updates).length) await updateDoc(doc(db, "clients", existing.id), updates);
     return existing.id;
   }
+
   const ref = await addDoc(collection(db, "clients"), {
     name: trimmedName,
     phone: phone || "",
+    phoneDigits,
     notes: "",
     createdAt: Date.now(),
   });
   return ref.id;
 }
-// Uso desde la app pública de Reservas (sin login): no puede leer la lista de
-// clientes (por privacidad), así que solo crea un registro nuevo siempre.
-// Si la persona ya era cliente, vas a ver el nombre duplicado en tu lista de
-// Clientes — no rompe nada, simplemente no fusiona automáticamente. Podés
-// fusionarlos a mano más adelante si hace falta, o lo mejoramos después.
+
+// Uso desde la app pública de Reservas (sin login): intenta deduplicar por teléfono
+// antes de crear. El query puede fallar por reglas de Firestore; en ese caso crea
+// un registro nuevo (comportamiento anterior). La creación nunca tumba la reserva.
 export async function createClientPublic(name, phone) {
+  const phoneDigits = normalizePhone(phone);
+
+  if (phoneDigits) {
+    try {
+      const qPhone = query(collection(db, "clients"), where("phoneDigits", "==", phoneDigits));
+      const snapPhone = await getDocs(qPhone);
+      if (!snapPhone.empty) return snapPhone.docs[0].id;
+    } catch {
+      // Sin permisos de lectura — continúa a crear
+    }
+  }
+
   try {
     const ref = await addDoc(collection(db, "clients"), {
       name: name.trim(),
       phone: phone || "",
+      phoneDigits,
       notes: "",
       createdAt: Date.now(),
     });
     return ref.id;
   } catch (err) {
-    // Si por algún motivo esto falla, no debe tumbar la reserva: ya se creó el turno.
     console.error("No se pudo crear/actualizar la ficha del cliente:", err);
     return null;
   }
