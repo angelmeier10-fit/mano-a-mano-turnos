@@ -86,13 +86,20 @@ export function AgendaView({
   function setApptStatus(id, status) {
     onUpdateAppt(id, { status });
   }
-  function saveAppt(data) {
-    if (editingAppt) {
-      onUpdateAppt(editingAppt.id, data);
-    } else {
-      onCreateAppt({ status: "confirmado", ...data });
+  async function saveAppt(data) {
+    let clientId = null;
+    if (data.clientName) {
+      try {
+        clientId = await upsertClientByName(data.clientName, data.clientPhone);
+      } catch (err) {
+        console.error("No se pudo registrar la ficha de cliente:", err);
+      }
     }
-    if (data.clientName) upsertClientByName(data.clientName, data.clientPhone);
+    if (editingAppt) {
+      onUpdateAppt(editingAppt.id, { ...data, ...(clientId ? { clientId } : {}) });
+    } else {
+      onCreateAppt({ status: "confirmado", ...data, ...(clientId ? { clientId } : {}) });
+    }
     setShowApptForm(false);
   }
 

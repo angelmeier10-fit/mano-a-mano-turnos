@@ -56,6 +56,17 @@ export default function ReservarView({ services, availability, businessInfo, onB
   async function bookSlot(slot) {
     if (!clientName.trim() || !svc || booking) return;
     setBooking(true);
+
+    // Crear/recuperar el cliente primero para tener el clientId antes de guardar el turno
+    let clientId = null;
+    if (onUpsertClient) {
+      try {
+        clientId = await onUpsertClient(clientName, clientPhone);
+      } catch (err) {
+        console.error("No se pudo registrar la ficha de cliente:", err);
+      }
+    }
+
     const end = minutesToTime(timeToMinutes(slot.start) + svc.duration);
     const appt = {
       dateKey: selectedDate,
@@ -67,6 +78,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
       notes: "",
       status: "confirmado",
       fromAvailabilityId: slot.id,
+      ...(clientId ? { clientId } : {}),
     };
     try {
       await onBookSlot(appt);
@@ -75,13 +87,6 @@ export default function ReservarView({ services, availability, businessInfo, onB
       alert("Hubo un problema al reservar. Probá de nuevo, puede que alguien haya tomado ese horario.");
       setBooking(false);
       return;
-    }
-    if (onUpsertClient) {
-      try {
-        await onUpsertClient(clientName, clientPhone);
-      } catch (err) {
-        console.error("No se pudo registrar la ficha de cliente:", err);
-      }
     }
     setConfirmed(appt);
     setBooking(false);

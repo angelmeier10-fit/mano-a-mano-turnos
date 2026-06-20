@@ -7,13 +7,16 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
 
-  function clientHistory(clientName) {
+  function clientHistory(client) {
     return appointments
-      .filter(a => a.clientName.trim().toLowerCase() === clientName.trim().toLowerCase())
+      .filter(a =>
+        (a.clientId && a.clientId === client.id) ||
+        (!a.clientId && a.clientName.trim().toLowerCase() === client.name.trim().toLowerCase())
+      )
       .sort((a,b) => (b.dateKey+b.start).localeCompare(a.dateKey+a.start));
   }
-  function clientStats(clientName) {
-    const hist = clientHistory(clientName);
+  function clientStats(client) {
+    const hist = clientHistory(client);
     const completed = hist.filter(a => a.status === "completado");
     const totalSpent = completed.reduce((sum, a) => {
       const svc = services.find(s => s.id === a.serviceId);
@@ -36,8 +39,8 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
   }
 
   if (selected) {
-    const history = clientHistory(selected.name);
-    const stats = clientStats(selected.name);
+    const history = clientHistory(selected);
+    const stats = clientStats(selected);
     const waLink = selected.phone ? `https://wa.me/${selected.phone.replace(/[^\d]/g, "")}` : null;
     return (
       <div style={styles.viewWrap}>
