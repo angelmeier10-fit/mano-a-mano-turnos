@@ -365,17 +365,33 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
     const newStart = timeToMinutes(start);
     const newEnd = timeToMinutes(end);
     if (newEnd <= newStart) return;
-    const overlap = existing.find(s => newStart < timeToMinutes(s.end) && timeToMinutes(s.start) < newEnd);
-    if (overlap) {
-      setOverlapError(`Se superpone con el cupo ${overlap.start}–${overlap.end}.`);
-      return;
+
+    const slots = [];
+    let t = newStart;
+    while (t + 60 <= newEnd) {
+      slots.push({ start: minutesToTime(t), end: minutesToTime(t + 60) });
+      t += 60;
     }
+    if (slots.length === 0) return;
+
+    for (const slot of slots) {
+      const sStart = timeToMinutes(slot.start);
+      const sEnd = timeToMinutes(slot.end);
+      const overlap = existing.find(ex => sStart < timeToMinutes(ex.end) && timeToMinutes(ex.start) < sEnd);
+      if (overlap) {
+        setOverlapError(`El cupo ${slot.start}–${slot.end} se superpone con ${overlap.start}–${overlap.end}.`);
+        return;
+      }
+    }
+
     setOverlapError(null);
-    onAdd({ start, end });
+    slots.forEach(slot => onAdd(slot));
     setStart(end);
     const next = minutesToTime(Math.min(newEnd + 60, 23*60+45));
     setEnd(next);
   }
+
+  const slotCount = Math.floor((timeToMinutes(end) - timeToMinutes(start)) / 60);
 
   const sorted = existing.slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
   const removableIds = sorted.filter(s => !bookedSlotIds?.has(s.id)).map(s => s.id);
@@ -446,7 +462,9 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
           <div style={styles.modalActions}>
             <div style={{ flex: 1 }} />
             <button type="button" style={styles.cancelBtn} onClick={onClose}>Listo</button>
-            <button type="submit" style={styles.saveBtn}><Plus size={16} /> Agregar bloque</button>
+            <button type="submit" style={styles.saveBtn}>
+              <Plus size={16} /> {slotCount > 1 ? `Agregar ${slotCount} cupos` : "Agregar cupo"}
+            </button>
           </div>
         </form>
       </div>
