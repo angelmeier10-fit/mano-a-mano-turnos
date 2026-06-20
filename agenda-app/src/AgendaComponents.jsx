@@ -35,11 +35,11 @@ export function AgendaView({
     .filter(a => a.dateKey === tomorrowKey && (a.status === "confirmado"))
     .sort((a,b) => timeToMinutes(a.start) - timeToMinutes(b.start)), [appointments, tomorrowKey]);
 
-  function reminderWhatsappLink(appt) {
+  function reminderWhatsappLink(appt, when) {
     if (!appt.clientPhone) return null;
     const svc = services.find(s => s.id === appt.serviceId);
     const cleanPhone = appt.clientPhone.replace(/[^\d]/g, "");
-    const msg = `Hola ${appt.clientName}! Te recuerdo tu turno de ${svc?.name || "masaje"} mañana a las ${appt.start} hs en ${businessInfo?.address || ""}. ¡Te espero!`;
+    const msg = `Hola ${appt.clientName}! Te recuerdo tu turno de ${svc?.name || "masaje"} ${when} a las ${appt.start} hs en ${businessInfo?.address || ""}. ¡Te espero!`;
     return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
   }
 
@@ -104,13 +104,23 @@ export function AgendaView({
             <span style={styles.todayCardCount}>{todayAppts.length} turno{todayAppts.length !== 1 ? "s" : ""}</span>
           </div>
           <div style={styles.todayList}>
-            {todayAppts.map(a => (
-              <button key={a.id} style={styles.todayRow} onClick={() => openEditAppt(a)}>
-                <span style={styles.todayTime}>{a.start}</span>
-                <span style={styles.todayName}>{a.clientName}</span>
-                <span style={{ ...styles.statusDot, background: STATUS[a.status]?.color }} />
-              </button>
-            ))}
+            {todayAppts.map(a => {
+              const waLink = reminderWhatsappLink(a, "hoy");
+              return (
+                <div key={a.id} style={styles.todayRow}>
+                  <button style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }} onClick={() => openEditAppt(a)}>
+                    <span style={styles.todayTime}>{a.start}</span>
+                    <span style={styles.todayName}>{a.clientName}</span>
+                    <span style={{ ...styles.statusDot, background: STATUS[a.status]?.color }} />
+                  </button>
+                  {waLink && a.status !== "completado" && a.status !== "cancelado" && (
+                    <a href={waLink} target="_blank" rel="noopener noreferrer" style={styles.reminderWaBtn} onClick={e => e.stopPropagation()}>
+                      <MessageCircle size={13} /> Recordar
+                    </a>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -123,7 +133,7 @@ export function AgendaView({
           </div>
           <div style={styles.todayList}>
             {tomorrowAppts.map(a => {
-              const waLink = reminderWhatsappLink(a);
+              const waLink = reminderWhatsappLink(a, "mañana");
               return (
                 <div key={a.id} style={styles.reminderRow}>
                   <span style={styles.reminderTime}>{a.start}</span>
@@ -398,7 +408,6 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
     setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort());
   }
 
-  // genera bloques de slotLength minutos entre start y end
   function buildDaySlots() {
     const slots = [];
     let t = timeToMinutes(start);
@@ -650,4 +659,3 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
     </div>
   );
 }
-
