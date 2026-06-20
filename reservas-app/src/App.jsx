@@ -5,7 +5,7 @@ import {
   listenAvailability,
   listenAppointments,
   createAppointment,
-  upsertClientByName,
+  createClientPublic,
   listenBusinessInfo,
 } from "../../shared/firestoreApi";
 import { DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
@@ -67,7 +67,7 @@ export default function App() {
           availability={availability}
           businessInfo={businessInfo}
           onBookSlot={createAppointment}
-          onUpsertClient={upsertClientByName}
+          onUpsertClient={createClientPublic}
         />
       </main>
     </div>

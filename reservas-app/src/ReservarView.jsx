@@ -74,8 +74,6 @@ export default function ReservarView({ services, appointments, availability, bus
       setBooking(false);
       return;
     }
-    // El turno ya quedó confirmado en este punto. Si falla guardar/actualizar
-    // la ficha del cliente, no afecta la reserva — solo lo registramos.
     if (onUpsertClient) {
       try {
         await onUpsertClient(clientName, clientPhone);
@@ -87,7 +85,6 @@ export default function ReservarView({ services, appointments, availability, bus
     setBooking(false);
   }
 
-
   if (confirmed) {
     const cSvc = services.find(s => s.id === confirmed.serviceId);
     return (
@@ -98,17 +95,12 @@ export default function ReservarView({ services, appointments, availability, bus
           <p style={styles.confirmDetail}>{cSvc?.name} · {confirmed.start} a {confirmed.end}</p>
           {cSvc?.price && <p style={styles.confirmPrice}>{formatPrice(cSvc.price)}</p>}
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
-          <p style={{ ...styles.confirmDetail, marginTop: 10 }}>{businessInfo?.address}</p>
-          {businessInfo?.whatsapp && (
-            
-              href={`https://wa.me/549${businessInfo.whatsapp.replace(/[^\d]/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ ...styles.businessWaBtn, marginTop: 14 }}
-            >
+          <p style={{ marginTop: 10 }}>{businessInfo?.address}</p>
+          {businessInfo?.whatsapp ? (
+            <a href={"https://wa.me/549" + businessInfo.whatsapp.replace(/[^0-9]/g, "")} target="_blank" rel="noopener noreferrer" style={{ ...styles.businessWaBtn, marginTop: 14 }}>
               <MessageCircle size={14} /> Cualquier duda, escribime por WhatsApp
             </a>
-          )}
+          ) : null}
           <button style={{ ...styles.saveBtn, marginTop: 16 }} onClick={() => { setConfirmed(null); setClientName(""); setClientPhone(""); }}>
             Reservar otro turno
           </button>
@@ -129,16 +121,11 @@ export default function ReservarView({ services, appointments, availability, bus
           <Calendar size={14} color="#8A8275" />
           <span>{businessInfo?.address} <span style={{ color: "#8A8275" }}>· {businessInfo?.addressDetail}</span></span>
         </div>
-        {businessInfo?.whatsapp && (
-          
-            href={`https://wa.me/549${businessInfo.whatsapp.replace(/[^\d]/g, "")}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={styles.businessWaBtn}
-          >
+        {businessInfo?.whatsapp ? (
+          <a href={"https://wa.me/549" + businessInfo.whatsapp.replace(/[^0-9]/g, "")} target="_blank" rel="noopener noreferrer" style={styles.businessWaBtn}>
             <MessageCircle size={14} /> Escribime por WhatsApp ante cualquier duda
           </a>
-        )}
+        ) : null}
       </div>
 
       <label style={styles.fieldLabel}>Tipo de masaje</label>
@@ -154,7 +141,7 @@ export default function ReservarView({ services, appointments, availability, bus
           >
             <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
             <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
-              {s.duration} min{s.price ? ` · ${formatPrice(s.price)}` : ""}
+              {s.duration} min{s.price ? " · " + formatPrice(s.price) : ""}
             </span>
           </button>
         ))}
@@ -205,7 +192,7 @@ export default function ReservarView({ services, appointments, availability, bus
           <input id="client-name-input" style={styles.input} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre y apellido" />
           <label style={styles.fieldLabel}>Teléfono (WhatsApp)</label>
           <input style={styles.input} value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder="11 1234 5678" />
-          <p style={{ ...styles.helperText, marginTop: 4 }}>Tocá un horario arriba para confirmar tu turno al instante.</p>
+          <p style={{ marginTop: 4 }}>Tocá un horario arriba para confirmar tu turno al instante.</p>
         </>
       )}
     </div>
