@@ -55,6 +55,20 @@ export async function addAvailabilitySlot(slot) {
 export async function removeAvailabilitySlot(id) {
   return deleteDoc(doc(db, "availability", id));
 }
+export async function freeAvailabilitySlot(id) {
+  return updateDoc(doc(db, "availability", id), { booked: false });
+}
+// Marca como cancelado el registro en phoneIndex/bookings del cliente (best-effort).
+// Se usa cuando el profesional cancela un turno desde la Agenda.
+export async function markBookingRefCancelled(clientPhone, apptId) {
+  const phoneDigits = normalizePhone(clientPhone);
+  if (!phoneDigits || !apptId) return;
+  try {
+    await updateDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "cancelado" });
+  } catch {
+    // Si el cliente no tiene registro en phoneIndex/bookings, se ignora silenciosamente.
+  }
+}
 // Crea muchos cupos de una sola vez (ej: "todos los lunes de 10 a 14, por 8 semanas")
 // Firestore permite hasta 500 escrituras por batch; si hay más, las dividimos.
 export async function addAvailabilitySlotsBatch(slots) {

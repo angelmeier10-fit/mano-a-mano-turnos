@@ -10,7 +10,7 @@ import {
   listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
   listenAppointments, createAppointment, updateAppointment, deleteAppointment,
   listenClients, upsertClientByName, updateClient, deleteClient,
-  listenBusinessInfo, setBusinessInfo,
+  listenBusinessInfo, setBusinessInfo, freeAvailabilitySlot,
 } from "../../shared/firestoreApi";
 import { DEFAULT_SERVICES, DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
 import styles from "../../shared/styles";
@@ -109,6 +109,7 @@ export default function App() {
             onRemoveSlot={removeAvailabilitySlot}
             onCloseDay={removeAvailabilitySlotsByIds}
             onAddSlotsBatch={addAvailabilitySlotsBatch}
+            onFreeSlot={freeAvailabilitySlot}
             upsertClientByName={upsertClientByName}
           />
         )}

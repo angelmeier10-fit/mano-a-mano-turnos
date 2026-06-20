@@ -7,11 +7,12 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
+import { markBookingRefCancelled } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo,
   onCreateAppt, onUpdateAppt, onDeleteAppt,
-  onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch,
+  onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch, onFreeSlot,
   upsertClientByName,
 }) {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
@@ -85,8 +86,16 @@ export function AgendaView({
   function deleteAppt(id) {
     onDeleteAppt(id);
   }
-  function setApptStatus(id, status) {
-    onUpdateAppt(id, { status });
+  async function setApptStatus(id, status, fromAvailabilityId, clientPhone) {
+    await onUpdateAppt(id, { status });
+    if (status === "cancelado") {
+      if (fromAvailabilityId && onFreeSlot) {
+        try { await onFreeSlot(fromAvailabilityId); } catch (e) {
+          console.error("No se pudo liberar el cupo:", e);
+        }
+      }
+      markBookingRefCancelled(clientPhone, id).catch(() => {});
+    }
   }
   async function saveAppt(data) {
     let clientId = null;
@@ -324,7 +333,7 @@ export function AgendaView({
           onClose={() => setShowApptForm(false)}
           onSave={saveAppt}
           onDelete={editingAppt ? () => { deleteAppt(editingAppt.id); setShowApptForm(false); } : null}
-          onStatusChange={editingAppt ? (status) => { setApptStatus(editingAppt.id, status); setShowApptForm(false); } : null}
+          onStatusChange={editingAppt ? (status) => { setApptStatus(editingAppt.id, status, editingAppt.fromAvailabilityId, editingAppt.clientPhone); setShowApptForm(false); } : null}
         />
       )}
 
