@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Calendar, Clock, Check, MessageCircle, CalendarDays, List } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
-  formatPrice, formatDateLong, formatDateShort, DAY_NAMES,
+  formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
 } from "../../shared/helpers";
 import { MiniCalendar } from "../../shared/MiniCalendar";
 import styles from "../../shared/styles";
@@ -105,7 +105,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
           <p style={{ ...styles.confirmDetail, marginTop: 10 }}>{businessInfo?.address}</p>
           {businessInfo?.whatsapp && (
             <a
-              href={`https://wa.me/549${businessInfo.whatsapp.replace(/[^\d]/g, "")}`}
+              href={`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ ...styles.businessWaBtn, marginTop: 14 }}
@@ -135,7 +135,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
         </div>
         {businessInfo?.whatsapp && (
           <a
-            href={`https://wa.me/549${businessInfo.whatsapp.replace(/[^\d]/g, "")}`}
+            href={`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}`}
             target="_blank"
             rel="noopener noreferrer"
             style={styles.businessWaBtn}

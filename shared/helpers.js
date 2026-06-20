@@ -41,6 +41,22 @@ export function formatDateShort(dKey) {
   const dayName = DAY_NAMES[d.getDay()];
   return `${dayName} ${d.getDate()}/${d.getMonth() + 1}`;
 }
+export function formatPhoneForWhatsapp(phone) {
+  if (!phone) return null;
+  let d = phone.replace(/[^\d]/g, "");
+  if (!d) return null;
+  if (d.startsWith("549") && d.length === 13) return d;
+  if (d.startsWith("54") && d.length === 12) return "549" + d.slice(2);
+  if (d.startsWith("0")) d = d.slice(1);
+  if (d.length === 12) {
+    if (d.slice(2, 4) === "15")      d = d.slice(0, 2) + d.slice(4);
+    else if (d.slice(3, 5) === "15") d = d.slice(0, 3) + d.slice(5);
+    else if (d.slice(4, 6) === "15") d = d.slice(0, 4) + d.slice(6);
+  }
+  if (d.length < 10) return null;
+  return "549" + d;
+}
+
 export function isPastSlot(dKey, time) {
   const now = new Date();
   if (dKey > dateKey(now)) return false;

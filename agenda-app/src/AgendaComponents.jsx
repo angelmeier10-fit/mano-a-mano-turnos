@@ -3,6 +3,7 @@ import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, Mes
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys,
+  formatPhoneForWhatsapp,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
@@ -40,10 +41,11 @@ export function AgendaView({
 
   function reminderWhatsappLink(appt, when) {
     if (!appt.clientPhone) return null;
+    const waPhone = formatPhoneForWhatsapp(appt.clientPhone);
+    if (!waPhone) return null;
     const svc = services.find(s => s.id === appt.serviceId);
-    const cleanPhone = appt.clientPhone.replace(/[^\d]/g, "");
     const msg = `Hola ${appt.clientName}! Te recuerdo tu turno de ${svc?.name || "masaje"} ${when} a las ${appt.start} hs en ${businessInfo?.address || ""}. ¡Te espero!`;
-    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    return `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
   }
 
   const monthStats = useMemo(() => {
@@ -604,10 +606,10 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
   }
 
   function whatsappLink() {
-    if (!clientPhone) return null;
-    const cleanPhone = clientPhone.replace(/[^\d]/g, "");
+    const waPhone = formatPhoneForWhatsapp(clientPhone);
+    if (!waPhone) return null;
     const msg = `Hola ${clientName}! Te confirmo tu turno de ${svc?.name} el ${formatDateLong(dateVal)} a las ${start} hs en ${businessInfo?.address || ""}. ¡Te espero!`;
-    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`;
+    return `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
   }
   const waLink = whatsappLink();
 

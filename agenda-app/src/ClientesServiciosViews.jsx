@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check } from "lucide-react";
-import { formatPrice, STATUS } from "../../shared/helpers";
+import { formatPrice, STATUS, formatPhoneForWhatsapp } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
 export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointments, services }) {
@@ -41,7 +41,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
   if (selected) {
     const history = clientHistory(selected);
     const stats = clientStats(selected);
-    const waLink = selected.phone ? `https://wa.me/${selected.phone.replace(/[^\d]/g, "")}` : null;
+    const waLink = formatPhoneForWhatsapp(selected.phone) ? `https://wa.me/${formatPhoneForWhatsapp(selected.phone)}` : null;
     return (
       <div style={styles.viewWrap}>
         <button style={styles.backBtn} onClick={() => setSelected(null)}>
