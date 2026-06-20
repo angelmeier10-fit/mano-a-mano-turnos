@@ -112,6 +112,7 @@ export default function MiTurnoView({
   }
 
   function startCancel(booking) {
+    if (!isMoreThan24hAway(booking.dateKey, booking.start)) return;
     setSelected(booking);
     setWorkError(null);
     setStep("cancel");
@@ -119,6 +120,10 @@ export default function MiTurnoView({
 
   async function confirmCancel() {
     if (!selected || working) return;
+    if (!isMoreThan24hAway(selected.dateKey, selected.start)) {
+      setWorkError("Ya no es posible cancelar: faltan menos de 24 hs para el turno. Escribime por WhatsApp.");
+      return;
+    }
     const token = localTokens[selected.id]?.cancelToken;
     if (!token) return;
     setWorking(true);
@@ -136,6 +141,7 @@ export default function MiTurnoView({
   }
 
   function startReschedule(booking) {
+    if (!isMoreThan24hAway(booking.dateKey, booking.start)) return;
     setSelected(booking);
     setWorkError(null);
     setReschedServiceId(booking.serviceId || services[0]?.id || "");
@@ -146,6 +152,10 @@ export default function MiTurnoView({
 
   async function confirmReschedule() {
     if (!selected || !reschedSlot || !reschedSvc || working) return;
+    if (!isMoreThan24hAway(selected.dateKey, selected.start)) {
+      setWorkError("Ya no es posible reprogramar: faltan menos de 24 hs para el turno. Escribime por WhatsApp.");
+      return;
+    }
     const token = localTokens[selected.id]?.cancelToken;
     if (!token) return;
     setWorking(true);
