@@ -5,6 +5,7 @@ import {
   formatPrice, formatDateLong, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
+import { MonthView, MiniCalendar } from "./CalendarViews";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo,
@@ -13,6 +14,8 @@ export function AgendaView({
   upsertClientByName,
 }) {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
+  const [calendarView, setCalendarView] = useState("week"); // "week" | "month"
+  const [monthDate, setMonthDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [showApptForm, setShowApptForm] = useState(false);
   const [editingAppt, setEditingAppt] = useState(null);
   const [prefillSlot, setPrefillSlot] = useState(null);
@@ -172,93 +175,135 @@ export function AgendaView({
         <CalendarPlus size={15} /> Cargar horario semanal recurrente
       </button>
 
-      <div style={styles.weekNav}>
-        <button style={styles.navBtn} onClick={() => setWeekStart(addDays(weekStart, -7))}>
-          <ChevronLeft size={18} />
+      <div style={styles.viewToggle}>
+        <button
+          style={{ ...styles.viewToggleBtn, ...(calendarView === "week" ? styles.viewToggleBtnActive : {}) }}
+          onClick={() => setCalendarView("week")}
+        >
+          Semana
         </button>
-        <div style={{ textAlign: "center" }}>
-          <div style={styles.weekLabel}>{weekLabel}</div>
-          <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>Hoy</button>
-        </div>
-        <button style={styles.navBtn} onClick={() => setWeekStart(addDays(weekStart, 7))}>
-          <ChevronRight size={18} />
+        <button
+          style={{ ...styles.viewToggleBtn, ...(calendarView === "month" ? styles.viewToggleBtnActive : {}) }}
+          onClick={() => setCalendarView("month")}
+        >
+          Mes
         </button>
       </div>
 
-      <div style={styles.weekGrid}>
-        {days.map((d, i) => {
-          const isToday = dateKey(d) === todayKey;
-          const dKey = dateKey(d);
-          const dayAppts = apptsForDay(d);
-          const dayAvail = (availabilityByDate[dKey] || []).slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
-          const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
-          const openSlots = dayAvail.filter(s => !bookedSlotIds.has(s.id));
-
-          return (
-            <div key={i} style={{ ...styles.dayCol, ...(isToday ? styles.dayColToday : {}) }}>
-              <div style={styles.dayHeader}>
-                <span style={styles.dayName}>{DAY_NAMES[d.getDay()]}</span>
-                <span style={{ ...styles.dayNum, ...(isToday ? styles.dayNumToday : {}) }}>{d.getDate()}</span>
-                <button style={styles.availAddBtn} onClick={() => setShowAvailForm(dKey)} title="Abrir cupos">
-                  <CalendarPlus size={14} />
-                </button>
-              </div>
-              <div style={styles.dayBody}>
-                {dayAppts.length === 0 && openSlots.length === 0 && (
-                  <button style={styles.emptySlot} onClick={() => openNewAppt(d)}>
-                    <Plus size={14} />
-                  </button>
-                )}
-                {dayAppts.map(a => {
-                  const svc = services.find(s => s.id === a.serviceId) || {};
-                  const maxDur = Math.max(...services.map(s => s.duration), 60);
-                  const thickness = 3 + Math.round((svc.duration / maxDur) * 7);
-                  return (
-                    <button
-                      key={a.id}
-                      onClick={() => openEditAppt(a)}
-                      style={{
-                        ...styles.apptCard,
-                        borderLeftWidth: thickness,
-                        borderLeftColor: svc.color || "#B5654A",
-                      }}
-                    >
-                      <div style={styles.apptTopRow}>
-                        <span style={styles.apptTime}>{a.start}–{a.end}</span>
-                        <span style={{ ...styles.statusDot, background: STATUS[a.status]?.color }} />
-                      </div>
-                      <div style={styles.apptClient}>{a.clientName}</div>
-                      <div style={styles.apptService}>{svc.name}</div>
-                    </button>
-                  );
-                })}
-                {openSlots.map(slot => (
-                  <div key={slot.id} style={styles.openSlotCard}>
-                    <div style={styles.openSlotInfo}>
-                      <Clock size={12} color="#6E7F5C" />
-                      <span>{slot.start}–{slot.end}</span>
-                      <span style={styles.openSlotTag}>Cupo libre</span>
-                    </div>
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <button style={styles.slotMiniBtn} onClick={() => openNewAppt(d, slot.start, slot.id)} title="Cargar turno acá">
-                        <Plus size={12} />
-                      </button>
-                      <button style={styles.slotMiniBtnGhost} onClick={() => onRemoveSlot(slot.id)} title="Quitar cupo">
-                        <X size={12} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {(dayAppts.length > 0 || openSlots.length > 0) && (
-                  <button style={styles.addMoreBtn} onClick={() => openNewAppt(d)}>
-                    <Plus size={12} /> Agregar turno
-                  </button>
-                )}
-              </div>
+      {calendarView === "month" ? (
+        <>
+          <div style={styles.weekNav}>
+            <button style={styles.navBtn} onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1))}>
+              <ChevronLeft size={18} />
+            </button>
+            <div style={{ textAlign: "center" }}>
+              <div style={styles.weekLabel}>{MONTH_NAMES[monthDate.getMonth()]} {monthDate.getFullYear()}</div>
+              <button style={styles.todayBtn} onClick={() => setMonthDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Hoy</button>
             </div>
-          );
-        })}
-      </div>
+            <button style={styles.navBtn} onClick={() => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1))}>
+              <ChevronRight size={18} />
+            </button>
+          </div>
+          <MonthView
+            appointments={appointments}
+            monthDate={monthDate}
+            onSelectDay={(d) => {
+              setWeekStart(startOfWeek(d));
+              setCalendarView("week");
+            }}
+          />
+        </>
+      ) : (
+        <>
+          <div style={styles.weekNav}>
+            <button style={styles.navBtn} onClick={() => setWeekStart(addDays(weekStart, -7))}>
+              <ChevronLeft size={18} />
+            </button>
+            <div style={{ textAlign: "center" }}>
+              <div style={styles.weekLabel}>{weekLabel}</div>
+              <button style={styles.todayBtn} onClick={() => setWeekStart(startOfWeek(new Date()))}>Hoy</button>
+            </div>
+            <button style={styles.navBtn} onClick={() => setWeekStart(addDays(weekStart, 7))}>
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          <div style={styles.weekGrid}>
+            {days.map((d, i) => {
+              const isToday = dateKey(d) === todayKey;
+              const dKey = dateKey(d);
+              const dayAppts = apptsForDay(d);
+              const dayAvail = (availabilityByDate[dKey] || []).slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
+              const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
+              const openSlots = dayAvail.filter(s => !bookedSlotIds.has(s.id));
+
+              return (
+                <div key={i} style={{ ...styles.dayCol, ...(isToday ? styles.dayColToday : {}) }}>
+                  <div style={styles.dayHeader}>
+                    <span style={styles.dayName}>{DAY_NAMES[d.getDay()]}</span>
+                    <span style={{ ...styles.dayNum, ...(isToday ? styles.dayNumToday : {}) }}>{d.getDate()}</span>
+                    <button style={styles.availAddBtn} onClick={() => setShowAvailForm(dKey)} title="Abrir cupos">
+                      <CalendarPlus size={14} />
+                    </button>
+                  </div>
+                  <div style={styles.dayBody}>
+                    {dayAppts.length === 0 && openSlots.length === 0 && (
+                      <button style={styles.emptySlot} onClick={() => openNewAppt(d)}>
+                        <Plus size={14} />
+                      </button>
+                    )}
+                    {dayAppts.map(a => {
+                      const svc = services.find(s => s.id === a.serviceId) || {};
+                      const maxDur = Math.max(...services.map(s => s.duration), 60);
+                      const thickness = 3 + Math.round((svc.duration / maxDur) * 7);
+                      return (
+                        <button
+                          key={a.id}
+                          onClick={() => openEditAppt(a)}
+                          style={{
+                            ...styles.apptCard,
+                            borderLeftWidth: thickness,
+                            borderLeftColor: svc.color || "#B5654A",
+                          }}
+                        >
+                          <div style={styles.apptTopRow}>
+                            <span style={styles.apptTime}>{a.start}–{a.end}</span>
+                            <span style={{ ...styles.statusDot, background: STATUS[a.status]?.color }} />
+                          </div>
+                          <div style={styles.apptClient}>{a.clientName}</div>
+                          <div style={styles.apptService}>{svc.name}</div>
+                        </button>
+                      );
+                    })}
+                    {openSlots.map(slot => (
+                      <div key={slot.id} style={styles.openSlotCard}>
+                        <div style={styles.openSlotInfo}>
+                          <Clock size={12} color="#6E7F5C" />
+                          <span>{slot.start}–{slot.end}</span>
+                          <span style={styles.openSlotTag}>Cupo libre</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 4 }}>
+                          <button style={styles.slotMiniBtn} onClick={() => openNewAppt(d, slot.start, slot.id)} title="Cargar turno acá">
+                            <Plus size={12} />
+                          </button>
+                          <button style={styles.slotMiniBtnGhost} onClick={() => onRemoveSlot(slot.id)} title="Quitar cupo">
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {(dayAppts.length > 0 || openSlots.length > 0) && (
+                      <button style={styles.addMoreBtn} onClick={() => openNewAppt(d)}>
+                        <Plus size={12} /> Agregar turno
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {showApptForm && (
         <ApptFormModal
@@ -524,6 +569,7 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
   const [clientPhone, setClientPhone] = useState(base.clientPhone || "");
   const [notes, setNotes] = useState(base.notes || "");
   const [showClientList, setShowClientList] = useState(false);
+  const [showDateCalendar, setShowDateCalendar] = useState(false);
   const fromAvailabilityId = initial?.fromAvailabilityId || prefill?.fromAvailabilityId || null;
 
   const svc = services.find(s => s.id === serviceId);
@@ -608,13 +654,28 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
         <div style={styles.fieldRow}>
           <div style={{ flex: 1 }}>
             <label style={styles.fieldLabel}>Fecha</label>
-            <input type="date" style={styles.input} value={dateVal} onChange={e => setDateVal(e.target.value)} required />
+            <button
+              type="button"
+              style={{ ...styles.input, textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}
+              onClick={() => setShowDateCalendar(v => !v)}
+            >
+              <span>{formatDateLong(dateVal)}</span>
+              <CalendarPlus size={15} color="#8A8275" />
+            </button>
           </div>
           <div style={{ flex: 1 }}>
             <label style={styles.fieldLabel}>Hora</label>
             <input type="time" style={styles.input} value={start} onChange={e => setStart(e.target.value)} required />
           </div>
         </div>
+        {showDateCalendar && (
+          <div style={{ marginTop: 8, marginBottom: 4 }}>
+            <MiniCalendar
+              selectedDateKey={dateVal}
+              onSelectDate={(dKey) => { setDateVal(dKey); setShowDateCalendar(false); }}
+            />
+          </div>
+        )}
 
         <label style={styles.fieldLabel}>Servicio</label>
         <div style={styles.serviceChips}>

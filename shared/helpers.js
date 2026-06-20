@@ -63,3 +63,26 @@ export function getRecurringDateKeys(weekdays, weeksCount) {
   }
   return result;
 }
+
+export function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+export function addMonths(d, n) { return new Date(d.getFullYear(), d.getMonth() + n, 1); }
+
+// Devuelve un array de arrays (semanas), cada una con 7 fechas (Date), cubriendo
+// el mes completo con días de relleno del mes anterior/siguiente para completar
+// semanas enteras. Útil para pintar una grilla de calendario mensual.
+export function getMonthGrid(d) {
+  const first = startOfMonth(d);
+  const gridStart = addDays(first, -first.getDay());
+  const weeks = [];
+  let cursor = gridStart;
+  for (let w = 0; w < 6; w++) {
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
+    weeks.push(week);
+    if (week[6].getMonth() !== d.getMonth() && week[6] > first) break;
+  }
+  return weeks;
+}

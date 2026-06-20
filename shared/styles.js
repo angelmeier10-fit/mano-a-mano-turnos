@@ -215,7 +215,8 @@ const styles = {
   },
   businessInfoRow: {
     display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#2A2622",
-  },businessWaBtn: {
+  },
+  businessWaBtn: {
     display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
     marginTop: 4, padding: "9px", borderRadius: 9, background: "#3DA854",
     color: "#fff", fontWeight: 600, fontSize: 12.5, textDecoration: "none",
@@ -400,6 +401,73 @@ const styles = {
     width: "100%", padding: "12px", borderRadius: 12, border: "1.5px solid #DCD4C4",
     background: "#fff", color: "#2A2622", fontWeight: 600, fontSize: 13.5,
     cursor: "pointer", fontFamily: "'Inter', sans-serif",
+  },
+
+  // ---- Toggle Semana/Mes ----
+  viewToggle: {
+    display: "flex", background: "#fff", borderRadius: 10, border: "1px solid #DCD4C4",
+    padding: 3, marginBottom: 14, gap: 2,
+  },
+  viewToggleBtn: {
+    flex: 1, padding: "7px 0", borderRadius: 7, border: "none", background: "none",
+    fontSize: 12.5, fontWeight: 600, color: "#8A8275", cursor: "pointer",
+    fontFamily: "'Inter', sans-serif",
+  },
+  viewToggleBtnActive: {
+    background: "#2A2622", color: "#EFE9DF",
+  },
+
+  // ---- Mini-calendario (selector de fecha reutilizable) ----
+  miniCalendar: {
+    background: "#fff", border: "1px solid #DCD4C4", borderRadius: 12, padding: "10px 12px",
+  },
+  miniCalHeader: {
+    display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
+  },
+  miniCalNavBtn: {
+    width: 26, height: 26, borderRadius: 7, border: "1px solid #DCD4C4", background: "#fff",
+    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#2A2622",
+  },
+  miniCalTitle: { fontFamily: "'Fraunces', serif", fontSize: 14, fontWeight: 600, color: "#2A2622" },
+  miniCalWeekDays: { display: "flex", marginBottom: 4 },
+  miniCalWeekDay: {
+    flex: 1, textAlign: "center", fontSize: 10, fontWeight: 700, color: "#B0A78F",
+    textTransform: "uppercase",
+  },
+  miniCalRow: { display: "flex", gap: 2, marginBottom: 2 },
+  miniCalDay: {
+    flex: 1, aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center",
+    border: "none", background: "none", borderRadius: 7, fontSize: 12.5, color: "#2A2622",
+    cursor: "pointer", position: "relative", fontFamily: "'Inter', sans-serif",
+  },
+  miniCalDayOutMonth: { color: "#D4CCBA" },
+  miniCalDayToday: { fontWeight: 700, color: "#B5654A" },
+  miniCalDaySelected: { background: "#2A2622", color: "#EFE9DF", fontWeight: 700 },
+  miniCalDot: {
+    position: "absolute", bottom: 3, width: 4, height: 4, borderRadius: "50%", background: "#6E7F5C",
+  },
+
+  // ---- Vista mensual de la Agenda ----
+  monthGrid: {
+    background: "#fff", border: "1px solid #E3DBCB", borderRadius: 14, padding: "10px 8px", marginBottom: 14,
+  },
+  monthWeekDaysRow: { display: "flex", marginBottom: 6 },
+  monthWeekDayLabel: {
+    flex: 1, textAlign: "center", fontSize: 10.5, fontWeight: 700, color: "#8A8275",
+    textTransform: "uppercase",
+  },
+  monthWeekRow: { display: "flex", gap: 3, marginBottom: 3 },
+  monthDayCell: {
+    flex: 1, aspectRatio: "0.85", display: "flex", flexDirection: "column", alignItems: "center",
+    justifyContent: "center", gap: 2, border: "1px solid #F0EBE0", background: "#FAF7F1",
+    borderRadius: 9, cursor: "pointer", fontFamily: "'Inter', sans-serif",
+  },
+  monthDayCellOutMonth: { background: "none", border: "1px solid transparent" },
+  monthDayCellToday: { borderColor: "#B5654A", borderWidth: 1.5 },
+  monthDayNum: { fontSize: 12.5, fontWeight: 600, color: "#2A2622" },
+  monthDayBadge: {
+    fontSize: 9.5, fontWeight: 700, color: "#fff", background: "#6E7F5C",
+    borderRadius: 8, padding: "1px 5px", minWidth: 14, textAlign: "center",
   },
 };
 
