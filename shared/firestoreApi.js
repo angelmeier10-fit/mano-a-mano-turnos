@@ -103,6 +103,7 @@ export function listenClients(callback) {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
+// Uso desde la Agenda (vos, logueado): busca si el cliente ya existe y actualiza
 export async function upsertClientByName(name, phone) {
   const trimmedName = name.trim();
   const q = query(collection(db, "clients"), where("name", "==", trimmedName));
@@ -119,6 +120,26 @@ export async function upsertClientByName(name, phone) {
     createdAt: Date.now(),
   });
   return ref.id;
+}
+// Uso desde la app pública de Reservas (sin login): no puede leer la lista de
+// clientes (por privacidad), así que solo crea un registro nuevo siempre.
+// Si la persona ya era cliente, vas a ver el nombre duplicado en tu lista de
+// Clientes — no rompe nada, simplemente no fusiona automáticamente. Podés
+// fusionarlos a mano más adelante si hace falta, o lo mejoramos después.
+export async function createClientPublic(name, phone) {
+  try {
+    const ref = await addDoc(collection(db, "clients"), {
+      name: name.trim(),
+      phone: phone || "",
+      notes: "",
+      createdAt: Date.now(),
+    });
+    return ref.id;
+  } catch (err) {
+    // Si por algún motivo esto falla, no debe tumbar la reserva: ya se creó el turno.
+    console.error("No se pudo crear/actualizar la ficha del cliente:", err);
+    return null;
+  }
 }
 export async function updateClient(id, data) {
   return updateDoc(doc(db, "clients", id), data);

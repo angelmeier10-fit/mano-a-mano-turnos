@@ -35,8 +35,11 @@ service cloud.firestore {
     }
 
     match /clients/{clientId} {
-      // los datos de clientes son privados: solo vos los leés/editás
-      allow read, write: if isSignedIn();
+      // cualquiera puede crear su propia ficha al reservar (vía la app pública)
+      allow create: if request.resource.data.name is string
+                    && request.resource.data.name.size() > 0;
+      // los datos de clientes son privados: solo vos los leés, editás o borrás
+      allow read, update, delete: if isSignedIn();
     }
 
     match /businessInfo/{docId} {

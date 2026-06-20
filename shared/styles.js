@@ -215,6 +215,10 @@ const styles = {
   },
   businessInfoRow: {
     display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#2A2622",
+  },businessWaBtn: {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+    marginTop: 4, padding: "9px", borderRadius: 9, background: "#3DA854",
+    color: "#fff", fontWeight: 600, fontSize: 12.5, textDecoration: "none",
   },
 
   statusRow: { display: "flex", flexWrap: "wrap", gap: 6, margin: "12px 0 4px" },

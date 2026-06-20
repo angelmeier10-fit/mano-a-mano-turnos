@@ -14,10 +14,11 @@ export const DEFAULT_SERVICES = [
 ];
 
 export const DEFAULT_BUSINESS_INFO = {
-  name: "Mano a Mano",
+  name: "Angel Meier — Masoterapia",
   address: "Arata 1967, Don Torcuato",
   addressDetail: "Entre Brasil y Ecuador",
   hoursLabel: "Lunes a viernes de 10 a 20 hs",
+  whatsapp: "",
 };
 
 export const STATUS = {

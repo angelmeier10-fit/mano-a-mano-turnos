@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Calendar, Clock, Check } from "lucide-react";
+import { Calendar, Clock, Check, MessageCircle } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, DAY_NAMES,
@@ -68,14 +68,23 @@ export default function ReservarView({ services, appointments, availability, bus
     };
     try {
       await onBookSlot(appt);
-      if (onUpsertClient) await onUpsertClient(clientName, clientPhone);
-      setConfirmed(appt);
     } catch (err) {
       console.error(err);
       alert("Hubo un problema al reservar. Probá de nuevo, puede que alguien haya tomado ese horario.");
-    } finally {
       setBooking(false);
+      return;
     }
+    // El turno ya quedó confirmado en este punto. Si falla guardar/actualizar
+    // la ficha del cliente, no afecta la reserva — solo lo registramos.
+    if (onUpsertClient) {
+      try {
+        await onUpsertClient(clientName, clientPhone);
+      } catch (err) {
+        console.error("No se pudo registrar la ficha de cliente:", err);
+      }
+    }
+    setConfirmed(appt);
+    setBooking(false);
   }
 
 
@@ -90,7 +99,17 @@ export default function ReservarView({ services, appointments, availability, bus
           {cSvc?.price && <p style={styles.confirmPrice}>{formatPrice(cSvc.price)}</p>}
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
           <p style={{ ...styles.confirmDetail, marginTop: 10 }}>{businessInfo?.address}</p>
-          <button style={styles.saveBtn} onClick={() => { setConfirmed(null); setClientName(""); setClientPhone(""); }}>
+          {businessInfo?.whatsapp && (
+            
+              href={`https://wa.me/549${businessInfo.whatsapp.replace(/[^\d]/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ ...styles.businessWaBtn, marginTop: 14 }}
+            >
+              <MessageCircle size={14} /> Cualquier duda, escribime por WhatsApp
+            </a>
+          )}
+          <button style={{ ...styles.saveBtn, marginTop: 16 }} onClick={() => { setConfirmed(null); setClientName(""); setClientPhone(""); }}>
             Reservar otro turno
           </button>
         </div>
@@ -110,6 +129,16 @@ export default function ReservarView({ services, appointments, availability, bus
           <Calendar size={14} color="#8A8275" />
           <span>{businessInfo?.address} <span style={{ color: "#8A8275" }}>· {businessInfo?.addressDetail}</span></span>
         </div>
+        {businessInfo?.whatsapp && (
+          
+            href={`https://wa.me/549${businessInfo.whatsapp.replace(/[^\d]/g, "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={styles.businessWaBtn}
+          >
+            <MessageCircle size={14} /> Escribime por WhatsApp ante cualquier duda
+          </a>
+        )}
       </div>
 
       <label style={styles.fieldLabel}>Tipo de masaje</label>
