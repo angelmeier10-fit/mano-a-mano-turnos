@@ -9,6 +9,7 @@ import {
   collection,
   doc,
   addDoc,
+  getDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
@@ -130,7 +131,7 @@ function normalizePhone(phone) {
 }
 
 // Uso desde la Agenda (vos, logueado): deduplica primero por teléfono (dígitos),
-// después por nombre. Guarda phoneDigits para que las búsquedas futuras funcionen.
+// después por nombre. Guarda phoneDigits y mantiene phoneIndex sincronizado.
 export async function upsertClientByName(name, phone) {
   const trimmedName = name.trim();
   const phoneDigits = normalizePhone(phone);
@@ -141,6 +142,7 @@ export async function upsertClientByName(name, phone) {
     if (!snapPhone.empty) {
       const existing = snapPhone.docs[0];
       await updateDoc(doc(db, "clients", existing.id), { phone: phone || existing.data().phone });
+      // phoneIndex ya existe para estos dígitos — no hace falta tocarlo
       return existing.id;
     }
   }
@@ -153,6 +155,9 @@ export async function upsertClientByName(name, phone) {
     if (phone) updates.phone = phone;
     if (phoneDigits) updates.phoneDigits = phoneDigits;
     if (Object.keys(updates).length) await updateDoc(doc(db, "clients", existing.id), updates);
+    if (phoneDigits) {
+      await setDoc(doc(db, "phoneIndex", phoneDigits), { clientId: existing.id });
+    }
     return existing.id;
   }
 
@@ -163,22 +168,24 @@ export async function upsertClientByName(name, phone) {
     notes: "",
     createdAt: Date.now(),
   });
+  if (phoneDigits) {
+    await setDoc(doc(db, "phoneIndex", phoneDigits), { clientId: ref.id });
+  }
   return ref.id;
 }
 
-// Uso desde la app pública de Reservas (sin login): intenta deduplicar por teléfono
-// antes de crear. El query puede fallar por reglas de Firestore; en ese caso crea
-// un registro nuevo (comportamiento anterior). La creación nunca tumba la reserva.
+// Uso desde la app pública de Reservas (sin login): deduplica por teléfono usando
+// la colección phoneIndex (accesible públicamente, sin datos sensibles).
+// La creación de cliente nunca tumba la reserva — todos los errores son silenciosos.
 export async function createClientPublic(name, phone) {
   const phoneDigits = normalizePhone(phone);
 
   if (phoneDigits) {
     try {
-      const qPhone = query(collection(db, "clients"), where("phoneDigits", "==", phoneDigits));
-      const snapPhone = await getDocs(qPhone);
-      if (!snapPhone.empty) return snapPhone.docs[0].id;
+      const indexSnap = await getDoc(doc(db, "phoneIndex", phoneDigits));
+      if (indexSnap.exists()) return indexSnap.data().clientId;
     } catch {
-      // Sin permisos de lectura — continúa a crear
+      // Error de red o permisos — continúa a crear
     }
   }
 
@@ -190,6 +197,13 @@ export async function createClientPublic(name, phone) {
       notes: "",
       createdAt: Date.now(),
     });
+    if (phoneDigits) {
+      try {
+        await setDoc(doc(db, "phoneIndex", phoneDigits), { clientId: ref.id });
+      } catch (indexErr) {
+        console.error("[phoneIndex] No se pudo crear la entrada para", phoneDigits, indexErr);
+      }
+    }
     return ref.id;
   } catch (err) {
     console.error("No se pudo crear/actualizar la ficha del cliente:", err);
@@ -200,6 +214,14 @@ export async function updateClient(id, data) {
   return updateDoc(doc(db, "clients", id), data);
 }
 export async function deleteClient(id) {
+  try {
+    const snap = await getDoc(doc(db, "clients", id));
+    if (snap.exists() && snap.data().phoneDigits) {
+      await deleteDoc(doc(db, "phoneIndex", snap.data().phoneDigits));
+    }
+  } catch {
+    // Best-effort: si falla la limpieza del índice, igual borra el cliente
+  }
   return deleteDoc(doc(db, "clients", id));
 }
 

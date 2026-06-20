@@ -51,5 +51,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSignedIn();
     }
+
+    // Índice liviano para deduplicar clientes desde la app pública sin exponer datos sensibles.
+    // ID del documento = dígitos del teléfono. Solo contiene { clientId }.
+    match /phoneIndex/{phoneDigitsId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isSignedIn();
+    }
   }
 }
