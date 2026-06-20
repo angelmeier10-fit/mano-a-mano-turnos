@@ -132,7 +132,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
       ) : (
         <div style={styles.clientList}>
           {filtered.map(c => {
-            const stats = clientStats(c.name);
+            const stats = clientStats(c);
             return (
               <button key={c.id} style={styles.clientRow} onClick={() => setSelected(c)}>
                 <div style={styles.clientAvatarSm}><User size={16} color="#EFE9DF" /></div>
