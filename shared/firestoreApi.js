@@ -184,8 +184,8 @@ export async function createClientPublic(name, phone) {
     try {
       const indexSnap = await getDoc(doc(db, "phoneIndex", phoneDigits));
       if (indexSnap.exists()) return indexSnap.data().clientId;
-    } catch {
-      // Error de red o permisos — continúa a crear
+    } catch (getErr) {
+      console.error("[phoneIndex] No se pudo leer la entrada para", phoneDigits, getErr);
     }
   }
 

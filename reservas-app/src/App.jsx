@@ -3,7 +3,6 @@ import ReservarView from "./ReservarView";
 import {
   listenServices,
   listenAvailability,
-  listenAppointments,
   bookSlotAtomic,
   createClientPublic,
   listenBusinessInfo,
@@ -24,17 +23,15 @@ function GoogleFontsLoader() {
 
 export default function App() {
   const [services, setServices] = useState([]);
-  const [appointments, setAppointments] = useState([]);
   const [availability, setAvailability] = useState([]);
   const [businessInfo, setBusinessInfo] = useState(DEFAULT_BUSINESS_INFO);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const unsubServices = listenServices(setServices);
-    const unsubAppts = listenAppointments(setAppointments);
     const unsubAvail = listenAvailability((data) => { setAvailability(data); setLoaded(true); });
     const unsubBiz = listenBusinessInfo((data) => { if (data) setBusinessInfo(data); });
-    return () => { unsubServices(); unsubAppts(); unsubAvail(); unsubBiz(); };
+    return () => { unsubServices(); unsubAvail(); unsubBiz(); };
   }, []);
 
   if (!loaded) {
@@ -63,7 +60,6 @@ export default function App() {
       <main style={styles.main}>
         <ReservarView
           services={services}
-          appointments={appointments}
           availability={availability}
           businessInfo={businessInfo}
           onBookSlot={bookSlotAtomic}

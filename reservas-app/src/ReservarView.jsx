@@ -7,7 +7,7 @@ import {
 import { MiniCalendar } from "../../shared/MiniCalendar";
 import styles from "../../shared/styles";
 
-export default function ReservarView({ services, appointments, availability, businessInfo, onBookSlot, onUpsertClient }) {
+export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient }) {
   const availabilityByDate = useMemo(() => {
     const map = {};
     availability.forEach(slot => {
@@ -46,14 +46,12 @@ export default function ReservarView({ services, appointments, availability, bus
 
   const slotsForSelectedDate = useMemo(() => {
     if (!selectedDate || !svc) return [];
-    const dayAppts = appointments.filter(a => a.dateKey === selectedDate && a.status !== "cancelado");
-    const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
     return (availabilityByDate[selectedDate] || [])
-      .filter(s => !bookedSlotIds.has(s.id) && !s.booked)
+      .filter(s => !s.booked)
       .filter(s => !isPastSlot(selectedDate, s.start))
       .filter(s => timeToMinutes(s.end) - timeToMinutes(s.start) >= svc.duration)
       .sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
-  }, [selectedDate, svc, availabilityByDate, appointments]);
+  }, [selectedDate, svc, availabilityByDate]);
 
   async function bookSlot(slot) {
     if (!clientName.trim() || !svc || booking) return;
