@@ -278,16 +278,35 @@ export function listenAppointments(callback) {
 }
 export async function createAppointment(appt) {
   // appt: { dateKey, start, end, serviceId, clientName, clientPhone, notes, status, fromAvailabilityId? }
-  const ref = await addDoc(collection(db, "appointments"), { ...appt, createdAt: Date.now() });
+  const slotId = appt.fromAvailabilityId || null;
+  let apptRef;
+
+  if (slotId) {
+    // Si viene de un cupo existente, marcar booked:true y crear el turno atómicamente
+    // para evitar que un cliente reserve el mismo horario simultáneamente.
+    apptRef = doc(collection(db, "appointments"));
+    const slotRef = doc(db, "availability", slotId);
+    await runTransaction(db, async (t) => {
+      const slotSnap = await t.get(slotRef);
+      if (!slotSnap.exists() || slotSnap.data().booked) {
+        throw new Error("Este cupo ya fue reservado.");
+      }
+      t.update(slotRef, { booked: true });
+      t.set(apptRef, { ...appt, createdAt: Date.now() });
+    });
+  } else {
+    apptRef = await addDoc(collection(db, "appointments"), { ...appt, createdAt: Date.now() });
+  }
+
   const phoneDigits = normalizePhone(appt.clientPhone);
   if (phoneDigits) {
     try {
-      await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", ref.id), {
+      await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptRef.id), {
         dateKey: appt.dateKey,
         start: appt.start,
         end: appt.end,
         serviceId: appt.serviceId || null,
-        fromAvailabilityId: appt.fromAvailabilityId || null,
+        fromAvailabilityId: slotId,
         clientName: appt.clientName || "",
         clientId: appt.clientId || null,
         status: appt.status || "confirmado",
@@ -297,7 +316,7 @@ export async function createAppointment(appt) {
       console.error("[phoneIndex/bookings] No se pudo crear la referencia desde Agenda:", e);
     }
   }
-  return ref;
+  return apptRef;
 }
 export async function updateAppointment(id, data) {
   return updateDoc(doc(db, "appointments", id), data);
