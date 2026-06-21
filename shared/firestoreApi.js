@@ -276,7 +276,25 @@ export function listenAppointments(callback) {
 }
 export async function createAppointment(appt) {
   // appt: { dateKey, start, end, serviceId, clientName, clientPhone, notes, status, fromAvailabilityId? }
-  return addDoc(collection(db, "appointments"), { ...appt, createdAt: Date.now() });
+  const ref = await addDoc(collection(db, "appointments"), { ...appt, createdAt: Date.now() });
+  const phoneDigits = normalizePhone(appt.clientPhone);
+  if (phoneDigits) {
+    try {
+      await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", ref.id), {
+        dateKey: appt.dateKey,
+        start: appt.start,
+        end: appt.end,
+        serviceId: appt.serviceId || null,
+        fromAvailabilityId: appt.fromAvailabilityId || null,
+        clientName: appt.clientName || "",
+        clientId: appt.clientId || null,
+        status: appt.status || "confirmado",
+      });
+    } catch (e) {
+      console.error("[phoneIndex/bookings] No se pudo crear la referencia desde Agenda:", e);
+    }
+  }
+  return ref;
 }
 export async function updateAppointment(id, data) {
   return updateDoc(doc(db, "appointments", id), data);
