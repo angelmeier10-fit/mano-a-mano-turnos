@@ -44,6 +44,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
   const [confirmed, setConfirmed] = useState(null);
   const [booking, setBooking] = useState(false);
   const [dateViewMode, setDateViewMode] = useState("list");
+  const [phoneError, setPhoneError] = useState("");
 
   useEffect(() => {
     if (!selectedDate && availableDates.length > 0) setSelectedDate(availableDates[0]);
@@ -167,6 +168,12 @@ export default function ReservarView({ services, availability, businessInfo, onB
         )}
       </div>
 
+      <label style={styles.fieldLabel}>Tu nombre</label>
+      <input id="client-name-input" style={styles.input} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre y apellido" />
+      <label style={styles.fieldLabel}>Teléfono (WhatsApp)</label>
+      <input id="client-phone-input" style={styles.input} value={clientPhone} onChange={e => { setClientPhone(e.target.value); if (phoneError) setPhoneError(""); }} placeholder="11 1234 5678" />
+      {phoneError && <p style={{ color: "#c0392b", fontSize: 13, marginTop: 4, marginBottom: 0 }}>{phoneError}</p>}
+
       <label style={styles.fieldLabel}>Tipo de masaje</label>
       <div style={styles.serviceChips}>
         {services.map(s => (
@@ -253,6 +260,12 @@ export default function ReservarView({ services, availability, businessInfo, onB
                     document.getElementById("client-name-input")?.focus();
                     return;
                   }
+                  if (!clientPhone.trim()) {
+                    setPhoneError("Ingresá tu número de teléfono para poder reservar");
+                    document.getElementById("client-phone-input")?.focus();
+                    return;
+                  }
+                  setPhoneError("");
                   bookSlot(s);
                 }}>
                   <Clock size={13} /> {s.start}
@@ -261,11 +274,6 @@ export default function ReservarView({ services, availability, businessInfo, onB
             </div>
           )}
 
-          <label style={styles.fieldLabel}>Tu nombre</label>
-          <input id="client-name-input" style={styles.input} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre y apellido" />
-          <label style={styles.fieldLabel}>Teléfono (WhatsApp)</label>
-          <input style={styles.input} value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder="11 1234 5678" />
-          <p style={{ ...styles.helperText, marginTop: 4 }}>Tocá un horario arriba para confirmar tu turno al instante.</p>
         </>
       )}
     </div>
