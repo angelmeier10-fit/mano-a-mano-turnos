@@ -69,6 +69,19 @@ export async function markBookingRefCancelled(clientPhone, apptId) {
     // Si el cliente no tiene registro en phoneIndex/bookings, se ignora silenciosamente.
   }
 }
+// Borra la entrada en phoneIndex/bookings cuando el profesional elimina el turno desde la Agenda.
+export async function deleteBookingRef(clientPhone, apptId) {
+  const phoneDigits = normalizePhone(clientPhone);
+  if (!phoneDigits || !apptId) {
+    console.error("[phoneIndex/bookings] deleteBookingRef: clientPhone o apptId faltante", { clientPhone, apptId });
+    return;
+  }
+  try {
+    await deleteDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId));
+  } catch (e) {
+    console.error("[phoneIndex/bookings] No se pudo borrar la referencia:", e, { phoneDigits, apptId });
+  }
+}
 // Marca como confirmado el registro en phoneIndex/bookings del cliente (best-effort).
 // Se usa cuando el profesional confirma un turno pendiente desde la Agenda.
 // Usa setDoc con merge:true para que funcione aunque el documento no exista todavía.

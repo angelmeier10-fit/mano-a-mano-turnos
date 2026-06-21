@@ -7,7 +7,7 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
-import { markBookingRefCancelled, markBookingRefConfirmed } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo,
@@ -83,8 +83,9 @@ export function AgendaView({
     setPrefillSlot(null);
     setShowApptForm(true);
   }
-  function deleteAppt(id) {
+  function deleteAppt(id, clientPhone) {
     onDeleteAppt(id);
+    deleteBookingRef(clientPhone, id).catch((e) => console.error("[deleteAppt] deleteBookingRef falló:", e));
   }
   async function setApptStatus(id, status, fromAvailabilityId, clientPhone) {
     await onUpdateAppt(id, { status });
@@ -335,7 +336,7 @@ export function AgendaView({
           prefill={prefillSlot}
           onClose={() => setShowApptForm(false)}
           onSave={saveAppt}
-          onDelete={editingAppt ? () => { deleteAppt(editingAppt.id); setShowApptForm(false); } : null}
+          onDelete={editingAppt ? () => { deleteAppt(editingAppt.id, editingAppt.clientPhone); setShowApptForm(false); } : null}
           onStatusChange={editingAppt ? (status) => { setApptStatus(editingAppt.id, status, editingAppt.fromAvailabilityId, editingAppt.clientPhone); setShowApptForm(false); } : null}
         />
       )}
