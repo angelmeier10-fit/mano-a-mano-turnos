@@ -49,9 +49,9 @@ service cloud.firestore {
                     && (resource.data.status == "confirmado" || resource.data.status == "pendiente")
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelProof'])
                     && (
-                         (resource.data.cancelToken != null
+                         (resource.data.get('cancelToken', null) != null
                           && request.resource.data.cancelProof == resource.data.cancelToken)
-                         || resource.data.cancelToken == null
+                         || resource.data.get('cancelToken', null) == null
                        );
     }
 
