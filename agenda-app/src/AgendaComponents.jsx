@@ -7,7 +7,7 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
-import { markBookingRefCancelled } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo,
@@ -95,6 +95,8 @@ export function AgendaView({
         }
       }
       markBookingRefCancelled(clientPhone, id).catch(() => {});
+    } else if (status === "confirmado") {
+      markBookingRefConfirmed(clientPhone, id).catch(() => {});
     }
   }
   async function saveAppt(data) {

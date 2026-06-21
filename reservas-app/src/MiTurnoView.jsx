@@ -100,7 +100,7 @@ export default function MiTurnoView({
       setLocalTokens(tokens);
       const today = dateKey(new Date());
       const future = refs
-        .filter(b => b.status === "confirmado" && b.dateKey >= today)
+        .filter(b => (b.status === "confirmado" || b.status === "pendiente") && b.dateKey >= today)
         .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.start.localeCompare(b.start));
       setBookings(future);
       setStep("list");
@@ -358,7 +358,7 @@ export default function MiTurnoView({
       <div style={styles.viewWrap}>
         <h2 style={styles.sectionTitle}>Mis turnos</h2>
         <p style={{ fontSize: 13, color: "#8A8275", marginBottom: 16 }}>
-          Turnos confirmados para <strong>{phone}</strong>
+          Turnos para <strong>{phone}</strong>
         </p>
         {bookings.length === 0 ? (
           <p style={styles.emptyMsg}>No encontramos turnos futuros para ese teléfono.</p>
@@ -373,9 +373,19 @@ export default function MiTurnoView({
                 <div key={b.id} style={{
                   background: "#fff", borderRadius: 14, border: "1px solid #E3DBCB", padding: "14px 16px",
                 }}>
-                  <p style={{ margin: "0 0 2px", fontWeight: 700, fontSize: 14.5 }}>
-                    {formatDateLong(b.dateKey)}
-                  </p>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5 }}>
+                      {formatDateLong(b.dateKey)}
+                    </p>
+                    <span style={{
+                      fontSize: 11.5, fontWeight: 600, borderRadius: 20, padding: "2px 9px",
+                      ...(b.status === "confirmado"
+                        ? { background: "#E6F4EA", color: "#2E7D32" }
+                        : { background: "#FFF8E1", color: "#B37D00" }),
+                    }}>
+                      {b.status === "confirmado" ? "Confirmado" : "Pendiente"}
+                    </span>
+                  </div>
                   <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6E6555" }}>
                     {b.start} hs · {svc?.name || "Masaje"}
                   </p>

@@ -69,6 +69,17 @@ export async function markBookingRefCancelled(clientPhone, apptId) {
     // Si el cliente no tiene registro en phoneIndex/bookings, se ignora silenciosamente.
   }
 }
+// Marca como confirmado el registro en phoneIndex/bookings del cliente (best-effort).
+// Se usa cuando el profesional confirma un turno pendiente desde la Agenda.
+export async function markBookingRefConfirmed(clientPhone, apptId) {
+  const phoneDigits = normalizePhone(clientPhone);
+  if (!phoneDigits || !apptId) return;
+  try {
+    await updateDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "confirmado" });
+  } catch {
+    // Si el cliente no tiene registro en phoneIndex/bookings, se ignora silenciosamente.
+  }
+}
 // Crea muchos cupos de una sola vez (ej: "todos los lunes de 10 a 14, por 8 semanas")
 // Firestore permite hasta 500 escrituras por batch; si hay más, las dividimos.
 export async function addAvailabilitySlotsBatch(slots) {
