@@ -98,7 +98,7 @@ export default function MiTurnoView({
       const refs = await onGetMyBookings(phone);
       const tokens = getLocalTokenMap();
       setLocalTokens(tokens);
-      const today = dateKey(new Date());
+        const today = dateKey(new Date());
       const future = refs
         .filter(b => (b.status === "confirmado" || b.status === "pendiente") && b.dateKey >= today)
         .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.start.localeCompare(b.start));
@@ -124,8 +124,9 @@ export default function MiTurnoView({
       setWorkError("Ya no es posible cancelar: faltan menos de 24 hs para el turno. Escribime por WhatsApp.");
       return;
     }
-    const token = localTokens[selected.id]?.cancelToken;
-    if (!token) return;
+    const requiresToken = selected.requiresCancelToken !== false;
+    const token = localTokens[selected.id]?.cancelToken || null;
+    if (requiresToken && !token) return;
     setWorking(true);
     setWorkError(null);
     try {
@@ -156,8 +157,9 @@ export default function MiTurnoView({
       setWorkError("Ya no es posible reprogramar: faltan menos de 24 hs para el turno. Escribime por WhatsApp.");
       return;
     }
-    const token = localTokens[selected.id]?.cancelToken;
-    if (!token) return;
+    const requiresToken = selected.requiresCancelToken !== false;
+    const token = localTokens[selected.id]?.cancelToken || null;
+    if (requiresToken && !token) return;
     setWorking(true);
     setWorkError(null);
     try {
@@ -366,9 +368,10 @@ export default function MiTurnoView({
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {bookings.map(b => {
               const svc = services.find(s => s.id === b.serviceId);
-              const hasToken = !!localTokens[b.id]?.cancelToken;
-              const canModify = hasToken && isMoreThan24hAway(b.dateKey, b.start);
-              const tooClose = hasToken && !isMoreThan24hAway(b.dateKey, b.start);
+              const hasLocalToken = !!localTokens[b.id]?.cancelToken;
+              const isManual = b.requiresCancelToken === false;
+              const canModify = (hasLocalToken || isManual) && isMoreThan24hAway(b.dateKey, b.start);
+              const tooClose = (hasLocalToken || isManual) && !isMoreThan24hAway(b.dateKey, b.start);
               return (
                 <div key={b.id} style={{
                   background: "#fff", borderRadius: 14, border: "1px solid #E3DBCB", padding: "14px 16px",
@@ -407,7 +410,7 @@ export default function MiTurnoView({
                     </div>
                   )}
 
-                  {(tooClose || !hasToken) && (
+                  {(tooClose || (!hasLocalToken && !isManual)) && (
                     <div style={{
                       background: "#FBF5EC", border: "1px solid #E8D9B8", borderRadius: 10,
                       padding: "10px 12px",

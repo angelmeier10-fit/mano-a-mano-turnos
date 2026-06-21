@@ -176,6 +176,7 @@ export async function bookSlotAtomic(appt) {
         clientName: appt.clientName || "",
         clientId: appt.clientId || null,
         status: appt.status || "confirmado",
+        requiresCancelToken: true,
       });
     } catch (e) {
       console.error("[phoneIndex/bookings] No se pudo guardar la referencia:", e);
@@ -262,6 +263,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
         clientName: newAppt.clientName || "",
         clientId: newAppt.clientId || null,
         status: "confirmado",
+        requiresCancelToken: true,
       });
     } catch {}
   }
@@ -289,6 +291,7 @@ export async function createAppointment(appt) {
         clientName: appt.clientName || "",
         clientId: appt.clientId || null,
         status: appt.status || "confirmado",
+        requiresCancelToken: false,
       });
     } catch (e) {
       console.error("[phoneIndex/bookings] No se pudo crear la referencia desde Agenda:", e);
