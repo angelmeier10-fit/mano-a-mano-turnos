@@ -96,7 +96,8 @@ export function AgendaView({
       }
       markBookingRefCancelled(clientPhone, id).catch(() => {});
     } else if (status === "confirmado") {
-      markBookingRefConfirmed(clientPhone, id).catch(() => {});
+      console.log("[setApptStatus] confirmando turno en phoneIndex:", { id, clientPhone });
+      markBookingRefConfirmed(clientPhone, id).catch((e) => console.error("[setApptStatus] markBookingRefConfirmed falló:", e));
     }
   }
   async function saveAppt(data) {

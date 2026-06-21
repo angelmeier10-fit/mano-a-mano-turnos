@@ -71,13 +71,17 @@ export async function markBookingRefCancelled(clientPhone, apptId) {
 }
 // Marca como confirmado el registro en phoneIndex/bookings del cliente (best-effort).
 // Se usa cuando el profesional confirma un turno pendiente desde la Agenda.
+// Usa setDoc con merge:true para que funcione aunque el documento no exista todavía.
 export async function markBookingRefConfirmed(clientPhone, apptId) {
   const phoneDigits = normalizePhone(clientPhone);
-  if (!phoneDigits || !apptId) return;
+  if (!phoneDigits || !apptId) {
+    console.error("[phoneIndex/bookings] markBookingRefConfirmed: clientPhone o apptId faltante", { clientPhone, apptId });
+    return;
+  }
   try {
-    await updateDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "confirmado" });
-  } catch {
-    // Si el cliente no tiene registro en phoneIndex/bookings, se ignora silenciosamente.
+    await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "confirmado" }, { merge: true });
+  } catch (e) {
+    console.error("[phoneIndex/bookings] No se pudo marcar como confirmado:", e, { phoneDigits, apptId });
   }
 }
 // Crea muchos cupos de una sola vez (ej: "todos los lunes de 10 a 14, por 8 semanas")
