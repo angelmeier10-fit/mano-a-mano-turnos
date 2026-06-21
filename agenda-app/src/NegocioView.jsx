@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Check, Download } from "lucide-react";
+import { Check, Download, Copy, Share2 } from "lucide-react";
 import styles from "../../shared/styles";
 import { STATUS, formatPrice } from "../../shared/helpers";
+
+const RESERVAS_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
 function csvEscape(value) {
   const str = String(value ?? "");
@@ -31,6 +33,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   const [hoursLabel, setHoursLabel] = useState(businessInfo?.hoursLabel || "");
   const [whatsapp, setWhatsapp] = useState(businessInfo?.whatsapp || "");
   const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setName(businessInfo?.name || "");
@@ -39,6 +42,16 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     setHoursLabel(businessInfo?.hoursLabel || "");
     setWhatsapp(businessInfo?.whatsapp || "");
   }, [businessInfo]);
+
+  function copyLink() {
+    navigator.clipboard.writeText(RESERVAS_URL).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function shareLink() {
+    try { await navigator.share({ url: RESERVAS_URL, title: "Reservá tu sesión" }); } catch {}
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -82,6 +95,22 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   return (
     <div style={styles.viewWrap}>
       <h2 style={styles.sectionTitle}>Mi negocio</h2>
+
+      <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "12px 14px", marginBottom: 20 }}>
+        <p style={{ fontSize: 12, color: "#8A8275", margin: "0 0 4px 0" }}>Link de reservas para tus clientes</p>
+        <p style={{ fontSize: 13, color: "#2A2622", wordBreak: "break-all", margin: "0 0 10px 0", fontWeight: 500 }}>{RESERVAS_URL}</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" style={{ ...styles.saveBtn, flex: 1 }} onClick={copyLink}>
+            <Copy size={14} /> {copied ? "Copiado ✓" : "Copiar link"}
+          </button>
+          {"share" in navigator && (
+            <button type="button" style={{ ...styles.exportBtn, flex: 1 }} onClick={shareLink}>
+              <Share2 size={14} /> Compartir
+            </button>
+          )}
+        </div>
+      </div>
+
       <p style={styles.helperText}>Esta info aparece en la app de reservas para tus clientes.</p>
 
       <form onSubmit={handleSubmit}>
