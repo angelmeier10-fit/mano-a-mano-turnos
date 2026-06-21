@@ -19,6 +19,7 @@ export const DEFAULT_BUSINESS_INFO = {
 };
 
 export const STATUS = {
+  pendiente: { label: "Pendiente", color: "#C9973A" },
   confirmado: { label: "Confirmado", color: "#6E7F5C" },
   completado: { label: "Completado", color: "#2A2622" },
   cancelado: { label: "Cancelado", color: "#A6483A" },

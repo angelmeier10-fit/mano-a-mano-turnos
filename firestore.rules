@@ -35,17 +35,18 @@ service cloud.firestore {
 
     match /appointments/{apptId} {
       // cualquiera puede crear una reserva (vía la app pública)
-      allow create: if request.resource.data.status == "confirmado"
+      allow create: if (request.resource.data.status == "confirmado"
+                        || request.resource.data.status == "pendiente")
                     && request.resource.data.clientName is string
                     && request.resource.data.clientName.size() > 0;
       // solo vos (logueado) podés leer la lista completa, editar o borrar
       allow read, update, delete: if isSignedIn();
       // Cliente sin login puede cancelar su propio turno si demuestra que conoce el cancelToken.
       // El cliente envía el token en el campo cancelProof; se compara contra cancelToken almacenado.
-      // Solo se permite cambiar status y cancelProof, y únicamente si el turno está confirmado.
+      // Solo se permite cambiar status y cancelProof, y únicamente si el turno está pendiente o confirmado.
       allow update: if !isSignedIn()
                     && resource.data.cancelToken != null
-                    && resource.data.status == "confirmado"
+                    && (resource.data.status == "confirmado" || resource.data.status == "pendiente")
                     && request.resource.data.cancelProof == resource.data.cancelToken
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelProof']);
     }

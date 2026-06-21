@@ -45,6 +45,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
   const [booking, setBooking] = useState(false);
   const [dateViewMode, setDateViewMode] = useState("list");
   const [phoneError, setPhoneError] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState(null);
 
   useEffect(() => {
     if (!selectedDate && availableDates.length > 0) setSelectedDate(availableDates[0]);
@@ -66,10 +67,9 @@ export default function ReservarView({ services, availability, businessInfo, onB
   }, [selectedDate, svc, availabilityByDate]);
 
   async function bookSlot(slot) {
-    if (!clientName.trim() || !svc || booking) return;
+    if (!clientName.trim() || !clientPhone.trim() || !svc || booking) return;
     setBooking(true);
 
-    // Crear/recuperar el cliente primero para tener el clientId antes de guardar el turno
     let clientId = null;
     if (onUpsertClient) {
       try {
@@ -88,7 +88,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
       clientName: clientName.trim(),
       clientPhone,
       notes: "",
-      status: "confirmado",
+      status: "pendiente",
       fromAvailabilityId: slot.id,
       ...(clientId ? { clientId } : {}),
     };
@@ -103,6 +103,11 @@ export default function ReservarView({ services, availability, businessInfo, onB
     }
     const confirmedAppt = { ...appt, apptId: result.apptId, cancelToken: result.cancelToken };
     saveBookingToLocalStorage(result.apptId, result.cancelToken, appt, svc?.name || "");
+    if (businessInfo?.whatsapp) {
+      const msg = `Hola! Reservé un turno de ${svc.name} para el ${formatDateLong(selectedDate)} a las ${slot.start}. Mi nombre es ${clientName.trim()}.`;
+      window.open(`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}?text=${encodeURIComponent(msg)}`, "_blank");
+    }
+    setSelectedSlot(null);
     setConfirmed(confirmedAppt);
     setBooking(false);
   }
@@ -113,7 +118,8 @@ export default function ReservarView({ services, availability, businessInfo, onB
       <div style={styles.viewWrap}>
         <div style={styles.confirmCard}>
           <div style={styles.confirmCheck}><Check size={28} color="#EFE9DF" /></div>
-          <h2 style={styles.confirmTitle}>Turno confirmado</h2>
+          <h2 style={styles.confirmTitle}>Turno pendiente de confirmación</h2>
+          <p style={{ ...styles.confirmDetail, color: "#8A8275", marginBottom: 4 }}>Te confirmamos el turno pronto por WhatsApp.</p>
           <p style={styles.confirmDetail}>{cSvc?.name} · {confirmed.start} a {confirmed.end}</p>
           {cSvc?.price && <p style={styles.confirmPrice}>{formatPrice(cSvc.price)}</p>}
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
@@ -128,7 +134,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
               <MessageCircle size={14} /> Cualquier duda, escribime por WhatsApp
             </a>
           )}
-          <button style={{ ...styles.saveBtn, marginTop: 16 }} onClick={() => { setConfirmed(null); setClientName(""); setClientPhone(""); }}>
+          <button style={{ ...styles.saveBtn, marginTop: 16 }} onClick={() => { setConfirmed(null); setClientName(""); setClientPhone(""); setSelectedSlot(null); }}>
             Reservar otro turno
           </button>
           {onNavigateToMiTurno && (
@@ -255,22 +261,48 @@ export default function ReservarView({ services, availability, businessInfo, onB
           ) : (
             <div style={styles.slotsGrid}>
               {slotsForSelectedDate.map(s => (
-                <button key={s.id} style={{ ...styles.slotBtn, opacity: booking ? 0.5 : 1 }} disabled={booking} onClick={() => {
-                  if (!clientName.trim()) {
-                    document.getElementById("client-name-input")?.focus();
-                    return;
-                  }
-                  if (!clientPhone.trim()) {
-                    setPhoneError("Ingresá tu número de teléfono para poder reservar");
-                    document.getElementById("client-phone-input")?.focus();
-                    return;
-                  }
-                  setPhoneError("");
-                  bookSlot(s);
-                }}>
+                <button
+                  key={s.id}
+                  disabled={booking}
+                  style={{
+                    ...styles.slotBtn,
+                    opacity: booking ? 0.5 : 1,
+                    ...(selectedSlot?.id === s.id ? { background: "#2A2622", color: "#EFE9DF", borderColor: "#2A2622" } : {}),
+                  }}
+                  onClick={() => {
+                    if (!clientName.trim()) {
+                      document.getElementById("client-name-input")?.focus();
+                      return;
+                    }
+                    if (!clientPhone.trim()) {
+                      setPhoneError("Ingresá tu número de teléfono para poder reservar");
+                      document.getElementById("client-phone-input")?.focus();
+                      return;
+                    }
+                    setPhoneError("");
+                    setSelectedSlot(s);
+                  }}
+                >
                   <Clock size={13} /> {s.start}
                 </button>
               ))}
+            </div>
+          )}
+
+          {selectedSlot && slotsForSelectedDate.some(s => s.id === selectedSlot.id) && (
+            <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "14px 16px", marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#2A2622" }}>{svc?.name}</div>
+              <div style={{ fontSize: 13, color: "#5A5046" }}>
+                {formatDateLong(selectedDate)} · {selectedSlot.start} a {minutesToTime(timeToMinutes(selectedSlot.start) + (svc?.duration || 0))}
+              </div>
+              {svc?.price && <div style={{ fontSize: 13, color: "#5A5046" }}>{formatPrice(svc.price)}</div>}
+              <button
+                style={{ ...styles.saveBtn, marginTop: 10, opacity: booking ? 0.6 : 1 }}
+                disabled={booking}
+                onClick={() => bookSlot(selectedSlot)}
+              >
+                {booking ? "Reservando…" : "Confirmar turno"}
+              </button>
             </div>
           )}
 

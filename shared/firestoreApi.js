@@ -147,7 +147,7 @@ export async function bookSlotAtomic(appt) {
         fromAvailabilityId: slotId,
         clientName: appt.clientName || "",
         clientId: appt.clientId || null,
-        status: "confirmado",
+        status: appt.status || "confirmado",
       });
     } catch (e) {
       console.error("[phoneIndex/bookings] No se pudo guardar la referencia:", e);

@@ -37,7 +37,7 @@ export function AgendaView({
 
   const tomorrowKey = dateKey(addDays(new Date(), 1));
   const tomorrowAppts = useMemo(() => appointments
-    .filter(a => a.dateKey === tomorrowKey && (a.status === "confirmado"))
+    .filter(a => a.dateKey === tomorrowKey && (a.status === "confirmado" || a.status === "pendiente"))
     .sort((a,b) => timeToMinutes(a.start) - timeToMinutes(b.start)), [appointments, tomorrowKey]);
 
   function reminderWhatsappLink(appt, when) {
