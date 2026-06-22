@@ -7,7 +7,7 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo,
@@ -125,7 +125,9 @@ export function AgendaView({
       }
     }
     if (editingAppt) {
-      onUpdateAppt(editingAppt.id, { ...data, ...(clientId ? { clientId } : {}) });
+      const mergedData = { ...data, ...(clientId ? { clientId } : {}) };
+      updateAppointmentWithSlotSwap(editingAppt.id, editingAppt.fromAvailabilityId || null, mergedData)
+        .catch((e) => console.error("[saveAppt] updateAppointmentWithSlotSwap falló:", e));
       if (data.clientPhone) {
         const svc = services.find(s => s.id === data.serviceId);
         updateBookingRef(data.clientPhone, editingAppt.id, {

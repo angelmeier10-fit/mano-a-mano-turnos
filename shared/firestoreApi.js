@@ -357,6 +357,35 @@ export async function createAppointment(appt) {
 export async function updateAppointment(id, data) {
   return updateDoc(doc(db, "appointments", id), data);
 }
+// Al editar un turno desde la Agenda: libera el cupo anterior (si había uno distinto al nuevo),
+// busca un cupo coincidente con el nuevo dateKey+start y lo ocupa, y actualiza el turno — todo atómicamente.
+export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityId, newData) {
+  // La query no puede ir dentro de la transacción (limitación del SDK web de Firestore)
+  const slotQuery = query(
+    collection(db, "availability"),
+    where("dateKey", "==", newData.dateKey),
+    where("start", "==", newData.start),
+  );
+  const slotSnap = await getDocs(slotQuery);
+  const newSlotId = slotSnap.empty ? null : slotSnap.docs[0].id;
+
+  const sameSlot = newSlotId !== null && newSlotId === oldFromAvailabilityId;
+  const apptRef = doc(db, "appointments", apptId);
+  const oldSlotRef = (oldFromAvailabilityId && !sameSlot) ? doc(db, "availability", oldFromAvailabilityId) : null;
+  const newSlotRef = (newSlotId && !sameSlot) ? doc(db, "availability", newSlotId) : null;
+
+  await runTransaction(db, async (t) => {
+    // Firestore exige todos los reads antes de cualquier write en la transacción
+    if (oldSlotRef) await t.get(oldSlotRef);
+    if (newSlotRef) await t.get(newSlotRef);
+
+    if (oldSlotRef) t.update(oldSlotRef, { booked: false });
+    if (newSlotRef) t.update(newSlotRef, { booked: true });
+    t.update(apptRef, { ...newData, fromAvailabilityId: newSlotId });
+  });
+
+  return newSlotId;
+}
 export async function deleteAppointment(id) {
   return deleteDoc(doc(db, "appointments", id));
 }
