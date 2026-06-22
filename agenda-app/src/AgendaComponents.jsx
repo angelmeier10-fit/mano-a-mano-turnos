@@ -7,7 +7,7 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo,
@@ -126,6 +126,15 @@ export function AgendaView({
     }
     if (editingAppt) {
       onUpdateAppt(editingAppt.id, { ...data, ...(clientId ? { clientId } : {}) });
+      if (data.clientPhone) {
+        const svc = services.find(s => s.id === data.serviceId);
+        updateBookingRef(data.clientPhone, editingAppt.id, {
+          dateKey: data.dateKey,
+          start: data.start,
+          end: data.end,
+          serviceName: svc?.name || "",
+        }).catch((e) => console.error("[saveAppt] updateBookingRef falló:", e));
+      }
     } else {
       onCreateAppt({ status: "confirmado", ...data, ...(clientId ? { clientId } : {}) });
     }

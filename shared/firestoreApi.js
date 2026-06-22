@@ -97,6 +97,21 @@ export async function markBookingRefConfirmed(clientPhone, apptId) {
     console.error("[phoneIndex/bookings] No se pudo marcar como confirmado:", e, { phoneDigits, apptId });
   }
 }
+// Actualiza dateKey, start, end y serviceName en phoneIndex/bookings cuando el profesional
+// edita un turno desde la Agenda. Usa setDoc merge:true para cubrir el caso de que no exista.
+export async function updateBookingRef(clientPhone, apptId, { dateKey, start, end, serviceName }) {
+  const phoneDigits = normalizePhone(clientPhone);
+  if (!phoneDigits || !apptId) return;
+  try {
+    await setDoc(
+      doc(db, "phoneIndex", phoneDigits, "bookings", apptId),
+      { dateKey, start, end, serviceName: serviceName || "" },
+      { merge: true }
+    );
+  } catch (e) {
+    console.error("[phoneIndex/bookings] No se pudo actualizar la referencia:", e, { phoneDigits, apptId });
+  }
+}
 // Crea muchos cupos de una sola vez (ej: "todos los lunes de 10 a 14, por 8 semanas")
 // Firestore permite hasta 500 escrituras por batch; si hay más, las dividimos.
 export async function addAvailabilitySlotsBatch(slots) {
