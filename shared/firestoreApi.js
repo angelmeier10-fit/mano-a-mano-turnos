@@ -278,7 +278,7 @@ export function listenAppointments(callback) {
 }
 export async function createAppointment(appt) {
   // appt: { dateKey, start, end, serviceId, clientName, clientPhone, notes, status, fromAvailabilityId? }
-  const slotId = appt.fromAvailabilityId || null;
+  let slotId = appt.fromAvailabilityId || null;
   let apptRef;
 
   if (slotId) {
@@ -295,7 +295,28 @@ export async function createAppointment(appt) {
       t.set(apptRef, { ...appt, createdAt: Date.now() });
     });
   } else {
-    apptRef = await addDoc(collection(db, "appointments"), { ...appt, createdAt: Date.now() });
+    // Sin fromAvailabilityId: buscar si existe un cupo con el mismo día y hora de inicio
+    const slotQuery = query(
+      collection(db, "availability"),
+      where("dateKey", "==", appt.dateKey),
+      where("start", "==", appt.start),
+    );
+    const slotSnap = await getDocs(slotQuery);
+    if (slotSnap.size > 1) {
+      console.warn(`[createAppointment] Se encontraron ${slotSnap.size} cupos para ${appt.dateKey} ${appt.start}. Se ocupa el primero.`);
+    }
+    if (slotSnap.size >= 1) {
+      const matchedSlot = slotSnap.docs[0];
+      apptRef = doc(collection(db, "appointments"));
+      const matchedSlotRef = doc(db, "availability", matchedSlot.id);
+      slotId = matchedSlot.id;
+      await runTransaction(db, async (t) => {
+        t.update(matchedSlotRef, { booked: true });
+        t.set(apptRef, { ...appt, fromAvailabilityId: slotId, createdAt: Date.now() });
+      });
+    } else {
+      apptRef = await addDoc(collection(db, "appointments"), { ...appt, createdAt: Date.now() });
+    }
   }
 
   const phoneDigits = normalizePhone(appt.clientPhone);
