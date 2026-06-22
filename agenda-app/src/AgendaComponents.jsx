@@ -371,7 +371,7 @@ export function AgendaView({
 function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose, onAdd, onRemove, onCloseDay }) {
   const [start, setStart] = useState("10:00");
   const [end, setEnd] = useState("11:00");
-  const [overlapError, setOverlapError] = useState(null);
+  const [statusMsg, setStatusMsg] = useState(null);
 
   function handleAdd(e) {
     e.preventDefault();
@@ -387,18 +387,35 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
     }
     if (slots.length === 0) return;
 
+    const toAdd = [];
+    let skipped = 0;
     for (const slot of slots) {
       const sStart = timeToMinutes(slot.start);
       const sEnd = timeToMinutes(slot.end);
       const overlap = existing.find(ex => sStart < timeToMinutes(ex.end) && timeToMinutes(ex.start) < sEnd);
       if (overlap) {
-        setOverlapError(`El cupo ${slot.start}–${slot.end} se superpone con ${overlap.start}–${overlap.end}.`);
-        return;
+        skipped++;
+      } else {
+        toAdd.push(slot);
       }
     }
 
-    setOverlapError(null);
-    slots.forEach(slot => onAdd(slot));
+    if (toAdd.length === 0) {
+      setStatusMsg({ type: "error", text: "Todos los cupos ya existen, no se agregó ninguno." });
+      return;
+    }
+
+    toAdd.forEach(slot => onAdd(slot));
+
+    if (skipped > 0) {
+      setStatusMsg({
+        type: "info",
+        text: `Se agregaron ${toAdd.length} cupo${toAdd.length !== 1 ? "s" : ""}. Se saltaron ${skipped} que ya existían.`,
+      });
+    } else {
+      setStatusMsg(null);
+    }
+
     setStart(end);
     const next = minutesToTime(Math.min(newEnd + 60, 23*60+45));
     setEnd(next);
@@ -462,15 +479,15 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
           <div style={styles.fieldRow}>
             <div style={{ flex: 1 }}>
               <label style={styles.fieldLabel}>Desde</label>
-              <input type="time" style={styles.input} value={start} onChange={e => { setStart(e.target.value); setOverlapError(null); }} required />
+              <input type="time" style={styles.input} value={start} onChange={e => { setStart(e.target.value); setStatusMsg(null); }} required />
             </div>
             <div style={{ flex: 1 }}>
               <label style={styles.fieldLabel}>Hasta</label>
-              <input type="time" style={styles.input} value={end} onChange={e => { setEnd(e.target.value); setOverlapError(null); }} required />
+              <input type="time" style={styles.input} value={end} onChange={e => { setEnd(e.target.value); setStatusMsg(null); }} required />
             </div>
           </div>
-          {overlapError && (
-            <p style={{ fontSize: 12, color: "#A6483A", margin: "6px 0 0", fontWeight: 600 }}>{overlapError}</p>
+          {statusMsg && (
+            <p style={{ fontSize: 12, color: statusMsg.type === "error" ? "#A6483A" : "#6E7F5C", margin: "6px 0 0", fontWeight: 600 }}>{statusMsg.text}</p>
           )}
           <div style={styles.modalActions}>
             <div style={{ flex: 1 }} />
