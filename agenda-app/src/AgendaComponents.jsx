@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus } from "lucide-react";
+import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys,
@@ -101,6 +101,20 @@ export function AgendaView({
       markBookingRefConfirmed(clientPhone, id).catch((e) => console.error("[setApptStatus] markBookingRefConfirmed falló:", e));
     }
   }
+  function duplicateAppt(appt) {
+    const [y, m, d] = appt.dateKey.split("-").map(Number);
+    const nextDate = addDays(new Date(y, m - 1, d), 7);
+    setPrefillSlot({
+      dateKey: dateKey(nextDate),
+      start: appt.start,
+      serviceId: appt.serviceId,
+      clientName: appt.clientName,
+      clientPhone: appt.clientPhone || "",
+      notes: appt.notes || "",
+    });
+    setEditingAppt(null);
+  }
+
   async function saveAppt(data) {
     let clientId = null;
     if (data.clientName) {
@@ -329,6 +343,7 @@ export function AgendaView({
 
       {showApptForm && (
         <ApptFormModal
+          key={editingAppt ? `edit-${editingAppt.id}` : `new-${prefillSlot?.dateKey}-${prefillSlot?.clientName || ""}`}
           services={services}
           clients={clients}
           businessInfo={businessInfo}
@@ -338,6 +353,7 @@ export function AgendaView({
           onSave={saveAppt}
           onDelete={editingAppt ? () => { deleteAppt(editingAppt.id, editingAppt.clientPhone); setShowApptForm(false); } : null}
           onStatusChange={editingAppt ? (status) => { setApptStatus(editingAppt.id, status, editingAppt.fromAvailabilityId, editingAppt.clientPhone); setShowApptForm(false); } : null}
+          onDuplicate={editingAppt ? () => duplicateAppt(editingAppt) : null}
         />
       )}
 
@@ -618,14 +634,14 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
   );
 }
 
-function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, onDelete, onStatusChange, businessInfo }) {
+function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo }) {
   const base = initial || {
     dateKey: prefill?.dateKey || dateKey(new Date()),
     start: prefill?.start || "10:00",
-    serviceId: services[0]?.id || "",
-    clientName: "",
-    clientPhone: "",
-    notes: "",
+    serviceId: prefill?.serviceId || services[0]?.id || "",
+    clientName: prefill?.clientName || "",
+    clientPhone: prefill?.clientPhone || "",
+    notes: prefill?.notes || "",
   };
   const [dateVal, setDateVal] = useState(base.dateKey);
   const [start, setStart] = useState(base.start);
@@ -773,6 +789,11 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
           {onDelete && (
             <button type="button" style={styles.deleteBtn} onClick={onDelete}>
               <Trash2 size={16} /> Eliminar
+            </button>
+          )}
+          {onDuplicate && (
+            <button type="button" style={styles.duplicateBtn} onClick={onDuplicate}>
+              <Copy size={16} /> Duplicar
             </button>
           )}
           <div style={{ flex: 1 }} />

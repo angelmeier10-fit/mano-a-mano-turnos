@@ -273,6 +273,11 @@ const styles = {
     padding: "10px 16px", borderRadius: 10, border: "1.5px solid #E0BBB0",
     background: "none", color: "#A6483A", fontWeight: 600, fontSize: 13.5, cursor: "pointer",
   },
+  duplicateBtn: {
+    display: "flex", alignItems: "center", gap: 6,
+    padding: "10px 16px", borderRadius: 10, border: "1.5px solid #A0B490",
+    background: "none", color: "#5A7048", fontWeight: 600, fontSize: 13.5, cursor: "pointer",
+  },
 
   availExistingRow: {
     display: "flex", alignItems: "center", gap: 8, background: "#fff",
