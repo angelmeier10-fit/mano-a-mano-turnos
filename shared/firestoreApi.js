@@ -215,9 +215,36 @@ export async function getMyBookingRefs(phone) {
   }
 }
 
+// Escribe un evento en appointmentHistory (best-effort, nunca bloquea la operación principal).
+export async function addAppointmentHistory(event) {
+  try {
+    await addDoc(collection(db, "appointmentHistory"), event);
+  } catch (e) {
+    console.error("[appointmentHistory] No se pudo guardar el evento:", e);
+  }
+}
+
+// Trae el historial de movimientos de un cliente por clientId, ordenado más reciente primero.
+export async function getAppointmentHistory(clientId) {
+  if (!clientId) return [];
+  try {
+    const snap = await getDocs(
+      query(collection(db, "appointmentHistory"), where("clientId", "==", clientId))
+    );
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => b.happenedAt - a.happenedAt);
+  } catch (e) {
+    console.error("[appointmentHistory] No se pudo leer el historial:", e);
+    return [];
+  }
+}
+
 // Cancela un turno desde la app pública. El cliente debe proveer el cancelToken
 // que recibió al reservar (se envía como cancelProof para que Firestore lo valide).
-export async function cancelAppointmentPublic(apptId, cancelToken, availabilitySlotId, phone) {
+// historyData es opcional: { clientId, clientPhone, clientName, originalDateKey,
+//   originalStart, originalEnd, serviceId, serviceName }
+export async function cancelAppointmentPublic(apptId, cancelToken, availabilitySlotId, phone, historyData) {
   await updateDoc(doc(db, "appointments", apptId), {
     status: "cancelado",
     cancelProof: cancelToken,
@@ -235,11 +262,21 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
       await updateDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "cancelado" });
     } catch {}
   }
+  if (historyData) {
+    addAppointmentHistory({
+      ...historyData,
+      apptId,
+      eventType: "cancelado_cliente",
+      happenedAt: Date.now(),
+    });
+  }
 }
 
 // Reprograma un turno: cancela el viejo (atómico) y crea uno nuevo.
 // Devuelve { apptId, cancelToken } del nuevo turno.
-export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, oldSlotId, newAppt, phone }) {
+// historyData es opcional: { clientId, clientPhone, clientName, originalDateKey,
+//   originalStart, originalEnd, serviceId, serviceName }
+export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, oldSlotId, newAppt, phone, historyData }) {
   const newCancelToken = generateCancelToken();
   const oldApptRef = doc(db, "appointments", oldApptId);
   const newSlotRef = doc(db, "availability", newAppt.fromAvailabilityId);
@@ -290,6 +327,19 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
         requiresCancelToken: true,
       });
     } catch {}
+  }
+
+  if (historyData) {
+    addAppointmentHistory({
+      ...historyData,
+      apptId: oldApptId,
+      eventType: "reprogramado_cliente",
+      happenedAt: Date.now(),
+      newApptId,
+      newDateKey: newAppt.dateKey,
+      newStart: newAppt.start,
+      newEnd: newAppt.end,
+    });
   }
 
   return { apptId: newApptId, cancelToken: newCancelToken };

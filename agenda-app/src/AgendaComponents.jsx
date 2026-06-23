@@ -7,7 +7,7 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo,
@@ -87,7 +87,7 @@ export function AgendaView({
     onDeleteAppt(id);
     deleteBookingRef(clientPhone, id).catch((e) => console.error("[deleteAppt] deleteBookingRef falló:", e));
   }
-  async function setApptStatus(id, status, fromAvailabilityId, clientPhone) {
+  async function setApptStatus(id, status, fromAvailabilityId, clientPhone, appt) {
     await onUpdateAppt(id, { status });
     if (status === "cancelado") {
       if (fromAvailabilityId && onFreeSlot) {
@@ -96,6 +96,22 @@ export function AgendaView({
         }
       }
       markBookingRefCancelled(clientPhone, id).catch(() => {});
+      if (appt) {
+        const svc = services.find(s => s.id === appt.serviceId);
+        addAppointmentHistory({
+          clientId: appt.clientId || null,
+          clientPhone: appt.clientPhone || "",
+          clientName: appt.clientName || "",
+          apptId: id,
+          eventType: "cancelado_profesional",
+          happenedAt: Date.now(),
+          originalDateKey: appt.dateKey,
+          originalStart: appt.start,
+          originalEnd: appt.end,
+          serviceId: appt.serviceId || null,
+          serviceName: svc?.name || "",
+        });
+      }
     } else if (status === "confirmado") {
       console.log("[setApptStatus] confirmando turno en phoneIndex:", { id, clientPhone });
       markBookingRefConfirmed(clientPhone, id).catch((e) => console.error("[setApptStatus] markBookingRefConfirmed falló:", e));
@@ -136,6 +152,26 @@ export function AgendaView({
           end: data.end,
           serviceName: svc?.name || "",
         }).catch((e) => console.error("[saveAppt] updateBookingRef falló:", e));
+      }
+      if (editingAppt.dateKey !== data.dateKey || editingAppt.start !== data.start) {
+        const oldSvc = services.find(s => s.id === editingAppt.serviceId);
+        addAppointmentHistory({
+          clientId: clientId || editingAppt.clientId || null,
+          clientPhone: data.clientPhone || editingAppt.clientPhone || "",
+          clientName: data.clientName || editingAppt.clientName || "",
+          apptId: editingAppt.id,
+          eventType: "reprogramado_profesional",
+          happenedAt: Date.now(),
+          originalDateKey: editingAppt.dateKey,
+          originalStart: editingAppt.start,
+          originalEnd: editingAppt.end,
+          serviceId: editingAppt.serviceId || null,
+          serviceName: oldSvc?.name || "",
+          newApptId: editingAppt.id,
+          newDateKey: data.dateKey,
+          newStart: data.start,
+          newEnd: data.end,
+        });
       }
     } else {
       onCreateAppt({ status: "confirmado", ...data, ...(clientId ? { clientId } : {}) });
@@ -363,7 +399,7 @@ export function AgendaView({
           onClose={() => setShowApptForm(false)}
           onSave={saveAppt}
           onDelete={editingAppt ? () => { deleteAppt(editingAppt.id, editingAppt.clientPhone); setShowApptForm(false); } : null}
-          onStatusChange={editingAppt ? (status) => { setApptStatus(editingAppt.id, status, editingAppt.fromAvailabilityId, editingAppt.clientPhone); setShowApptForm(false); } : null}
+          onStatusChange={editingAppt ? (status) => { setApptStatus(editingAppt.id, status, editingAppt.fromAvailabilityId, editingAppt.clientPhone, editingAppt); setShowApptForm(false); } : null}
           onDuplicate={editingAppt ? () => duplicateAppt(editingAppt) : null}
         />
       )}

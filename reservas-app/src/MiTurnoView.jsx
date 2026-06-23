@@ -130,7 +130,18 @@ export default function MiTurnoView({
     setWorking(true);
     setWorkError(null);
     try {
-      await onCancelAppointment(selected.id, token, selected.fromAvailabilityId, phone);
+      const svc = services.find(s => s.id === selected.serviceId);
+      const historyData = {
+        clientId: selected.clientId || null,
+        clientPhone: phone,
+        clientName: selected.clientName || "",
+        originalDateKey: selected.dateKey,
+        originalStart: selected.start,
+        originalEnd: selected.end || "",
+        serviceId: selected.serviceId || null,
+        serviceName: svc?.name || "",
+      };
+      await onCancelAppointment(selected.id, token, selected.fromAvailabilityId, phone, historyData);
       removeFromLocalStorage(selected.id);
       setDoneMsg("Tu turno fue cancelado. El cupo quedó libre para que otro cliente pueda reservarlo.");
       setStep("done");
@@ -164,6 +175,17 @@ export default function MiTurnoView({
     setWorkError(null);
     try {
       const newEnd = minutesToTime(timeToMinutes(reschedSlot.start) + reschedSvc.duration);
+      const oldSvc = services.find(s => s.id === selected.serviceId);
+      const historyData = {
+        clientId: selected.clientId || null,
+        clientPhone: phone,
+        clientName: selected.clientName || "",
+        originalDateKey: selected.dateKey,
+        originalStart: selected.start,
+        originalEnd: selected.end || "",
+        serviceId: selected.serviceId || null,
+        serviceName: oldSvc?.name || "",
+      };
       const result = await onReschedule({
         oldApptId: selected.id,
         oldCancelToken: token,
@@ -180,6 +202,7 @@ export default function MiTurnoView({
           fromAvailabilityId: reschedSlot.id,
         },
         phone,
+        historyData,
       });
       // Actualizar localStorage: quitar el viejo, guardar el nuevo
       removeFromLocalStorage(selected.id);

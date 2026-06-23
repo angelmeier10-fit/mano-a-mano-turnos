@@ -1,11 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check } from "lucide-react";
-import { formatPrice, STATUS, formatPhoneForWhatsapp } from "../../shared/helpers";
+import { formatPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
+import { getAppointmentHistory } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
 export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointments, services }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
+  const [movements, setMovements] = useState([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selected) { setMovements([]); return; }
+    setMovementsLoading(true);
+    getAppointmentHistory(selected.id)
+      .then(setMovements)
+      .catch(() => setMovements([]))
+      .finally(() => setMovementsLoading(false));
+  }, [selected?.id]);
 
   function clientHistory(client) {
     return appointments
@@ -105,6 +117,51 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
                     {h.notes && <div style={styles.historyNotes}>{h.notes}</div>}
                   </div>
                   <span style={{ ...styles.historyStatusTag, color: STATUS[h.status]?.color }}>{STATUS[h.status]?.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <label style={{ ...styles.fieldLabel, marginTop: 24 }}>
+          Movimientos{movements.length > 0 ? ` (${movements.length})` : ""}
+        </label>
+        {movementsLoading ? (
+          <p style={styles.emptyMsg}>Cargando…</p>
+        ) : movements.length === 0 ? (
+          <p style={styles.emptyMsg}>Sin cancelaciones ni reprogramaciones registradas.</p>
+        ) : (
+          <div style={styles.historyList}>
+            {movements.map(m => {
+              const isCancelled = m.eventType === "cancelado_cliente" || m.eventType === "cancelado_profesional";
+              return (
+                <div key={m.id} style={styles.historyItem}>
+                  <div style={{ width: 4, borderRadius: 2, alignSelf: "stretch", background: isCancelled ? "#A6483A" : "#6E7F5C" }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={styles.historyDate}>
+                      {new Date(m.happenedAt).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })}
+                      {" · "}
+                      {new Date(m.happenedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                    <div style={{ ...styles.historyService, fontWeight: 600 }}>
+                      {m.eventType === "cancelado_cliente" && "El cliente canceló"}
+                      {m.eventType === "cancelado_profesional" && "Cancelaste vos"}
+                      {m.eventType === "reprogramado_cliente" && "El cliente cambió el horario"}
+                      {m.eventType === "reprogramado_profesional" && "Modificaste el horario"}
+                    </div>
+                    {isCancelled ? (
+                      <div style={styles.historyNotes}>
+                        {m.originalDateKey ? formatDateLong(m.originalDateKey) : "?"} · {m.originalStart} hs
+                        {m.serviceName ? ` · ${m.serviceName}` : ""}
+                      </div>
+                    ) : (
+                      <div style={styles.historyNotes}>
+                        De {m.originalDateKey ? formatDateLong(m.originalDateKey) : "?"} {m.originalStart} hs
+                        {" → "}
+                        {m.newDateKey ? formatDateLong(m.newDateKey) : "?"} {m.newStart} hs
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
