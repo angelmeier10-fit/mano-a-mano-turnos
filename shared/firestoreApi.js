@@ -251,10 +251,10 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
     if (!newSlotSnap.exists() || newSlotSnap.data().booked) {
       throw new Error("Este horario ya fue tomado. Por favor elegí otro.");
     }
+    // No incluimos el cupo viejo en la transacción: su regla exige booked:true,
+    // y si ya estuviera en false (estado inconsistente) haría fallar toda la transacción.
+    // Se libera best-effort después de que lo crítico ya se confirmó.
     t.update(oldApptRef, { status: "cancelado", cancelProof: oldCancelToken });
-    if (oldSlotId) {
-      t.update(doc(db, "availability", oldSlotId), { booked: false });
-    }
     t.update(newSlotRef, { booked: true });
     t.set(newApptRef, {
       ...newAppt,
@@ -264,6 +264,15 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
       createdAt: Date.now(),
     });
   });
+
+  // Liberar cupo viejo fuera de la transacción (best-effort)
+  if (oldSlotId) {
+    try {
+      await updateDoc(doc(db, "availability", oldSlotId), { booked: false });
+    } catch (e) {
+      console.error("[reschedule] No se pudo liberar el cupo anterior:", e);
+    }
+  }
 
   const phoneDigits = normalizePhone(phone);
   if (phoneDigits) {
