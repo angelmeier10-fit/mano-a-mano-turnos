@@ -132,6 +132,17 @@ export function AgendaView({
   }
 
   async function saveAppt(data) {
+    const duplicate = appointments.find(a =>
+      a.status !== "cancelado" &&
+      a.dateKey === data.dateKey &&
+      a.start === data.start &&
+      a.id !== (editingAppt?.id)
+    );
+    if (duplicate) {
+      alert(`Ya existe un turno a las ${data.start} el ${data.dateKey}. No se pueden tener turnos duplicados.`);
+      return;
+    }
+
     let clientId = null;
     if (data.clientName) {
       try {
@@ -142,8 +153,12 @@ export function AgendaView({
     }
     if (editingAppt) {
       const mergedData = { ...data, ...(clientId ? { clientId } : {}) };
-      updateAppointmentWithSlotSwap(editingAppt.id, editingAppt.fromAvailabilityId || null, mergedData)
-        .catch((e) => console.error("[saveAppt] updateAppointmentWithSlotSwap falló:", e));
+      try {
+        await updateAppointmentWithSlotSwap(editingAppt.id, editingAppt.fromAvailabilityId || null, mergedData);
+      } catch (e) {
+        alert(e.message || "No se pudo guardar el turno.");
+        return;
+      }
       if (data.clientPhone) {
         const svc = services.find(s => s.id === data.serviceId);
         updateBookingRef(data.clientPhone, editingAppt.id, {

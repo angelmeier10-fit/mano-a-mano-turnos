@@ -352,6 +352,16 @@ export function listenAppointments(callback) {
 }
 export async function createAppointment(appt) {
   // appt: { dateKey, start, end, serviceId, clientName, clientPhone, notes, status, fromAvailabilityId? }
+  const dupCheck = await getDocs(query(
+    collection(db, "appointments"),
+    where("dateKey", "==", appt.dateKey),
+    where("start", "==", appt.start),
+  ));
+  const activeCount = dupCheck.docs.filter(d => d.data().status !== "cancelado").length;
+  if (activeCount > 0) {
+    throw new Error(`Ya existe un turno a las ${appt.start} el ${appt.dateKey}.`);
+  }
+
   let slotId = appt.fromAvailabilityId || null;
   let apptRef;
 
@@ -420,6 +430,16 @@ export async function updateAppointment(id, data) {
 // busca un cupo coincidente con el nuevo dateKey+start y lo ocupa, y actualiza el turno — todo atómicamente.
 export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityId, newData) {
   // La query no puede ir dentro de la transacción (limitación del SDK web de Firestore)
+  const dupCheck = await getDocs(query(
+    collection(db, "appointments"),
+    where("dateKey", "==", newData.dateKey),
+    where("start", "==", newData.start),
+  ));
+  const activeDup = dupCheck.docs.find(d => d.id !== apptId && d.data().status !== "cancelado");
+  if (activeDup) {
+    throw new Error(`Ya existe un turno a las ${newData.start} el ${newData.dateKey}.`);
+  }
+
   const slotQuery = query(
     collection(db, "availability"),
     where("dateKey", "==", newData.dateKey),
