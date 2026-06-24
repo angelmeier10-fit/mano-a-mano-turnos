@@ -81,12 +81,15 @@ export function getRecurringDateKeys(weekdays, weeksCount) {
   return result;
 }
 
+function parseDateKeyAsLocal(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 export function getRecurringDateKeysByRange(weekdays, fromDate, toDate) {
   const result = [];
-  const from = new Date(fromDate);
-  from.setHours(0, 0, 0, 0);
-  const to = new Date(toDate);
-  to.setHours(0, 0, 0, 0);
+  const from = parseDateKeyAsLocal(fromDate);
+  const to = parseDateKeyAsLocal(toDate);
   let d = from;
   while (d <= to) {
     if (weekdays.includes(d.getDay())) result.push(dateKey(d));

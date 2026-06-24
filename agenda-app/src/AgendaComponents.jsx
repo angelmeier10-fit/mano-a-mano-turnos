@@ -3,7 +3,7 @@ import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, Mes
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
-  formatPhoneForWhatsapp,
+  formatPhoneForWhatsapp, parseDateKeyAsLocal,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
@@ -201,7 +201,7 @@ export function AgendaView({
       }
     } else {
       const weeks = data.repeatWeeks || 1;
-      const baseDate = new Date(data.dateKey);
+      const baseDate = parseDateKeyAsLocal(data.dateKey);
       for (let i = 0; i < weeks; i++) {
         const dKey = i === 0 ? data.dateKey : dateKey(addDays(baseDate, 7 * i));
         const dup = appointments.find(a => a.status !== "cancelado" && a.dateKey === dKey && a.start === data.start);
