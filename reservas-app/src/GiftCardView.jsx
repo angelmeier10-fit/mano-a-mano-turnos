@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Gift, ChevronLeft } from "lucide-react";
-import { uid, formatPrice, formatDateLong, dateKey, addDays } from "../../shared/helpers";
+import { uid, formatPrice, formatDateLong, dateKey, addDays, formatPhoneForWhatsapp } from "../../shared/helpers";
 import { createGiftCard } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
@@ -9,6 +9,8 @@ const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-m
 export default function GiftCardView({ services, businessInfo, onBack }) {
   const todayStr = dateKey(new Date());
   const [serviceId, setServiceId] = useState(services[0]?.id || "");
+  const [buyerName, setBuyerName] = useState("");
+  const [buyerPhone, setBuyerPhone] = useState("");
   const [fromName, setFromName] = useState("");
   const [toName, setToName] = useState("");
   const [message, setMessage] = useState("");
@@ -19,7 +21,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
   const svc = services.find(s => s.id === serviceId);
 
   async function handleGenerate() {
-    if (!fromName.trim() || !toName.trim() || !serviceId || loading) return;
+    if (!buyerName.trim() || !buyerPhone.trim() || !fromName.trim() || !toName.trim() || !serviceId || loading) return;
     setLoading(true);
     try {
       const code = uid() + uid();
@@ -29,6 +31,8 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
         serviceId,
         serviceName: svc?.name || "",
         servicePrice: svc?.price || 0,
+        buyerName: buyerName.trim(),
+        buyerPhone: buyerPhone.replace(/\D/g, ""),
         fromName: fromName.trim(),
         toName: toName.trim(),
         message: message.trim(),
@@ -45,9 +49,9 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
 
       // Abrir WhatsApp con los detalles
       if (businessInfo?.whatsapp) {
-        const waNum = businessInfo.whatsapp.replace(/\D/g, "");
-        const msg = `Hola! Alguien compró una gift card 🎁\nServicio: ${svc?.name} (${formatPrice(svc?.price)})\nDe: ${fromName.trim()}\nPara: ${toName.trim()}${message.trim() ? `\nMensaje: "${message.trim()}"` : ""}\nFecha de entrega elegida: ${formatDateLong(deliveryDate)}\n\nLink de la gift card:\n${link}\n\nPor favor confirmá el pago y activala desde la Agenda.`;
-        window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, "_blank");
+        const waNum = formatPhoneForWhatsapp(businessInfo.whatsapp);
+        const msg = `Hola! Alguien compró una gift card 🎁\nServicio: ${svc?.name} (${formatPrice(svc?.price)})\nComprador: ${buyerName.trim()} · ${buyerPhone.trim()}\nDe: ${fromName.trim()}\nPara: ${toName.trim()}${message.trim() ? `\nMensaje: "${message.trim()}"` : ""}\nFecha de entrega elegida: ${formatDateLong(deliveryDate)}\n\nLink de la gift card:\n${link}\n\nPor favor confirmá el pago y activala desde la Agenda.`;
+        if (waNum) window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`, "_blank");
       }
     } catch (e) {
       console.error(e);
@@ -61,7 +65,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
     return (
       <div style={{ padding: "20px 16px" }}>
         <div style={{ ...styles.giftCardVisual, marginBottom: 20 }}>
-          <div style={styles.giftCardVisualLogo}>Mano a Mano</div>
+          <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
           <div style={styles.giftCardVisualService}>{done.data.serviceName}</div>
           <div style={styles.giftCardVisualTo}>Para {done.data.toName} · de parte de {done.data.fromName}</div>
           {done.data.message && <div style={styles.giftCardVisualMessage}>"{done.data.message}"</div>}
@@ -84,6 +88,19 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
         >
           Copiar link
         </button>
+        {businessInfo?.whatsapp && (
+          <button
+            style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", marginBottom: 10, background: "#25D366" }}
+            onClick={() => {
+              const waNum = formatPhoneForWhatsapp(businessInfo.whatsapp);
+              if (!waNum) return;
+              const msg = `Hola ${done.data.toName}! Te comparto tu gift card de Angel Meier Masoterapia 🎁\nServicio: ${done.data.serviceName}\nDe parte de: ${done.data.fromName}${done.data.message ? `\n"${done.data.message}"` : ""}\n\nLink para usarla:\n${done.link}`;
+              window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+            }}
+          >
+            Reenviar link por WhatsApp
+          </button>
+        )}
         <button style={{ ...styles.cancelBtn, width: "100%", justifyContent: "center" }} onClick={onBack}>
           Volver al inicio
         </button>
@@ -104,6 +121,17 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
         <p style={{ fontSize: 13, color: "#8A8275", marginTop: 0, marginBottom: 20 }}>
           Elegí el servicio, completá los datos y generamos una gift card con un link único.
         </p>
+
+        <div style={styles.fieldRow}>
+          <div style={{ flex: 1 }}>
+            <label style={styles.fieldLabel}>Tu nombre</label>
+            <input style={styles.input} placeholder="Nombre de quien compra" value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={styles.fieldLabel}>Tu teléfono</label>
+            <input style={styles.input} placeholder="Ej: 1134567890" type="tel" value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} />
+          </div>
+        </div>
 
         <label style={styles.fieldLabel}>Servicio</label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
@@ -160,9 +188,9 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
         </p>
 
         <button
-          style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", opacity: (!fromName.trim() || !toName.trim()) ? 0.5 : 1 }}
+          style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", opacity: (!buyerName.trim() || !buyerPhone.trim() || !fromName.trim() || !toName.trim()) ? 0.5 : 1 }}
           onClick={handleGenerate}
-          disabled={!fromName.trim() || !toName.trim() || loading}
+          disabled={!buyerName.trim() || !buyerPhone.trim() || !fromName.trim() || !toName.trim() || loading}
         >
           <Gift size={16} /> {loading ? "Generando…" : "Generar gift card"}
         </button>

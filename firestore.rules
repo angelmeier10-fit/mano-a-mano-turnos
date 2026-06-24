@@ -72,7 +72,9 @@ service cloud.firestore {
     match /giftCards/{code} {
       allow create: if request.resource.data.status == "pending"
                     && request.resource.data.fromName is string
-                    && request.resource.data.fromName.size() > 0;
+                    && request.resource.data.fromName.size() > 0
+                    && request.resource.data.buyerPhone is string
+                    && request.resource.data.buyerPhone.size() > 0;
       allow read: if true;
       allow update: if isSignedIn()
                     || (

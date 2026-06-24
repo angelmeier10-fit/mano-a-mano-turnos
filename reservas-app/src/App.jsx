@@ -3,6 +3,7 @@ import ReservarView from "./ReservarView";
 import MiTurnoView from "./MiTurnoView";
 import GiftCardView from "./GiftCardView";
 import GiftCardRedeemView from "./GiftCardRedeemView";
+import GiftCardLookupView from "./GiftCardLookupView";
 import {
   listenServices,
   listenAvailability,
@@ -27,6 +28,31 @@ function GoogleFontsLoader() {
   return null;
 }
 
+function GiftCardMenuView({ onBuy, onLookup }) {
+  return (
+    <div style={{ padding: "32px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, margin: "0 0 8px", textAlign: "center" }}>Gift Cards</h2>
+      <p style={{ fontSize: 13, color: "#8A8275", textAlign: "center", margin: "0 0 16px" }}>
+        ¿Querés regalar una sesión o ya tenés una gift card?
+      </p>
+      <button
+        style={{ background: "#B5654A", color: "#fff", border: "none", borderRadius: 12, padding: "18px 20px", fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
+        onClick={onBuy}
+      >
+        🎁 Regalar una sesión
+        <div style={{ fontSize: 12, fontWeight: 400, opacity: 0.85, marginTop: 4 }}>Comprá una gift card para alguien especial</div>
+      </button>
+      <button
+        style={{ background: "#fff", color: "#2A2622", border: "2px solid #D0C5B4", borderRadius: 12, padding: "18px 20px", fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
+        onClick={onLookup}
+      >
+        Buscar mi gift card
+        <div style={{ fontSize: 12, fontWeight: 400, color: "#8A8275", marginTop: 4 }}>Buscá por número de teléfono</div>
+      </button>
+    </div>
+  );
+}
+
 function getGiftCardCodeFromURL() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -42,6 +68,8 @@ export default function App() {
   const [businessInfo, setBusinessInfo] = useState(DEFAULT_BUSINESS_INFO);
   const [loaded, setLoaded] = useState(false);
   const [currentView, setCurrentView] = useState("reservar");
+  const [giftCardSubview, setGiftCardSubview] = useState("menu"); // "menu" | "buy" | "lookup" | "redeem"
+  const [lookupSelectedCode, setLookupSelectedCode] = useState(null);
   const [miturnoInitPhone, setMiturnoInitPhone] = useState("");
 
   // Si la URL tiene ?giftcard=CODE, mostramos la vista de canje directamente
@@ -121,7 +149,7 @@ export default function App() {
           </button>
           <button
             style={{ ...styles.tabBtn, ...(currentView === "giftcard" ? styles.tabBtnActive : {}) }}
-            onClick={() => setCurrentView("giftcard")}
+            onClick={() => { setCurrentView("giftcard"); setGiftCardSubview("menu"); }}
           >
             Regalar 🎁
           </button>
@@ -145,11 +173,33 @@ export default function App() {
             onGoGiftCard={() => setCurrentView("giftcard")}
           />
         )}
-        {currentView === "giftcard" && (
+        {currentView === "giftcard" && giftCardSubview === "menu" && (
+          <GiftCardMenuView
+            onBuy={() => setGiftCardSubview("buy")}
+            onLookup={() => setGiftCardSubview("lookup")}
+          />
+        )}
+        {currentView === "giftcard" && giftCardSubview === "buy" && (
           <GiftCardView
             services={services}
             businessInfo={businessInfo}
-            onBack={() => setCurrentView("reservar")}
+            onBack={() => setGiftCardSubview("menu")}
+          />
+        )}
+        {currentView === "giftcard" && giftCardSubview === "lookup" && (
+          <GiftCardLookupView
+            onSelectGiftCard={(code) => { setLookupSelectedCode(code); setGiftCardSubview("redeem"); }}
+            onBack={() => setGiftCardSubview("menu")}
+          />
+        )}
+        {currentView === "giftcard" && giftCardSubview === "redeem" && lookupSelectedCode && (
+          <GiftCardRedeemView
+            code={lookupSelectedCode}
+            services={services}
+            availability={availability}
+            businessInfo={businessInfo}
+            onBookSlot={bookSlotAtomic}
+            onUpsertClient={createClientPublic}
           />
         )}
         {currentView === "miturno" && (

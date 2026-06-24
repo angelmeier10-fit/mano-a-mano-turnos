@@ -631,6 +631,12 @@ export async function getGiftCard(code) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
+export async function getGiftCardsByPhone(phone) {
+  const digits = phone.replace(/\D/g, "");
+  const snap = await getDocs(query(collection(db, "giftCards"), where("buyerPhone", "==", digits)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
 export async function activateGiftCard(code) {
   return updateDoc(doc(db, "giftCards", code), {
     status: "active",

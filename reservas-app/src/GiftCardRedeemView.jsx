@@ -11,7 +11,7 @@ function GiftCardVisual({ gc, canvasRef }) {
       <div style={{ position: "absolute", top: 0, right: 0, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.05)", transform: "translate(40%, -40%)" }} />
       <div style={{ position: "absolute", bottom: 0, left: 0, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,0,0,0.08)", transform: "translate(-30%, 40%)" }} />
       <div style={{ position: "relative" }}>
-        <div style={styles.giftCardVisualLogo}>🤍 Mano a Mano</div>
+        <div style={styles.giftCardVisualLogo}>🤍 Angel Meier Masoterapia</div>
         <div style={styles.giftCardVisualService}>{gc.serviceName}</div>
         <div style={{ fontSize: 15, color: "rgba(255,255,255,0.85)", marginBottom: 8, fontWeight: 600 }}>{formatPrice(gc.servicePrice)}</div>
         <div style={styles.giftCardVisualTo}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
@@ -89,7 +89,7 @@ export default function GiftCardRedeemView({ code, services, availability, busin
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <Gift size={28} color="#B5654A" />
         <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, margin: "8px 0 4px" }}>Gift Card</h2>
-        <p style={{ fontSize: 13, color: "#8A8275", margin: 0 }}>Mano a Mano · Masoterapia</p>
+        <p style={{ fontSize: 13, color: "#8A8275", margin: 0 }}>Angel Meier · Masoterapia</p>
       </div>
 
       <GiftCardVisual gc={gc} canvasRef={cardRef} />
