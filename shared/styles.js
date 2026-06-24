@@ -240,7 +240,7 @@ const styles = {
 
   modalOverlay: {
     position: "fixed", inset: 0, background: "rgba(42,38,34,0.55)",
-    display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50,
+    display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 300,
   },
   modal: {
     background: "#EFE9DF", borderRadius: "20px 20px 0 0", padding: "18px 18px 22px",
