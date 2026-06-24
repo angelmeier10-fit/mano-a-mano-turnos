@@ -114,10 +114,29 @@ export async function updateBookingRef(clientPhone, apptId, { dateKey, start, en
 }
 // Crea muchos cupos de una sola vez (ej: "todos los lunes de 10 a 14, por 8 semanas")
 // Firestore permite hasta 500 escrituras por batch; si hay más, las dividimos.
+// Descarta duplicados: no inserta cupos que ya existan con el mismo dateKey+start+end.
 export async function addAvailabilitySlotsBatch(slots) {
-  // slots: [{ dateKey, start, end }, ...]
+  if (slots.length === 0) return;
+
+  // Obtener todas las dateKeys únicas involucradas
+  const dateKeys = [...new Set(slots.map(s => s.dateKey))];
+
+  // Consultar cupos existentes para esas fechas (en lotes de 30 por límite de 'in')
+  const existing = new Set();
+  for (let i = 0; i < dateKeys.length; i += 30) {
+    const chunk = dateKeys.slice(i, i + 30);
+    const snap = await getDocs(query(collection(db, "availability"), where("dateKey", "in", chunk)));
+    snap.forEach(d => {
+      const { dateKey, start, end } = d.data();
+      existing.add(`${dateKey}|${start}|${end}`);
+    });
+  }
+
+  const newSlots = slots.filter(s => !existing.has(`${s.dateKey}|${s.start}|${s.end}`));
+  if (newSlots.length === 0) return;
+
   const chunks = [];
-  for (let i = 0; i < slots.length; i += 450) chunks.push(slots.slice(i, i + 450));
+  for (let i = 0; i < newSlots.length; i += 450) chunks.push(newSlots.slice(i, i + 450));
   for (const chunk of chunks) {
     const batch = writeBatch(db);
     chunk.forEach(slot => {
