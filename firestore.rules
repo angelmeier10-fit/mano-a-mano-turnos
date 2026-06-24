@@ -78,10 +78,22 @@ service cloud.firestore {
       allow read: if true;
       allow update: if isSignedIn()
                     || (
-                      // Cliente puede canjear: solo cambiar status a "used" y agregar apptId
+                      // Cliente puede canjear: cambiar status a "used" y agregar apptId
                       resource.data.status == "active"
                       && request.resource.data.status == "used"
                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'apptId', 'usedAt'])
+                    )
+                    || (
+                      // Cliente puede restaurar al cancelar: volver a "active" y limpiar apptId/usedAt
+                      resource.data.status == "used"
+                      && request.resource.data.status == "active"
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'apptId', 'usedAt'])
+                    )
+                    || (
+                      // Cliente puede actualizar apptId al reprogramar (gift card sigue "used")
+                      resource.data.status == "used"
+                      && request.resource.data.status == "used"
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['apptId'])
                     );
       allow delete: if isSignedIn();
     }

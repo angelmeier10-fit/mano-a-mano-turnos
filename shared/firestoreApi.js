@@ -274,6 +274,9 @@ export async function getAppointmentHistory(clientId) {
 // historyData es opcional: { clientId, clientPhone, clientName, originalDateKey,
 //   originalStart, originalEnd, serviceId, serviceName }
 export async function cancelAppointmentPublic(apptId, cancelToken, availabilitySlotId, phone, historyData) {
+  const apptSnap = await getDoc(doc(db, "appointments", apptId));
+  const giftCardCode = apptSnap.exists() ? apptSnap.data().giftCardCode : null;
+
   await updateDoc(doc(db, "appointments", apptId), {
     status: "cancelado",
     cancelProof: cancelToken,
@@ -291,6 +294,14 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
       await updateDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "cancelado" });
     } catch {}
   }
+  if (giftCardCode) {
+    try {
+      await restoreGiftCard(giftCardCode);
+    } catch (e) {
+      console.error("[giftCard] No se pudo restaurar la gift card:", e);
+    }
+  }
+
   if (historyData) {
     addAppointmentHistory({
       ...historyData,
@@ -308,6 +319,9 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
 export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, oldSlotId, newAppt, phone, historyData }) {
   const newCancelToken = generateCancelToken();
   const oldApptRef = doc(db, "appointments", oldApptId);
+
+  const oldApptSnap = await getDoc(oldApptRef);
+  const giftCardCode = oldApptSnap.exists() ? oldApptSnap.data().giftCardCode : null;
   const newSlotRef = doc(db, "availability", newAppt.fromAvailabilityId);
   const newApptRef = doc(collection(db, "appointments"));
   const newApptId = newApptRef.id;
@@ -330,6 +344,14 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
       createdAt: Date.now(),
     });
   });
+
+  if (giftCardCode) {
+    try {
+      await updateGiftCardApptId(giftCardCode, newApptId);
+    } catch (e) {
+      console.error("[giftCard] No se pudo actualizar apptId en gift card:", e);
+    }
+  }
 
   // Liberar cupo viejo fuera de la transacción (best-effort)
   if (oldSlotId) {
@@ -650,4 +672,16 @@ export async function redeemGiftCard(code, apptId) {
     apptId,
     usedAt: Date.now(),
   });
+}
+
+export async function restoreGiftCard(code) {
+  return updateDoc(doc(db, "giftCards", code), {
+    status: "active",
+    apptId: null,
+    usedAt: null,
+  });
+}
+
+export async function updateGiftCardApptId(code, newApptId) {
+  return updateDoc(doc(db, "giftCards", code), { apptId: newApptId });
 }
