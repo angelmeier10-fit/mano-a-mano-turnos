@@ -64,7 +64,8 @@ export default function App() {
     if (!user) return;
     const unsubServices = listenServices(setServices);
     const unsubAppts = listenAppointments(setAppointments);
-    const unsubIncoming = listenIncomingPendingAppointments((a) => {
+    const sessionStart = Date.now();
+    const unsubIncoming = listenIncomingPendingAppointments(sessionStart, (a) => {
       setApptNotifs(prev => [...prev, { id: a.id, clientName: a.clientName, dateKey: a.dateKey, start: a.start }]);
       if ("Notification" in window && Notification.permission === "granted") {
         new Notification("Nuevo turno solicitado", {

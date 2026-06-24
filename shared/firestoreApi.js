@@ -402,15 +402,13 @@ export function listenAppointments(callback) {
   });
 }
 
-// Llama a onNew solo para turnos NUEVOS que lleguen después de la carga inicial.
-export function listenIncomingPendingAppointments(onNew) {
-  let initialized = false;
+// Llama a onNew solo para turnos creados después de sessionStart (evita falsos positivos por cache/reconexión).
+export function listenIncomingPendingAppointments(sessionStart, onNew) {
   return onSnapshot(collection(db, "appointments"), (snap) => {
-    if (!initialized) { initialized = true; return; }
     snap.docChanges().forEach(change => {
       if (change.type === "added") {
         const a = { id: change.doc.id, ...change.doc.data() };
-        if (a.status === "pendiente") onNew(a);
+        if (a.status === "pendiente" && a.createdAt > sessionStart) onNew(a);
       }
     });
   });
