@@ -18,7 +18,7 @@ function saveBookingToLocalStorage(apptId, cancelToken, appt, serviceName) {
   } catch {}
 }
 
-export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno }) {
+export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, onBack, onGoGiftCard }) {
   const availabilityByDate = useMemo(() => {
     const map = {};
     availability.forEach(slot => {
@@ -38,7 +38,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
   const availableDatesSet = useMemo(() => new Set(availableDates), [availableDates]);
 
   const [selectedDate, setSelectedDate] = useState(null);
-  const [serviceId, setServiceId] = useState(services[0]?.id || "");
+  const [serviceId, setServiceId] = useState(preselectedServiceId || services[0]?.id || "");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [confirmed, setConfirmed] = useState(null);
@@ -91,6 +91,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
       status: "pendiente",
       fromAvailabilityId: slot.id,
       ...(clientId ? { clientId } : {}),
+      ...(giftCardCode ? { giftCardCode } : {}),
     };
     let result;
     try {
@@ -118,8 +119,11 @@ export default function ReservarView({ services, availability, businessInfo, onB
       <div style={styles.viewWrap}>
         <div style={styles.confirmCard}>
           <div style={styles.confirmCheck}><Check size={28} color="#EFE9DF" /></div>
-          <h2 style={styles.confirmTitle}>Turno pendiente de confirmación</h2>
-          <p style={{ ...styles.confirmDetail, color: "#8A8275", marginBottom: 4 }}>Te confirmamos el turno pronto por WhatsApp.</p>
+          <h2 style={styles.confirmTitle}>{giftCardCode ? "Turno confirmado" : "Turno pendiente de confirmación"}</h2>
+          {giftCardCode
+            ? <p style={{ ...styles.confirmDetail, color: "#4A5A40", fontWeight: 600, marginBottom: 4 }}>🎁 Pago con gift card</p>
+            : <p style={{ ...styles.confirmDetail, color: "#8A8275", marginBottom: 4 }}>Te confirmamos el turno pronto por WhatsApp.</p>
+          }
           <p style={styles.confirmDetail}>{cSvc?.name} · {confirmed.start} a {confirmed.end}</p>
           {cSvc?.price && <p style={styles.confirmPrice}>{formatPrice(cSvc.price)}</p>}
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
@@ -152,6 +156,26 @@ export default function ReservarView({ services, availability, businessInfo, onB
 
   return (
     <div style={styles.viewWrap}>
+      {giftCardCode && onBack && (
+        <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "#B5654A", fontWeight: 600, fontSize: 13, padding: "0 0 12px", display: "flex", alignItems: "center", gap: 4 }}>
+          ← Volver a la gift card
+        </button>
+      )}
+      {giftCardCode && (
+        <div style={{ background: "#EBF3E6", border: "1.5px solid #9AB88A", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#4A5A40", fontWeight: 600 }}>
+          🎁 Reserva con gift card — este turno ya está pago
+        </div>
+      )}
+      {!giftCardCode && onGoGiftCard && (
+        <div style={styles.giftCardBanner} onClick={onGoGiftCard} role="button">
+          <div style={styles.giftCardBannerIcon}>🎁</div>
+          <div style={styles.giftCardBannerText}>
+            <p style={styles.giftCardBannerTitle}>Regalá una sesión</p>
+            <p style={styles.giftCardBannerSub}>Gift cards para regalar · válidas 30 días</p>
+          </div>
+          <div style={styles.giftCardBannerArrow}>›</div>
+        </div>
+      )}
       <h2 style={styles.sectionTitle}>Reservá tu sesión</h2>
       <div style={styles.businessInfoCard}>
         <div style={styles.businessInfoRow}>

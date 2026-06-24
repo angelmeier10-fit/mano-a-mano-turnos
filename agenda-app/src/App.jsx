@@ -5,12 +5,14 @@ import Header from "./Header";
 import { AgendaView } from "./AgendaComponents";
 import { ClientesView, ServiciosView } from "./ClientesServiciosViews";
 import NegocioView from "./NegocioView";
+import GiftCardsView from "./GiftCardsView";
 import {
   listenServices, addService, deleteService,
   listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
   listenAppointments, createAppointment, updateAppointment, deleteAppointment,
   listenClients, upsertClientByName, updateClient, deleteClient,
   listenBusinessInfo, setBusinessInfo, freeAvailabilitySlot,
+  listenGiftCards,
 } from "../../shared/firestoreApi";
 import { DEFAULT_SERVICES, DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
 import styles from "../../shared/styles";
@@ -37,6 +39,7 @@ export default function App() {
   const [availability, setAvailability] = useState([]);
   const [businessInfo, setBusinessInfoState] = useState(DEFAULT_BUSINESS_INFO);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [giftCards, setGiftCards] = useState([]);
 
   useEffect(() => {
     const unsub = watchAuthState((u) => {
@@ -57,8 +60,9 @@ export default function App() {
       if (data) setBusinessInfoState(data);
       setDataLoaded(true);
     });
+    const unsubGiftCards = listenGiftCards(setGiftCards);
     return () => {
-      unsubServices(); unsubAppts(); unsubClients(); unsubAvail(); unsubBiz();
+      unsubServices(); unsubAppts(); unsubClients(); unsubAvail(); unsubBiz(); unsubGiftCards();
     };
   }, [user]);
 
@@ -93,7 +97,7 @@ export default function App() {
   return (
     <div style={styles.app}>
       <GoogleFontsLoader />
-      <Header view={view} setView={setView} onLogout={logout} />
+      <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} />
       <main style={styles.main}>
         {view === "agenda" && (
           <AgendaView
@@ -111,6 +115,8 @@ export default function App() {
             onAddSlotsBatch={addAvailabilitySlotsBatch}
             onFreeSlot={freeAvailabilitySlot}
             upsertClientByName={upsertClientByName}
+            pendingGiftCards={giftCards.filter(g => g.status === "pending").length}
+            onGoGiftCards={() => setView("giftcards")}
           />
         )}
         {view === "clientes" && (
@@ -137,6 +143,9 @@ export default function App() {
             clients={clients}
             services={services}
           />
+        )}
+        {view === "giftcards" && (
+          <GiftCardsView giftCards={giftCards} />
         )}
       </main>
     </div>

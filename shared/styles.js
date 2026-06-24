@@ -481,6 +481,86 @@ const styles = {
     fontSize: 9.5, fontWeight: 700, color: "#fff", background: "#6E7F5C",
     borderRadius: 8, padding: "1px 5px", minWidth: 14, textAlign: "center",
   },
+
+  // Gift Cards
+  giftCardBanner: {
+    display: "flex", alignItems: "center", gap: 12,
+    background: "linear-gradient(135deg, #2A2622 0%, #3D2E28 100%)",
+    border: "1.5px solid #B5654A",
+    borderRadius: 14, padding: "14px 16px", marginBottom: 16, cursor: "pointer",
+  },
+  giftCardBannerIcon: {
+    fontSize: 26, lineHeight: 1,
+  },
+  giftCardBannerText: {
+    flex: 1,
+  },
+  giftCardBannerTitle: {
+    fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 15,
+    color: "#EFE9DF", margin: 0,
+  },
+  giftCardBannerSub: {
+    fontSize: 12, color: "#B5A98F", marginTop: 2,
+  },
+  giftCardBannerArrow: {
+    color: "#B5654A", fontSize: 18,
+  },
+  giftCardVisual: {
+    background: "linear-gradient(135deg, #B5654A 0%, #8B4226 100%)",
+    borderRadius: 18, padding: "28px 28px 24px",
+    color: "#EFE9DF", position: "relative", overflow: "hidden",
+    minHeight: 180,
+  },
+  giftCardVisualLogo: {
+    fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 18,
+    color: "rgba(255,255,255,0.9)", marginBottom: 16,
+  },
+  giftCardVisualService: {
+    fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22,
+    color: "#fff", marginBottom: 6,
+  },
+  giftCardVisualTo: {
+    fontSize: 13, color: "rgba(255,255,255,0.75)", marginBottom: 4,
+  },
+  giftCardVisualMessage: {
+    fontSize: 13, color: "rgba(255,255,255,0.85)", fontStyle: "italic",
+    marginBottom: 16, lineHeight: 1.4,
+  },
+  giftCardVisualCode: {
+    fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 11,
+    color: "rgba(255,255,255,0.55)", letterSpacing: "0.12em",
+    borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 12, marginTop: 8,
+  },
+  giftCardStatusBadge: {
+    display: "inline-block", padding: "4px 10px", borderRadius: 20,
+    fontSize: 11.5, fontWeight: 700, letterSpacing: "0.04em",
+  },
+  giftCardPendingBanner: {
+    display: "flex", alignItems: "center", gap: 10,
+    background: "#FFF8EC", border: "1.5px solid #C9973A",
+    borderRadius: 12, padding: "12px 14px", marginBottom: 12,
+  },
+  giftCardRow: {
+    background: "#fff", borderRadius: 14, padding: "14px 16px",
+    marginBottom: 10, border: "1px solid #E8E0D4",
+  },
+  giftCardRowHeader: {
+    display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8,
+  },
+  giftCardRowService: {
+    fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 15, color: "#2A2622",
+  },
+  giftCardRowMeta: {
+    fontSize: 12, color: "#8A8275", marginTop: 4,
+  },
+  giftCardConfirmBtn: {
+    background: "#6E7F5C", color: "#fff", border: "none", borderRadius: 8,
+    padding: "7px 14px", fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+  giftCardBadgeActive: { background: "#EBF3E6", color: "#4A5A40" },
+  giftCardBadgePending: { background: "#FFF3DC", color: "#7A5C20" },
+  giftCardBadgeUsed: { background: "#F0EBE3", color: "#6E6555" },
 };
 
 export default styles;

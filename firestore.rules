@@ -68,6 +68,22 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
+    // Gift Cards: cualquiera puede crear y leer por código. Solo autenticado puede actualizar (activar/canjear).
+    match /giftCards/{code} {
+      allow create: if request.resource.data.status == "pending"
+                    && request.resource.data.fromName is string
+                    && request.resource.data.fromName.size() > 0;
+      allow read: if true;
+      allow update: if isSignedIn()
+                    || (
+                      // Cliente puede canjear: solo cambiar status a "used" y agregar apptId
+                      resource.data.status == "active"
+                      && request.resource.data.status == "used"
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'apptId', 'usedAt'])
+                    );
+      allow delete: if isSignedIn();
+    }
+
     // Índice liviano para deduplicar clientes desde la app pública sin exponer datos sensibles.
     // ID del documento = dígitos del teléfono. Solo contiene { clientId }.
     match /phoneIndex/{phoneDigitsId} {

@@ -13,7 +13,7 @@ export function AgendaView({
   services, appointments, availability, clients, businessInfo,
   onCreateAppt, onUpdateAppt, onDeleteAppt,
   onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch, onFreeSlot,
-  upsertClientByName,
+  upsertClientByName, pendingGiftCards = 0, onGoGiftCards,
 }) {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [calendarView, setCalendarView] = useState("week");
@@ -198,6 +198,18 @@ export function AgendaView({
 
   return (
     <div style={styles.viewWrap}>
+      {pendingGiftCards > 0 && (
+        <div style={{ ...styles.giftCardPendingBanner, cursor: "pointer" }} onClick={onGoGiftCards} role="button" tabIndex={0}>
+          <span style={{ fontSize: 20 }}>🎁</span>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontWeight: 700, fontSize: 13.5, color: "#7A5C20" }}>
+              {pendingGiftCards} gift card{pendingGiftCards !== 1 ? "s" : ""} pendiente{pendingGiftCards !== 1 ? "s" : ""} de pago
+            </span>
+            <div style={{ fontSize: 12, color: "#8A7040" }}>Tocá para confirmar el pago y activarlas</div>
+          </div>
+          <span style={{ color: "#C9973A", fontSize: 18 }}>›</span>
+        </div>
+      )}
       {todayAppts.length > 0 && (
         <div style={styles.todayCard}>
           <div style={styles.todayCardHeader}>
@@ -369,7 +381,10 @@ export function AgendaView({
                             <span style={{ ...styles.statusDot, background: STATUS[a.status]?.color }} />
                           </div>
                           <div style={styles.apptClient}>{a.clientName}</div>
-                          <div style={styles.apptService}>{svc.name}</div>
+                          <div style={styles.apptService}>
+                            {svc.name}
+                            {a.paidByGiftCard && <span style={{ marginLeft: 5, fontSize: 10, background: "#EBF3E6", color: "#4A5A40", borderRadius: 6, padding: "1px 6px", fontWeight: 700 }}>🎁 Gift Card</span>}
+                          </div>
                         </button>
                       );
                     })}

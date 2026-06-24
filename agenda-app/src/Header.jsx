@@ -1,10 +1,11 @@
 import React from "react";
-import { Calendar, Users, Settings, Sliders, LogOut } from "lucide-react";
+import { Calendar, Users, Settings, Sliders, LogOut, Gift } from "lucide-react";
 import styles from "../../shared/styles";
 
-export default function Header({ view, setView, onLogout }) {
+export default function Header({ view, setView, onLogout, pendingGiftCards = 0 }) {
   const tabs = [
     { id: "agenda", label: "Agenda", icon: Calendar },
+    { id: "giftcards", label: "Gift Cards", icon: Gift, badge: pendingGiftCards },
     { id: "clientes", label: "Clientes", icon: Users },
     { id: "servicios", label: "Servicios", icon: Settings },
     { id: "negocio", label: "Negocio", icon: Sliders },
@@ -38,7 +39,14 @@ export default function Header({ view, setView, onLogout }) {
               onClick={() => setView(t.id)}
               style={{ ...styles.tabBtn, ...(active ? styles.tabBtnActive : {}) }}
             >
-              <Icon size={16} strokeWidth={2.2} />
+              <div style={{ position: "relative", display: "inline-flex" }}>
+                <Icon size={16} strokeWidth={2.2} />
+                {t.badge > 0 && (
+                  <span style={{ position: "absolute", top: -4, right: -6, background: "#C9973A", color: "#fff", borderRadius: "50%", width: 13, height: 13, fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {t.badge}
+                  </span>
+                )}
+              </div>
               <span>{t.label}</span>
             </button>
           );

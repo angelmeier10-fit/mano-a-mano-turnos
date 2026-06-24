@@ -176,11 +176,19 @@ function generateCancelToken() {
 export async function bookSlotAtomic(appt) {
   const cancelToken = generateCancelToken();
   const slotId = appt.fromAvailabilityId;
+  const giftCardCode = appt.giftCardCode || null;
+
+  const apptData = {
+    ...appt,
+    cancelToken,
+    cancelProof: null,
+    createdAt: Date.now(),
+    ...(giftCardCode ? { paidByGiftCard: true, giftCardCode, status: "confirmado" } : {}),
+  };
 
   if (!slotId) {
-    const ref = await addDoc(collection(db, "appointments"), {
-      ...appt, cancelToken, cancelProof: null, createdAt: Date.now(),
-    });
+    const ref = await addDoc(collection(db, "appointments"), apptData);
+    if (giftCardCode) await redeemGiftCard(giftCardCode, ref.id);
     return { apptId: ref.id, cancelToken };
   }
 
@@ -194,8 +202,10 @@ export async function bookSlotAtomic(appt) {
     transaction.update(slotRef, { booked: true });
     const apptRef = doc(collection(db, "appointments"));
     apptId = apptRef.id;
-    transaction.set(apptRef, { ...appt, cancelToken, cancelProof: null, createdAt: Date.now() });
+    transaction.set(apptRef, apptData);
   });
+
+  if (giftCardCode) await redeemGiftCard(giftCardCode, apptId);
 
   // Guardar referencia en phoneIndex/bookings (best-effort, no bloquea la reserva)
   const phoneDigits = normalizePhone(appt.clientPhone);
@@ -209,7 +219,7 @@ export async function bookSlotAtomic(appt) {
         fromAvailabilityId: slotId,
         clientName: appt.clientName || "",
         clientId: appt.clientId || null,
-        status: appt.status || "confirmado",
+        status: apptData.status || "confirmado",
         requiresCancelToken: true,
       });
     } catch (e) {
@@ -601,4 +611,37 @@ export function listenBusinessInfo(callback) {
 }
 export async function setBusinessInfo(data) {
   return setDoc(doc(db, "businessInfo", "main"), data, { merge: true });
+}
+
+// ---------- Gift Cards ----------
+export async function createGiftCard(data) {
+  // data.code es el ID del documento
+  return setDoc(doc(db, "giftCards", data.code), data);
+}
+
+export function listenGiftCards(callback) {
+  return onSnapshot(
+    query(collection(db, "giftCards"), orderBy("createdAt", "desc")),
+    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+}
+
+export async function getGiftCard(code) {
+  const snap = await getDoc(doc(db, "giftCards", code));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+export async function activateGiftCard(code) {
+  return updateDoc(doc(db, "giftCards", code), {
+    status: "active",
+    activatedAt: Date.now(),
+  });
+}
+
+export async function redeemGiftCard(code, apptId) {
+  return updateDoc(doc(db, "giftCards", code), {
+    status: "used",
+    apptId,
+    usedAt: Date.now(),
+  });
 }
