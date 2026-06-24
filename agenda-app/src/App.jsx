@@ -49,11 +49,41 @@ export default function App() {
     return unsub;
   }, []);
 
+  // Pedir permiso de notificaciones al loguear
+  useEffect(() => {
+    if (!user) return;
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, [user]);
+
   // Suscripciones en tiempo real a Firestore, solo cuando hay sesión iniciada
   useEffect(() => {
     if (!user) return;
     const unsubServices = listenServices(setServices);
-    const unsubAppts = listenAppointments(setAppointments);
+    const knownIds = new Set();
+    let firstLoad = true;
+    const unsubAppts = listenAppointments((data) => {
+      if (firstLoad) {
+        data.forEach(a => knownIds.add(a.id));
+        firstLoad = false;
+      } else {
+        data.forEach(a => {
+          if (!knownIds.has(a.id) && a.status === "pendiente") {
+            knownIds.add(a.id);
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("Nuevo turno solicitado", {
+                body: `${a.clientName} · ${a.dateKey} ${a.start}`,
+                icon: "/mano-a-mano-agenda/favicon.ico",
+              });
+            }
+          } else {
+            knownIds.add(a.id);
+          }
+        });
+      }
+      setAppointments(data);
+    });
     const unsubClients = listenClients(setClients);
     const unsubAvail = listenAvailability(setAvailability);
     const unsubBiz = listenBusinessInfo((data) => {
