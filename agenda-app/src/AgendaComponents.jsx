@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy } from "lucide-react";
+import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2 } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
@@ -24,6 +24,7 @@ export function AgendaView({
   const [prefillSlot, setPrefillSlot] = useState(null);
   const [showAvailForm, setShowAvailForm] = useState(null);
   const [showRecurringForm, setShowRecurringForm] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const todayKey = dateKey(new Date());
@@ -301,6 +302,9 @@ export function AgendaView({
       <button style={styles.recurringBtn} onClick={() => setShowRecurringForm(true)}>
         <CalendarPlus size={15} /> Cargar horario semanal recurrente
       </button>
+      <button style={styles.recurringBtn} onClick={() => setShowExportModal(true)}>
+        <Share2 size={15} /> Exportar disponibilidad
+      </button>
 
       <div style={styles.viewToggle}>
         <button
@@ -472,6 +476,14 @@ export function AgendaView({
         <RecurringAvailabilityModal
           onClose={() => setShowRecurringForm(false)}
           onConfirm={onAddSlotsBatch}
+        />
+      )}
+      {showExportModal && (
+        <ExportDisponibilidadModal
+          availability={availability}
+          appointments={appointments}
+          businessInfo={businessInfo}
+          onClose={() => setShowExportModal(false)}
         />
       )}
     </div>
@@ -922,6 +934,180 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function ExportDisponibilidadModal({ availability, appointments, businessInfo, onClose }) {
+  const [days, setDays] = useState(7);
+  const [generating, setGenerating] = useState(false);
+
+  const today = new Date();
+  const todayKey = dateKey(today);
+
+  // Calcular cupos libres para los próximos N días
+  function getOpenSlots() {
+    const result = [];
+    for (let i = 0; i < days; i++) {
+      const d = addDays(today, i);
+      const dKey = dateKey(d);
+      const dayAvail = availability.filter(s => s.dateKey === dKey);
+      if (dayAvail.length === 0) continue;
+      const dayAppts = appointments.filter(a => a.dateKey === dKey && a.status !== "cancelado");
+      const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
+      const open = dayAvail
+        .filter(s => !bookedSlotIds.has(s.id) && !s.booked)
+        .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+      if (open.length > 0) result.push({ dKey, d, slots: open });
+    }
+    return result;
+  }
+
+  function exportImage() {
+    setGenerating(true);
+    const openDays = getOpenSlots();
+    const W = 800;
+    const PADDING = 40;
+    const ROW_H = 44;
+    const DAY_HEADER_H = 52;
+    const HEADER_H = 100;
+    const FOOTER_H = 60;
+
+    const totalRows = openDays.reduce((sum, d) => sum + d.slots.length, 0);
+    const H = HEADER_H + openDays.length * DAY_HEADER_H + totalRows * ROW_H + FOOTER_H + PADDING;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W * 2;
+    canvas.height = H * 2;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(2, 2);
+
+    // Fondo
+    ctx.fillStyle = "#EFE9DF";
+    ctx.fillRect(0, 0, W, H);
+
+    // Header
+    ctx.fillStyle = "#2A2622";
+    ctx.fillRect(0, 0, W, HEADER_H);
+    ctx.fillStyle = "#EFE9DF";
+    ctx.font = "bold 26px Georgia, serif";
+    ctx.fillText(businessInfo?.name || "Mano a Mano", PADDING, 42);
+    ctx.font = "16px Arial, sans-serif";
+    ctx.fillStyle = "#B5654A";
+    ctx.fillText("Turnos disponibles", PADDING, 68);
+    const rangeLabel = days === 1 ? "Hoy" : `Próximos ${days} días`;
+    ctx.fillStyle = "rgba(239,233,223,0.55)";
+    ctx.font = "13px Arial, sans-serif";
+    ctx.fillText(rangeLabel, PADDING, 88);
+
+    let y = HEADER_H + 16;
+
+    if (openDays.length === 0) {
+      ctx.fillStyle = "#8A8275";
+      ctx.font = "16px Arial, sans-serif";
+      ctx.fillText("Sin cupos disponibles para este período.", PADDING, y + 30);
+    }
+
+    for (const { dKey, d, slots } of openDays) {
+      // Día
+      const dayName = DAY_NAMES[d.getDay()];
+      const monthName = MONTH_NAMES[d.getMonth()];
+      ctx.fillStyle = "#B5654A";
+      ctx.font = "bold 15px Arial, sans-serif";
+      ctx.fillText(`${dayName} ${d.getDate()} de ${monthName}`.toUpperCase(), PADDING, y + 20);
+      // línea
+      ctx.strokeStyle = "#D0C5B4";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PADDING, y + 30);
+      ctx.lineTo(W - PADDING, y + 30);
+      ctx.stroke();
+      y += DAY_HEADER_H;
+
+      for (const slot of slots) {
+        // pill de horario
+        ctx.fillStyle = "#fff";
+        roundRect(ctx, PADDING, y + 4, 160, ROW_H - 10, 10);
+        ctx.fillStyle = "#2A2622";
+        ctx.font = "bold 15px Arial, sans-serif";
+        ctx.fillText(`${slot.start} – ${slot.end}`, PADDING + 14, y + ROW_H / 2 + 5);
+        y += ROW_H;
+      }
+      y += 8;
+    }
+
+    // Footer
+    ctx.fillStyle = "#8A8275";
+    ctx.font = "12px Arial, sans-serif";
+    ctx.fillText("Reservas: " + (businessInfo?.whatsapp ? `WhatsApp ${businessInfo.whatsapp}` : businessInfo?.name || ""), PADDING, H - 24);
+
+    const link = document.createElement("a");
+    link.download = `disponibilidad-${todayKey}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    setGenerating(false);
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const openDays = getOpenSlots();
+
+  return (
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div style={{ ...styles.modal, maxHeight: "80vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h3 style={styles.modalTitle}>Exportar disponibilidad</h3>
+          <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "16px 0" }}>
+          <label style={{ ...styles.fieldLabel, margin: 0, flex: 1 }}>Cantidad de días</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button type="button" onClick={() => setDays(d => Math.max(1, d - 1))} style={{ width: 28, height: 28, borderRadius: 8, border: "1.5px solid #D0C5B4", background: "#fff", fontSize: 16, cursor: "pointer" }}>−</button>
+            <span style={{ minWidth: 28, textAlign: "center", fontWeight: 700, fontSize: 15 }}>{days}</span>
+            <button type="button" onClick={() => setDays(d => Math.min(7, d + 1))} style={{ width: 28, height: 28, borderRadius: 8, border: "1.5px solid #D0C5B4", background: "#fff", fontSize: 16, cursor: "pointer" }}>+</button>
+          </div>
+        </div>
+
+        <div style={{ background: "#fff", borderRadius: 12, padding: "12px 16px", marginBottom: 16, minHeight: 60 }}>
+          {openDays.length === 0
+            ? <p style={{ color: "#8A8275", fontSize: 13, margin: 0 }}>Sin cupos disponibles para los próximos {days} días.</p>
+            : openDays.map(({ dKey, d, slots }) => (
+              <div key={dKey} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#B5654A", textTransform: "uppercase", marginBottom: 4 }}>
+                  {DAY_NAMES[d.getDay()]} {d.getDate()} de {MONTH_NAMES[d.getMonth()]}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {slots.map(s => (
+                    <span key={s.id} style={{ background: "#EFE9DF", border: "1px solid #D0C5B4", borderRadius: 8, padding: "3px 10px", fontSize: 13, fontWeight: 600 }}>{s.start}–{s.end}</span>
+                  ))}
+                </div>
+              </div>
+            ))
+          }
+        </div>
+
+        <button
+          style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", opacity: openDays.length === 0 ? 0.5 : 1 }}
+          onClick={exportImage}
+          disabled={generating || openDays.length === 0}
+        >
+          <Share2 size={16} /> {generating ? "Generando…" : "Descargar imagen"}
+        </button>
+      </div>
     </div>
   );
 }
