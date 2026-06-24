@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
@@ -14,6 +14,7 @@ export function AgendaView({
   onCreateAppt, onUpdateAppt, onDeleteAppt,
   onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch, onFreeSlot,
   upsertClientByName, pendingGiftCards = 0, onGoGiftCards,
+  openApptId, onOpenApptHandled,
 }) {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [calendarView, setCalendarView] = useState("week");
@@ -72,6 +73,15 @@ export function AgendaView({
     });
     return map;
   }, [availability]);
+
+  useEffect(() => {
+    if (!openApptId) return;
+    const appt = appointments.find(a => a.id === openApptId);
+    if (appt) {
+      openEditAppt(appt);
+      onOpenApptHandled?.();
+    }
+  }, [openApptId]);
 
   function openNewAppt(slotDate, slotTime, fromSlotId) {
     setPrefillSlot({ dateKey: dateKey(slotDate), start: slotTime || "10:00", fromAvailabilityId: fromSlotId || null });

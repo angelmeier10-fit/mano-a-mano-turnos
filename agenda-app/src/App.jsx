@@ -41,6 +41,7 @@ export default function App() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [giftCards, setGiftCards] = useState([]);
   const [apptNotifs, setApptNotifs] = useState([]); // [{ id, clientName, dateKey, start }]
+  const [openApptId, setOpenApptId] = useState(null);
 
   useEffect(() => {
     const unsub = watchAuthState((u) => {
@@ -121,7 +122,11 @@ export default function App() {
           {apptNotifs.map(n => (
             <div
               key={n.id}
-              onClick={() => setApptNotifs(prev => prev.filter(x => x.id !== n.id))}
+              onClick={() => {
+                setApptNotifs(prev => prev.filter(x => x.id !== n.id));
+                setView("agenda");
+                setOpenApptId(n.id);
+              }}
               style={{ background: "#B5654A", color: "#fff", padding: "12px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(0,0,0,0.1)" }}
             >
               <span style={{ fontSize: 13.5, fontWeight: 600 }}>Nuevo turno: {n.clientName} · {n.dateKey} {n.start}</span>
@@ -149,6 +154,8 @@ export default function App() {
             upsertClientByName={upsertClientByName}
             pendingGiftCards={giftCards.filter(g => g.status === "pending").length}
             onGoGiftCards={() => setView("giftcards")}
+            openApptId={openApptId}
+            onOpenApptHandled={() => setOpenApptId(null)}
           />
         )}
         {view === "clientes" && (
