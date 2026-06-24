@@ -81,6 +81,20 @@ export function getRecurringDateKeys(weekdays, weeksCount) {
   return result;
 }
 
+export function getRecurringDateKeysByRange(weekdays, fromDate, toDate) {
+  const result = [];
+  const from = new Date(fromDate);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(toDate);
+  to.setHours(0, 0, 0, 0);
+  let d = from;
+  while (d <= to) {
+    if (weekdays.includes(d.getDay())) result.push(dateKey(d));
+    d = addDays(d, 1);
+  }
+  return result;
+}
+
 export function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 export function addMonths(d, n) { return new Date(d.getFullYear(), d.getMonth() + n, 1); }
 

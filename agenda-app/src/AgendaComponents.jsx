@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
-  formatPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys,
+  formatPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
   formatPhoneForWhatsapp,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
@@ -581,11 +581,14 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
 }
 
 function RecurringAvailabilityModal({ onClose, onConfirm }) {
+  const todayStr = dateKey(new Date());
+  const inFourWeeks = dateKey(addDays(new Date(), 28));
   const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
   const [start, setStart] = useState("10:00");
   const [end, setEnd] = useState("14:00");
   const [slotLength, setSlotLength] = useState(60);
-  const [weeksCount, setWeeksCount] = useState(4);
+  const [fromDate, setFromDate] = useState(todayStr);
+  const [toDate, setToDate] = useState(inFourWeeks);
   const [saving, setSaving] = useState(false);
 
   const weekdayOptions = [
@@ -609,7 +612,9 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
   }
 
   const daySlots = buildDaySlots();
-  const dateKeys = selectedDays.length > 0 ? getRecurringDateKeys(selectedDays, weeksCount) : [];
+  const dateKeys = selectedDays.length > 0 && fromDate && toDate && fromDate <= toDate
+    ? getRecurringDateKeysByRange(selectedDays, fromDate, toDate)
+    : [];
   const totalSlots = dateKeys.length * daySlots.length;
 
   async function handleConfirm() {
@@ -672,16 +677,23 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
             <label style={styles.fieldLabel}>Duración de cada turno (min)</label>
             <input type="number" style={styles.input} value={slotLength} onChange={e => setSlotLength(Number(e.target.value) || 30)} min={10} step={5} />
           </div>
+        </div>
+
+        <div style={styles.fieldRow}>
           <div style={{ flex: 1 }}>
-            <label style={styles.fieldLabel}>Repetir por (semanas)</label>
-            <input type="number" style={styles.input} value={weeksCount} onChange={e => setWeeksCount(Number(e.target.value) || 1)} min={1} max={26} />
+            <label style={styles.fieldLabel}>Fecha inicio</label>
+            <input type="date" style={styles.input} value={fromDate} onChange={e => setFromDate(e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={styles.fieldLabel}>Fecha fin</label>
+            <input type="date" style={styles.input} value={toDate} onChange={e => setToDate(e.target.value)} min={fromDate} />
           </div>
         </div>
 
         <p style={styles.recurringPreview}>
           {totalSlots > 0
-            ? `Se van a crear ${totalSlots} cupos (${daySlots.length} por día, ${dateKeys.length} días) entre hoy y ${weeksCount} semana${weeksCount !== 1 ? "s" : ""}.`
-            : "Elegí al menos un día y un rango horario válido para ver la vista previa."}
+            ? `Se van a crear ${totalSlots} cupos (${daySlots.length} por día, ${dateKeys.length} días).`
+            : "Elegí al menos un día, un rango horario válido y fechas para ver la vista previa."}
         </p>
 
         <div style={styles.modalActions}>
