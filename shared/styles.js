@@ -25,7 +25,6 @@ const styles = {
   },
   header: {
     background: "#2A2622",
-    position: "sticky", top: 0, zIndex: 10,
     paddingBottom: 0,
   },
   headerTop: {

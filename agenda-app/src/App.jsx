@@ -117,25 +117,23 @@ export default function App() {
   return (
     <div style={styles.app}>
       <GoogleFontsLoader />
-      <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} />
-      {apptNotifs.length > 0 && (
-        <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-          {apptNotifs.map(n => (
-            <div
-              key={n.id}
-              onClick={() => {
-                setApptNotifs(prev => prev.filter(x => x.id !== n.id));
-                setView("agenda");
-                setOpenApptId(n.id);
-              }}
-              style={{ background: "#B5654A", color: "#fff", padding: "12px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(0,0,0,0.1)" }}
-            >
-              <span style={{ fontSize: 13.5, fontWeight: 600 }}>Nuevo turno: {n.clientName} · {n.dateKey} {n.start}</span>
-              <span style={{ fontSize: 18, lineHeight: 1, opacity: 0.8 }}>×</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
+        <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} />
+        {apptNotifs.map(n => (
+          <div
+            key={n.id}
+            onClick={() => {
+              setApptNotifs(prev => prev.filter(x => x.id !== n.id));
+              setView("agenda");
+              setOpenApptId(n.id);
+            }}
+            style={{ background: "#B5654A", color: "#fff", padding: "12px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.2)" }}
+          >
+            <span style={{ fontSize: 13.5, fontWeight: 600 }}>Nuevo turno: {n.clientName} · {n.dateKey} {n.start}</span>
+            <span style={{ fontSize: 20, lineHeight: 1, opacity: 0.8 }}>×</span>
+          </div>
+        ))}
+      </div>
       <main style={styles.main}>
         {view === "agenda" && (
           <AgendaView
