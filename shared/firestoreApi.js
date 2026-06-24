@@ -401,6 +401,20 @@ export function listenAppointments(callback) {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
+
+// Llama a onNew solo para turnos NUEVOS que lleguen después de la carga inicial.
+export function listenIncomingPendingAppointments(onNew) {
+  let initialized = false;
+  return onSnapshot(collection(db, "appointments"), (snap) => {
+    if (!initialized) { initialized = true; return; }
+    snap.docChanges().forEach(change => {
+      if (change.type === "added") {
+        const a = { id: change.doc.id, ...change.doc.data() };
+        if (a.status === "pendiente") onNew(a);
+      }
+    });
+  });
+}
 export async function createAppointment(appt) {
   // appt: { dateKey, start, end, serviceId, clientName, clientPhone, notes, status, fromAvailabilityId? }
   const dupCheck = await getDocs(query(

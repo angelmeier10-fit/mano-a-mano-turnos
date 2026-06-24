@@ -9,7 +9,7 @@ import GiftCardsView from "./GiftCardsView";
 import {
   listenServices, addService, deleteService,
   listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
-  listenAppointments, createAppointment, updateAppointment, deleteAppointment,
+  listenAppointments, listenIncomingPendingAppointments, createAppointment, updateAppointment, deleteAppointment,
   listenClients, upsertClientByName, updateClient, deleteClient,
   listenBusinessInfo, setBusinessInfo, freeAvailabilitySlot,
   listenGiftCards,
@@ -62,29 +62,15 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     const unsubServices = listenServices(setServices);
-    const knownIds = new Set();
-    let firstLoad = true;
-    const unsubAppts = listenAppointments((data) => {
-      if (firstLoad) {
-        data.forEach(a => knownIds.add(a.id));
-        firstLoad = false;
-      } else {
-        data.forEach(a => {
-          if (!knownIds.has(a.id) && a.status === "pendiente") {
-            knownIds.add(a.id);
-            setApptNotifs(prev => [...prev, { id: a.id, clientName: a.clientName, dateKey: a.dateKey, start: a.start }]);
-            if ("Notification" in window && Notification.permission === "granted") {
-              new Notification("Nuevo turno solicitado", {
-                body: `${a.clientName} · ${a.dateKey} ${a.start}`,
-                icon: "/mano-a-mano-agenda/favicon.ico",
-              });
-            }
-          } else {
-            knownIds.add(a.id);
-          }
+    const unsubAppts = listenAppointments(setAppointments);
+    const unsubIncoming = listenIncomingPendingAppointments((a) => {
+      setApptNotifs(prev => [...prev, { id: a.id, clientName: a.clientName, dateKey: a.dateKey, start: a.start }]);
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Nuevo turno solicitado", {
+          body: `${a.clientName} · ${a.dateKey} ${a.start}`,
+          icon: "/mano-a-mano-agenda/favicon.ico",
         });
       }
-      setAppointments(data);
     });
     const unsubClients = listenClients(setClients);
     const unsubAvail = listenAvailability(setAvailability);
@@ -94,7 +80,7 @@ export default function App() {
     });
     const unsubGiftCards = listenGiftCards(setGiftCards);
     return () => {
-      unsubServices(); unsubAppts(); unsubClients(); unsubAvail(); unsubBiz(); unsubGiftCards();
+      unsubServices(); unsubAppts(); unsubIncoming(); unsubClients(); unsubAvail(); unsubBiz(); unsubGiftCards();
     };
   }, [user]);
 
