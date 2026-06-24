@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil } from "lucide-react";
+import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus } from "lucide-react";
 import { formatPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
 import { getAppointmentHistory } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
@@ -50,6 +50,25 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
     setSelected(null);
   }
 
+  function downloadVCard(client) {
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      `FN:${client.name}`,
+      `N:${client.name};;;;`,
+    ];
+    if (client.phone) lines.push(`TEL;TYPE=CELL:${client.phone}`);
+    if (client.email) lines.push(`EMAIL:${client.email}`);
+    lines.push("END:VCARD");
+    const blob = new Blob([lines.join("\r\n")], { type: "text/vcard" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${client.name.replace(/\s+/g, "_")}.vcf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (selected) {
     const history = clientHistory(selected);
     const stats = clientStats(selected);
@@ -73,6 +92,9 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
               <MessageCircle size={17} />
             </a>
           )}
+          <button onClick={() => downloadVCard(selected)} style={styles.waIconBtn} title="Guardar contacto">
+            <UserPlus size={17} />
+          </button>
         </div>
 
         <div style={styles.clientStatsGrid}>
