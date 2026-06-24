@@ -118,7 +118,7 @@ export default function App() {
     <div style={styles.app}>
       <GoogleFontsLoader />
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-        <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} />
+        <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingAppts={appointments.filter(a => a.status === "pendiente").length} />
         {apptNotifs.map(n => (
           <div
             key={n.id}

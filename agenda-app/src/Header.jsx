@@ -2,9 +2,9 @@ import React from "react";
 import { Calendar, Users, Settings, Sliders, LogOut, Gift } from "lucide-react";
 import styles from "../../shared/styles";
 
-export default function Header({ view, setView, onLogout, pendingGiftCards = 0 }) {
+export default function Header({ view, setView, onLogout, pendingGiftCards = 0, pendingAppts = 0 }) {
   const tabs = [
-    { id: "agenda", label: "Agenda", icon: Calendar },
+    { id: "agenda", label: "Agenda", icon: Calendar, badge: pendingAppts },
     { id: "giftcards", label: "Gift Cards", icon: Gift, badge: pendingGiftCards },
     { id: "clientes", label: "Clientes", icon: Users },
     { id: "servicios", label: "Servicios", icon: Settings },
