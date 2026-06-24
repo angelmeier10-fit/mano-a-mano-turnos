@@ -199,7 +199,14 @@ export function AgendaView({
         });
       }
     } else {
-      onCreateAppt({ status: "confirmado", ...data, ...(clientId ? { clientId } : {}) });
+      const weeks = data.repeatWeeks || 1;
+      const baseDate = new Date(data.dateKey);
+      for (let i = 0; i < weeks; i++) {
+        const dKey = i === 0 ? data.dateKey : dateKey(addDays(baseDate, 7 * i));
+        const dup = appointments.find(a => a.status !== "cancelado" && a.dateKey === dKey && a.start === data.start);
+        if (dup) { alert(`Ya existe un turno a las ${data.start} el ${dKey}. Se omitió esa semana.`); continue; }
+        onCreateAppt({ status: "confirmado", ...data, dateKey: dKey, ...(clientId ? { clientId } : {}) });
+      }
     }
     setShowApptForm(false);
   }
@@ -750,6 +757,7 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
   const [notes, setNotes] = useState(base.notes || "");
   const [showClientList, setShowClientList] = useState(false);
   const [showDateCalendar, setShowDateCalendar] = useState(false);
+  const [repeatWeeks, setRepeatWeeks] = useState(1);
   const fromAvailabilityId = initial?.fromAvailabilityId || prefill?.fromAvailabilityId || null;
 
   const svc = services.find(s => s.id === serviceId);
@@ -765,6 +773,7 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
     onSave({
       dateKey: dateVal, start, end, serviceId, clientName, clientPhone, notes,
       ...(fromAvailabilityId ? { fromAvailabilityId } : {}),
+      ...(!initial && repeatWeeks > 1 ? { repeatWeeks } : {}),
     });
   }
 
@@ -874,6 +883,17 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
           ))}
         </div>
         <div style={styles.endTimeNote}>Finaliza a las {end}</div>
+
+        {!initial && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <label style={{ ...styles.fieldLabel, margin: 0, flex: 1 }}>Repetir semanalmente</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button type="button" onClick={() => setRepeatWeeks(w => Math.max(1, w - 1))} style={{ width: 28, height: 28, borderRadius: 8, border: "1.5px solid #D0C5B4", background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+              <span style={{ minWidth: 60, textAlign: "center", fontSize: 13.5, fontWeight: 600 }}>{repeatWeeks === 1 ? "No" : `${repeatWeeks} veces`}</span>
+              <button type="button" onClick={() => setRepeatWeeks(w => Math.min(52, w + 1))} style={{ width: 28, height: 28, borderRadius: 8, border: "1.5px solid #D0C5B4", background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+            </div>
+          </div>
+        )}
 
         <label style={styles.fieldLabel}>Notas</label>
         <textarea style={{ ...styles.input, minHeight: 60, resize: "vertical" }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Zona a trabajar, contracturas, preferencias…" />
