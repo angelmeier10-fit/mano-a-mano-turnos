@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check } from "lucide-react";
+import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil } from "lucide-react";
 import { formatPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
 import { getAppointmentHistory } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
@@ -213,8 +213,9 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
 // ====================================================================
 // SERVICIOS VIEW
 // ====================================================================
-export function ServiciosView({ services, onAddService, onDeleteService }) {
+export function ServiciosView({ services, onAddService, onUpdateService, onDeleteService }) {
   const [showForm, setShowForm] = useState(false);
+  const [editingService, setEditingService] = useState(null); // { id, name, duration, price, color }
   const [name, setName] = useState("");
   const [duration, setDuration] = useState(60);
   const [price, setPrice] = useState(20000);
@@ -229,8 +230,19 @@ export function ServiciosView({ services, onAddService, onDeleteService }) {
     setName(""); setDuration(60); setPrice(20000); setColor("#B5654A");
     setShowForm(false);
   }
-  function removeService(id) {
-    onDeleteService(id);
+
+  function startEdit(s) {
+    setEditingService(s);
+    setName(s.name); setDuration(s.duration); setPrice(s.price || 0); setColor(s.color);
+    setShowForm(false);
+  }
+
+  function saveEdit(e) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), color, price: Number(price) || 0 });
+    setEditingService(null);
+    setName(""); setDuration(60); setPrice(20000); setColor("#B5654A");
   }
 
   return (
@@ -238,15 +250,47 @@ export function ServiciosView({ services, onAddService, onDeleteService }) {
       <h2 style={styles.sectionTitle}>Servicios</h2>
       <div style={styles.serviceList}>
         {services.map(s => (
-          <div key={s.id} style={styles.serviceRow}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.color }} />
-            <div style={{ flex: 1 }}>
-              <div style={styles.serviceRowName}>{s.name}</div>
-              <div style={styles.serviceRowMeta}>{s.duration} minutos{s.price ? ` · ${formatPrice(s.price)}` : ""}</div>
+          <div key={s.id}>
+            <div style={styles.serviceRow}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={styles.serviceRowName}>{s.name}</div>
+                <div style={styles.serviceRowMeta}>{s.duration} minutos{s.price ? ` · ${formatPrice(s.price)}` : ""}</div>
+              </div>
+              <button style={styles.iconBtnGhost} onClick={() => editingService?.id === s.id ? setEditingService(null) : startEdit(s)}>
+                <Pencil size={15} />
+              </button>
+              <button style={styles.iconBtnGhost} onClick={() => onDeleteService(s.id)}>
+                <Trash2 size={15} />
+              </button>
             </div>
-            <button style={styles.iconBtnGhost} onClick={() => removeService(s.id)}>
-              <Trash2 size={15} />
-            </button>
+            {editingService?.id === s.id && (
+              <form style={{ ...styles.newServiceForm, marginTop: 4 }} onSubmit={saveEdit}>
+                <label style={styles.fieldLabel}>Nombre</label>
+                <input style={styles.input} value={name} onChange={e => setName(e.target.value)} autoFocus />
+                <div style={styles.fieldRow}>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.fieldLabel}>Duración (min)</label>
+                    <input type="number" style={styles.input} value={duration} onChange={e => setDuration(e.target.value)} min={10} step={5} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.fieldLabel}>Precio ($)</label>
+                    <input type="number" style={styles.input} value={price} onChange={e => setPrice(e.target.value)} min={0} step={500} />
+                  </div>
+                </div>
+                <label style={styles.fieldLabel}>Color</label>
+                <div style={styles.colorRow}>
+                  {palette.map(c => (
+                    <button type="button" key={c} onClick={() => setColor(c)}
+                      style={{ ...styles.colorDot, background: c, ...(color === c ? styles.colorDotActive : {}) }} />
+                  ))}
+                </div>
+                <div style={styles.modalActions}>
+                  <button type="button" style={styles.cancelBtn} onClick={() => setEditingService(null)}>Cancelar</button>
+                  <button type="submit" style={styles.saveBtn}><Check size={16} /> Guardar</button>
+                </div>
+              </form>
+            )}
           </div>
         ))}
       </div>

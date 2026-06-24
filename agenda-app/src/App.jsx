@@ -7,7 +7,7 @@ import { ClientesView, ServiciosView } from "./ClientesServiciosViews";
 import NegocioView from "./NegocioView";
 import GiftCardsView from "./GiftCardsView";
 import {
-  listenServices, addService, deleteService,
+  listenServices, addService, updateService, deleteService,
   listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
   listenAppointments, listenIncomingPendingAppointments, createAppointment, updateAppointment, deleteAppointment,
   listenClients, upsertClientByName, updateClient, deleteClient,
@@ -170,6 +170,7 @@ export default function App() {
           <ServiciosView
             services={services}
             onAddService={addService}
+            onUpdateService={updateService}
             onDeleteService={deleteService}
           />
         )}
