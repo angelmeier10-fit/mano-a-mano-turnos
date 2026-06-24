@@ -58,29 +58,6 @@ jobs:
         with:
           path: public-site
 
-  deploy-functions:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Descargar el codigo
-        uses: actions/checkout@v4
-
-      - name: Instalar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Instalar dependencias de Functions
-        run: npm install
-        working-directory: functions
-
-      - name: Deploy Firebase Functions
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
-        run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
-          npx firebase-tools@latest deploy --only functions --project mano-a-mano-turnos --non-interactive
-
   deploy:
     needs: build
     runs-on: ubuntu-latest
