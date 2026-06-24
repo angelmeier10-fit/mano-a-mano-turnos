@@ -646,6 +646,9 @@ export function listenBusinessInfo(callback) {
 export async function setBusinessInfo(data) {
   return setDoc(doc(db, "businessInfo", "main"), data, { merge: true });
 }
+export async function saveFcmToken(token) {
+  return setDoc(doc(db, "businessInfo", "main"), { fcmToken: token }, { merge: true });
+}
 
 // ---------- Gift Cards ----------
 export async function createGiftCard(data) {

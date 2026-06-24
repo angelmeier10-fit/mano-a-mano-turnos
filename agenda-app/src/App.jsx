@@ -15,6 +15,7 @@ import {
   listenGiftCards,
 } from "../../shared/firestoreApi";
 import { DEFAULT_SERVICES, DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
+import { initFcm } from "./fcm";
 import styles from "../../shared/styles";
 
 function GoogleFontsLoader() {
@@ -51,12 +52,10 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Pedir permiso de notificaciones al loguear
+  // Inicializar FCM: pide permiso, registra service worker y guarda token
   useEffect(() => {
     if (!user) return;
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
+    initFcm();
   }, [user]);
 
   // Suscripciones en tiempo real a Firestore, solo cuando hay sesión iniciada
