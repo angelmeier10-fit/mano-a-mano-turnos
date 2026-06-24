@@ -81,7 +81,7 @@ export function getRecurringDateKeys(weekdays, weeksCount) {
   return result;
 }
 
-function parseDateKeyAsLocal(str) {
+export function parseDateKeyAsLocal(str) {
   const [y, m, d] = str.split("-").map(Number);
   return new Date(y, m - 1, d);
 }
