@@ -183,7 +183,7 @@ export async function bookSlotAtomic(appt) {
     cancelToken,
     cancelProof: null,
     createdAt: Date.now(),
-    ...(giftCardCode ? { paidByGiftCard: true, giftCardCode, status: "confirmado" } : {}),
+    ...(giftCardCode ? { paidByGiftCard: true, giftCardCode } : {}),
   };
 
   if (!slotId) {
