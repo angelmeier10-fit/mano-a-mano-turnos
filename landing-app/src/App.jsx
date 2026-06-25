@@ -3,6 +3,10 @@ import { listenServices, listenBusinessInfo } from "../../shared/firestoreApi";
 import { DEFAULT_BUSINESS_INFO, GoogleFontsHref, formatPrice, formatPhoneForWhatsapp } from "../../shared/helpers";
 
 const RESERVAR_URL = "/mano-a-mano-turnos/mano-a-mano-reservas/";
+const INSTAGRAM_URL = "https://www.instagram.com/angelmasaje.fit/";
+
+const HERO_PHOTO = "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=1200&q=80&fit=crop&crop=center";
+const ABOUT_PHOTO = "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=800&q=80&fit=crop&crop=center";
 
 const C = {
   bg: "#EFE9DF",
@@ -38,54 +42,111 @@ function LogoMark({ size = 32 }) {
 function Hero({ businessInfo }) {
   return (
     <section style={{
-      background: C.dark,
-      padding: "48px 20px 52px",
+      position: "relative",
+      minHeight: "92vh",
       display: "flex",
       flexDirection: "column",
-      alignItems: "center",
-      textAlign: "center",
+      justifyContent: "flex-end",
+      overflow: "hidden",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-        <LogoMark size={36} />
-        <span style={{ fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600, color: "#EFE9DF", letterSpacing: "-0.01em" }}>
-          {businessInfo.name}
-        </span>
-      </div>
+      <div style={{
+        position: "absolute", inset: 0,
+        backgroundImage: `url(${HERO_PHOTO})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }} />
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(to bottom, rgba(42,38,34,0.3) 0%, rgba(42,38,34,0.85) 100%)",
+      }} />
 
-      <h1 style={{
-        fontFamily: "'Fraunces', serif", fontWeight: 700,
-        fontSize: "clamp(28px, 8vw, 42px)", color: "#EFE9DF",
-        margin: "0 0 14px", lineHeight: 1.15, letterSpacing: "-0.02em",
-        maxWidth: 480,
-      }}>
-        Masajes terapéuticos en Don Torcuato
-      </h1>
+      <div style={{ position: "relative", padding: "0 22px 52px", maxWidth: 560, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 20 }}>
+          <LogoMark size={28} />
+          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.75)", letterSpacing: "0.01em" }}>
+            {businessInfo.name}
+          </span>
+        </div>
 
-      <p style={{
-        fontSize: 16, color: "#B5A98F", margin: "0 0 32px",
-        lineHeight: 1.55, maxWidth: 360,
-      }}>
-        Reservá tu turno online en minutos, sin llamadas ni esperas.
-      </p>
+        <h1 style={{
+          fontFamily: "'Fraunces', serif", fontWeight: 700,
+          fontSize: "clamp(32px, 9vw, 48px)", color: "#fff",
+          margin: "0 0 14px", lineHeight: 1.1, letterSpacing: "-0.02em",
+        }}>
+          Masajes terapéuticos en Don Torcuato
+        </h1>
 
-      <a
-        href={RESERVAR_URL}
-        style={{
-          display: "inline-block",
+        <p style={{
+          fontSize: 16, color: "rgba(255,255,255,0.75)",
+          margin: "0 0 32px", lineHeight: 1.6, maxWidth: 380,
+        }}>
+          Descontracturante · Deportivo · Tratamiento del dolor.<br />
+          Reservá tu turno online en minutos.
+        </p>
+
+        <a href={RESERVAR_URL} style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
           background: C.accent, color: "#fff",
           fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 16,
-          padding: "16px 36px", borderRadius: 14, textDecoration: "none",
-          letterSpacing: "0.01em",
-        }}
-      >
-        Reservar mi turno
-      </a>
+          padding: "17px", borderRadius: 14, textDecoration: "none",
+        }}>
+          Reservar mi turno
+        </a>
 
-      {businessInfo.address && (
-        <p style={{ fontSize: 12.5, color: "#6E6358", margin: "22px 0 0" }}>
-          {businessInfo.address}{businessInfo.addressDetail ? ` · ${businessInfo.addressDetail}` : ""}
+        {businessInfo.address && (
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "18px 0 0" }}>
+            {businessInfo.address}{businessInfo.addressDetail ? ` · ${businessInfo.addressDetail}` : ""} · Don Torcuato, Buenos Aires
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Especialidades() {
+  const items = [
+    {
+      title: "Masaje descontracturante",
+      desc: "Libera tensiones musculares profundas. Ideal para contracturas cervicales, dorsales y lumbares.",
+      icon: "💆",
+    },
+    {
+      title: "Masaje deportivo",
+      desc: "Preparación y recuperación muscular para deportistas. Mejora el rendimiento y previene lesiones.",
+      icon: "⚡",
+    },
+    {
+      title: "Tratamiento del dolor",
+      desc: "Técnicas específicas para aliviar dolores crónicos y agudos. Trabajo profundo y focalizado.",
+      icon: "🌿",
+    },
+  ];
+
+  return (
+    <section style={{ padding: "48px 20px", background: C.bg }}>
+      <div style={{ maxWidth: 560, margin: "0 auto" }}>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, color: C.dark, margin: "0 0 6px" }}>
+          Especialidades
+        </h2>
+        <p style={{ fontSize: 14, color: C.muted, margin: "0 0 24px", lineHeight: 1.5 }}>
+          Masoterapia terapéutica en Don Torcuato, zona norte del Gran Buenos Aires.
         </p>
-      )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {items.map((item) => (
+            <div key={item.title} style={{
+              display: "flex", gap: 16, alignItems: "flex-start",
+              background: C.cardBg, border: `1px solid ${C.border}`,
+              borderRadius: 16, padding: "18px",
+            }}>
+              <span style={{ fontSize: 28, lineHeight: 1, flexShrink: 0 }}>{item.icon}</span>
+              <div>
+                <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16, color: C.dark, marginBottom: 5 }}>{item.title}</div>
+                <div style={{ fontSize: 13.5, color: "#5A5248", lineHeight: 1.55 }}>{item.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -93,9 +154,9 @@ function Hero({ businessInfo }) {
 function Services({ services }) {
   if (!services.length) return null;
   return (
-    <section style={{ padding: "40px 20px", maxWidth: 560, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, margin: "0 0 20px", color: C.dark }}>
-        Servicios
+    <section style={{ padding: "0 20px 48px", maxWidth: 560, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, margin: "0 0 20px", color: C.dark }}>
+        Servicios y precios
       </h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {services.map((s) => (
@@ -119,84 +180,114 @@ function Services({ services }) {
           </div>
         ))}
       </div>
-      <a
-        href={RESERVAR_URL}
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          marginTop: 20, padding: "14px", borderRadius: 12,
-          background: C.dark, color: "#EFE9DF",
-          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15,
-          textDecoration: "none",
-        }}
-      >
+      <a href={RESERVAR_URL} style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        marginTop: 16, padding: "14px", borderRadius: 12,
+        background: C.dark, color: "#EFE9DF",
+        fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15,
+        textDecoration: "none",
+      }}>
         Elegir servicio y reservar
       </a>
     </section>
   );
 }
 
-function HowItWorks() {
-  const steps = [
-    { n: "1", title: "Elegís el servicio", desc: "Medio torso, cuerpo completo o con ventosas" },
-    { n: "2", title: "Elegís día y horario", desc: "Ves los turnos disponibles en tiempo real" },
-    { n: "3", title: "Confirmación instantánea", desc: "Recibís los datos del turno al instante" },
-  ];
+function About() {
   return (
-    <section style={{ background: C.dark, padding: "40px 20px" }}>
+    <section style={{ background: C.dark, overflow: "hidden" }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: "#EFE9DF", margin: "0 0 24px", textAlign: "center" }}>
-          ¿Cómo funciona?
-        </h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {steps.map((s) => (
-            <div key={s.n} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: "50%", background: C.accent,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 15, color: "#fff", flexShrink: 0,
-              }}>{s.n}</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 15, color: "#EFE9DF" }}>{s.title}</div>
-                <div style={{ fontSize: 13, color: "#9A9183", marginTop: 3 }}>{s.desc}</div>
-              </div>
-            </div>
-          ))}
+        <div style={{
+          height: 260,
+          backgroundImage: `url(${ABOUT_PHOTO})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center top",
+        }} />
+        <div style={{ padding: "30px 22px 36px" }}>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, color: "#EFE9DF", margin: "0 0 14px" }}>
+            Masoterapia profesional
+          </h2>
+          <p style={{ fontSize: 14.5, color: "#B5A98F", lineHeight: 1.75, margin: 0 }}>
+            Especializado en masajes descontracturantes, masaje deportivo y tratamiento del dolor muscular. Técnicas manuales y con ventosas para aliviar contracturas, tensión y lesiones. Sesiones personalizadas de medio torso y cuerpo completo en Don Torcuato, zona norte del Gran Buenos Aires.
+          </p>
         </div>
       </div>
     </section>
   );
 }
 
-function WhyUs() {
-  const points = [
-    { icon: "📍", title: "En Don Torcuato", desc: "Arata 1967, entre Brasil y Ecuador", mapsUrl: "https://www.google.com/maps/search/?api=1&query=Arata+1967+Don+Torcuato+Buenos+Aires" },
-    { icon: "🕐", title: "Lunes a viernes de 10 a 20 hs", desc: "Agenda tu turno cuando quieras, las 24 horas" },
-    { icon: "✅", title: "Sin intermediarios", desc: "Reservá directo desde el celular, sin llamadas" },
+function HowItWorks() {
+  const steps = [
+    { n: "1", title: "Elegís el servicio", desc: "Descontracturante, deportivo o tratamiento del dolor" },
+    { n: "2", title: "Elegís día y horario", desc: "Ves los turnos disponibles en tiempo real" },
+    { n: "3", title: "Confirmación instantánea", desc: "Recibís los datos del turno al instante, sin llamadas" },
   ];
   return (
-    <section style={{ padding: "40px 20px", background: "#F5EFE6" }}>
+    <section style={{ background: "#F5EFE6", padding: "48px 20px" }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: C.dark, margin: "0 0 20px" }}>
-          Por qué elegirnos
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, color: C.dark, margin: "0 0 24px" }}>
+          ¿Cómo reservar?
         </h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {points.map((p) => (
-            <div key={p.title} style={{
-              display: "flex", gap: 14, alignItems: "flex-start",
-              background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px",
-            }}>
-              <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{p.icon}</span>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14.5, color: C.dark }}>{p.title}</div>
-                {p.mapsUrl ? (
-                  <a href={p.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: C.accent, marginTop: 3, display: "block", textDecoration: "none" }}>{p.desc} →</a>
-                ) : (
-                  <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{p.desc}</div>
-                )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {steps.map((s) => (
+            <div key={s.n} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: "50%", background: C.accent,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 15, color: "#fff", flexShrink: 0,
+              }}>{s.n}</div>
+              <div style={{ paddingTop: 6 }}>
+                <div style={{ fontWeight: 600, fontSize: 15, color: C.dark }}>{s.title}</div>
+                <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{s.desc}</div>
               </div>
             </div>
           ))}
         </div>
+        <a href={RESERVAR_URL} style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          marginTop: 28, padding: "15px", borderRadius: 12,
+          background: C.accent, color: "#fff",
+          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15,
+          textDecoration: "none",
+        }}>
+          Reservar turno ahora
+        </a>
+      </div>
+    </section>
+  );
+}
+
+function InstagramSection() {
+  return (
+    <section style={{ background: C.bg, padding: "48px 20px" }}>
+      <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>📸</div>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: C.dark, margin: "0 0 10px" }}>
+          Seguinos en Instagram
+        </h2>
+        <p style={{ fontSize: 14, color: C.muted, margin: "0 0 22px", lineHeight: 1.6 }}>
+          Mirá técnicas, resultados y tips en{" "}
+          <strong style={{ color: C.dark }}>@angelmasaje.fit</strong>
+        </p>
+        <a
+          href={INSTAGRAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "13px 28px", borderRadius: 12,
+            border: `2px solid ${C.dark}`, color: C.dark,
+            fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 14.5,
+            textDecoration: "none",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+          </svg>
+          Ver @angelmasaje.fit
+        </a>
       </div>
     </section>
   );
@@ -205,7 +296,7 @@ function WhyUs() {
 function Footer({ businessInfo }) {
   const waNumber = formatPhoneForWhatsapp(businessInfo.whatsapp);
   return (
-    <footer style={{ background: C.dark, padding: "36px 20px 48px" }}>
+    <footer style={{ background: C.dark, padding: "40px 20px 52px" }}>
       <div style={{ maxWidth: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <LogoMark size={28} />
@@ -214,16 +305,13 @@ function Footer({ businessInfo }) {
           </span>
         </div>
 
-        <a
-          href={RESERVAR_URL}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "14px", borderRadius: 12,
-            background: C.accent, color: "#fff",
-            fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15,
-            textDecoration: "none",
-          }}
-        >
+        <a href={RESERVAR_URL} style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "15px", borderRadius: 12,
+          background: C.accent, color: "#fff",
+          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15,
+          textDecoration: "none",
+        }}>
           Reservar turno online
         </a>
 
@@ -248,11 +336,29 @@ function Footer({ businessInfo }) {
           </a>
         )}
 
-        <p style={{ fontSize: 12, color: "#4A453D", margin: 0, lineHeight: 1.6 }}>
-          {businessInfo.address && <>{businessInfo.address}<br /></>}
-          {businessInfo.hoursLabel && <>{businessInfo.hoursLabel}<br /></>}
-          Don Torcuato, Buenos Aires
-        </p>
+        <a
+          href={INSTAGRAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "13px", borderRadius: 12,
+            border: "1.5px solid #6E6358", color: "#9A9183",
+            fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14,
+            textDecoration: "none",
+          }}
+        >
+          @angelmasaje.fit en Instagram
+        </a>
+
+        <div style={{ borderTop: "1px solid #3D372F", paddingTop: 16 }}>
+          <p style={{ fontSize: 12.5, color: "#4A453D", margin: 0, lineHeight: 1.8 }}>
+            {businessInfo.address && <>{businessInfo.address}<br /></>}
+            {businessInfo.addressDetail && <>{businessInfo.addressDetail}<br /></>}
+            Don Torcuato, Buenos Aires<br />
+            {businessInfo.hoursLabel && <>{businessInfo.hoursLabel}</>}
+          </p>
+        </div>
       </div>
     </footer>
   );
@@ -272,9 +378,11 @@ export default function App() {
     <div style={{ fontFamily: "'Inter', sans-serif", background: C.bg, minHeight: "100vh", color: C.dark }}>
       <GoogleFontsLoader />
       <Hero businessInfo={businessInfo} />
+      <Especialidades />
       <Services services={services} />
+      <About />
       <HowItWorks />
-      <WhyUs />
+      <InstagramSection />
       <Footer businessInfo={businessInfo} />
     </div>
   );
