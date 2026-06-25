@@ -724,6 +724,10 @@ export async function deactivateGiftCard(code) {
   });
 }
 
+export async function deleteGiftCard(code) {
+  return deleteDoc(doc(db, "giftCards", code));
+}
+
 export async function redeemGiftCard(code, apptId) {
   return updateDoc(doc(db, "giftCards", code), {
     status: "used",

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Check, Gift, Search } from "lucide-react";
-import { activateGiftCard, deactivateGiftCard, getGiftCard } from "../../shared/firestoreApi";
+import { activateGiftCard, deactivateGiftCard, deleteGiftCard, getGiftCard } from "../../shared/firestoreApi";
 import { formatPrice, formatDateLong } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
@@ -29,6 +29,20 @@ export default function GiftCardsView({ giftCards }) {
     } catch (e) {
       console.error(e);
       window.alert("No se pudo activar la gift card. Intentá de nuevo.");
+    } finally {
+      setConfirming(null);
+    }
+  }
+
+  async function handleDelete(code) {
+    if (!window.confirm("¿Seguro que querés eliminar esta gift card? Esta acción no se puede deshacer.")) return;
+    setConfirming(code);
+    try {
+      await deleteGiftCard(code);
+      if (codeSearch?.result?.code === code) setCodeSearch(null);
+    } catch (e) {
+      console.error(e);
+      window.alert("No se pudo eliminar la gift card. Intentá de nuevo.");
     } finally {
       setConfirming(null);
     }
@@ -123,6 +137,13 @@ export default function GiftCardsView({ giftCards }) {
                 {confirming === gc.code ? "Desactivando…" : "Desactivar"}
               </button>
             )}
+            <button
+              style={{ ...styles.giftCardConfirmBtn, background: "#F5F5F5", color: "#8A8275", borderColor: "#D0C5B4" }}
+              onClick={() => handleDelete(gc.code)}
+              disabled={confirming === gc.code}
+            >
+              {confirming === gc.code ? "Eliminando…" : "Eliminar"}
+            </button>
           </div>
         </div>
         <div style={{ marginTop: 8, fontSize: 11, color: "#B5A98F", letterSpacing: "0.06em" }}>
