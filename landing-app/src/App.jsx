@@ -169,7 +169,7 @@ function HowItWorks() {
 
 function WhyUs() {
   const points = [
-    { icon: "📍", title: "En Don Torcuato", desc: "Arata 1967, entre Brasil y Ecuador" },
+    { icon: "📍", title: "En Don Torcuato", desc: "Arata 1967, entre Brasil y Ecuador", mapsUrl: "https://www.google.com/maps/search/?api=1&query=Arata+1967+Don+Torcuato+Buenos+Aires" },
     { icon: "🕐", title: "Lunes a viernes de 10 a 20 hs", desc: "Agenda tu turno cuando quieras, las 24 horas" },
     { icon: "✅", title: "Sin intermediarios", desc: "Reservá directo desde el celular, sin llamadas" },
   ];
@@ -188,7 +188,11 @@ function WhyUs() {
               <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{p.icon}</span>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 14.5, color: C.dark }}>{p.title}</div>
-                <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{p.desc}</div>
+                {p.mapsUrl ? (
+                  <a href={p.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: C.accent, marginTop: 3, display: "block", textDecoration: "none" }}>{p.desc} →</a>
+                ) : (
+                  <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{p.desc}</div>
+                )}
               </div>
             </div>
           ))}
