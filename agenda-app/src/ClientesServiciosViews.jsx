@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus } from "lucide-react";
+import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import { formatPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
 import { getAppointmentHistory } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
@@ -241,9 +241,27 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
 // ====================================================================
 // SERVICIOS VIEW
 // ====================================================================
-export function ServiciosView({ services, onAddService, onUpdateService, onDeleteService }) {
+export function ServiciosView({ services, onAddService, onUpdateService, onDeleteService, businessInfo, onSaveBusinessInfo }) {
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState(null); // { id, name, duration, price, color }
+  const [showMsgs, setShowMsgs] = useState(false);
+  const [msgRecordatorio, setMsgRecordatorio] = useState("");
+  const [msgConfirmacion, setMsgConfirmacion] = useState("");
+  const [msgSaved, setMsgSaved] = useState(false);
+
+  useEffect(() => {
+    if (businessInfo) {
+      setMsgRecordatorio(businessInfo.msgRecordatorio || "");
+      setMsgConfirmacion(businessInfo.msgConfirmacion || "");
+    }
+  }, [businessInfo?.msgRecordatorio, businessInfo?.msgConfirmacion]);
+
+  function saveMsgs(e) {
+    e.preventDefault();
+    onSaveBusinessInfo({ msgRecordatorio, msgConfirmacion });
+    setMsgSaved(true);
+    setTimeout(() => setMsgSaved(false), 2000);
+  }
   const [name, setName] = useState("");
   const [duration, setDuration] = useState(60);
   const [price, setPrice] = useState(20000);
@@ -358,6 +376,46 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
           </div>
         </form>
       )}
+
+      <div style={{ marginTop: 24, borderTop: "1px solid #D8D0C4", paddingTop: 16 }}>
+        <button
+          type="button"
+          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", padding: 0, color: "#2A2622", fontSize: 14, fontWeight: 600 }}
+          onClick={() => setShowMsgs(v => !v)}
+        >
+          <MessageCircle size={15} />
+          Mensajes de WhatsApp
+          {showMsgs ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+
+        {showMsgs && (
+          <form style={{ marginTop: 12 }} onSubmit={saveMsgs}>
+            <p style={{ fontSize: 12, color: "#8A7E70", marginBottom: 12, lineHeight: 1.5 }}>
+              Variables disponibles: <code>{"{nombre}"}</code>, <code>{"{servicio}"}</code>, <code>{"{hora}"}</code>, <code>{"{direccion}"}</code>, <code>{"{cuando}"}</code> (recordatorio), <code>{"{fecha}"}</code> (confirmación)
+            </p>
+
+            <label style={styles.fieldLabel}>Recordatorio (hoy / mañana)</label>
+            <textarea
+              style={{ ...styles.input, height: 72, resize: "vertical", fontFamily: "inherit", fontSize: 13 }}
+              value={msgRecordatorio}
+              onChange={e => setMsgRecordatorio(e.target.value)}
+            />
+
+            <label style={{ ...styles.fieldLabel, marginTop: 10 }}>Confirmación de turno</label>
+            <textarea
+              style={{ ...styles.input, height: 72, resize: "vertical", fontFamily: "inherit", fontSize: 13 }}
+              value={msgConfirmacion}
+              onChange={e => setMsgConfirmacion(e.target.value)}
+            />
+
+            <div style={styles.modalActions}>
+              <button type="submit" style={styles.saveBtn}>
+                {msgSaved ? <><Check size={16} /> Guardado</> : <><Check size={16} /> Guardar mensajes</>}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

@@ -16,6 +16,8 @@ export const DEFAULT_BUSINESS_INFO = {
   addressDetail: "Entre Brasil y Ecuador",
   hoursLabel: "Lunes a viernes de 10 a 20 hs",
   whatsapp: "",
+  msgRecordatorio: "Hola {nombre}! Te recuerdo tu turno de {servicio} {cuando} a las {hora} hs en {direccion}. ¡Te espero!",
+  msgConfirmacion: "Hola {nombre}! Te confirmo tu turno de {servicio} el {fecha} a las {hora} hs en {direccion}. ¡Te espero!",
 };
 
 export const STATUS = {

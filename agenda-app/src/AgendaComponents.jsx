@@ -47,7 +47,13 @@ export function AgendaView({
     const waPhone = formatPhoneForWhatsapp(appt.clientPhone);
     if (!waPhone) return null;
     const svc = services.find(s => s.id === appt.serviceId);
-    const msg = `Hola ${appt.clientName}! Te recuerdo tu turno de ${svc?.name || "masaje"} ${when} a las ${appt.start} hs en ${businessInfo?.address || ""}. ¡Te espero!`;
+    const template = businessInfo?.msgRecordatorio || "Hola {nombre}! Te recuerdo tu turno de {servicio} {cuando} a las {hora} hs en {direccion}. ¡Te espero!";
+    const msg = template
+      .replace("{nombre}", appt.clientName)
+      .replace("{servicio}", svc?.name || "masaje")
+      .replace("{cuando}", when)
+      .replace("{hora}", appt.start)
+      .replace("{direccion}", businessInfo?.address || "");
     return `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
   }
 
@@ -797,7 +803,13 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
   function whatsappLink() {
     const waPhone = formatPhoneForWhatsapp(clientPhone);
     if (!waPhone) return null;
-    const msg = `Hola ${clientName}! Te confirmo tu turno de ${svc?.name} el ${formatDateLong(dateVal)} a las ${start} hs en ${businessInfo?.address || ""}. ¡Te espero!`;
+    const template = businessInfo?.msgConfirmacion || "Hola {nombre}! Te confirmo tu turno de {servicio} el {fecha} a las {hora} hs en {direccion}. ¡Te espero!";
+    const msg = template
+      .replace("{nombre}", clientName)
+      .replace("{servicio}", svc?.name || "")
+      .replace("{fecha}", formatDateLong(dateVal))
+      .replace("{hora}", start)
+      .replace("{direccion}", businessInfo?.address || "");
     return `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
   }
   const waLink = whatsappLink();

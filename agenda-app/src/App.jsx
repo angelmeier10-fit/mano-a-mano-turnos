@@ -172,6 +172,8 @@ export default function App() {
             onAddService={addService}
             onUpdateService={updateService}
             onDeleteService={deleteService}
+            businessInfo={businessInfo}
+            onSaveBusinessInfo={setBusinessInfo}
           />
         )}
         {view === "negocio" && (
