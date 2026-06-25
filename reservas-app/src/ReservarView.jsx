@@ -125,7 +125,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
             : <p style={{ ...styles.confirmDetail, color: "#8A8275", marginBottom: 4 }}>Te confirmamos el turno pronto por WhatsApp.</p>
           }
           <p style={styles.confirmDetail}>{cSvc?.name} · {confirmed.start} a {confirmed.end}</p>
-          {cSvc?.price && <p style={styles.confirmPrice}>{formatPrice(cSvc.price)}</p>}
+          {cSvc?.price && !preselectedServiceId && <p style={styles.confirmPrice}>{formatPrice(cSvc.price)}</p>}
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
           <p style={{ ...styles.confirmDetail, marginTop: 10 }}>{businessInfo?.address}</p>
           {businessInfo?.whatsapp && (
@@ -335,7 +335,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
               <div style={{ fontSize: 13, color: "#5A5046" }}>
                 {formatDateLong(selectedDate)} · {selectedSlot.start} a {minutesToTime(timeToMinutes(selectedSlot.start) + (svc?.duration || 0))}
               </div>
-              {svc?.price && <div style={{ fontSize: 13, color: "#5A5046" }}>{formatPrice(svc.price)}</div>}
+              {svc?.price && !preselectedServiceId && <div style={{ fontSize: 13, color: "#5A5046" }}>{formatPrice(svc.price)}</div>}
               <button
                 style={{ ...styles.saveBtn, marginTop: 10, opacity: booking ? 0.6 : 1 }}
                 disabled={booking}

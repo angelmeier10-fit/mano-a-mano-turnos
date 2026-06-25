@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { Search, ChevronLeft } from "lucide-react";
 import { getGiftCardsByPhone } from "../../shared/firestoreApi";
-import { formatPrice, formatDateLong, dateKey } from "../../shared/helpers";
+import { formatDateLong, dateKey } from "../../shared/helpers";
 import styles from "../../shared/styles";
+
+const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
 const STATUS_LABEL = {
   pending: { label: "Esperando pago", color: "#C9973A", bg: "#FFF8EC" },
@@ -77,17 +79,31 @@ export default function GiftCardLookupView({ onSelectGiftCard, onBack }) {
           return (
             <div
               key={gc.id}
-              onClick={() => onSelectGiftCard(gc.code)}
-              style={{ background: "#fff", border: "1px solid #E8E0D4", borderRadius: 12, padding: "14px 16px", marginBottom: 12, cursor: "pointer" }}
+              style={{ background: "#fff", border: "1px solid #E8E0D4", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#2A2622" }}>{gc.serviceName}</div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: s.color, background: s.bg, borderRadius: 6, padding: "2px 8px" }}>{s.label}</span>
+              <div
+                onClick={() => onSelectGiftCard(gc.code)}
+                style={{ cursor: "pointer" }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2A2622" }}>{gc.serviceName}</div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: s.color, background: s.bg, borderRadius: 6, padding: "2px 8px" }}>{s.label}</span>
+                </div>
+                <div style={{ fontSize: 13, color: "#6E6555" }}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
+                <div style={{ fontSize: 12, color: "#8A8275", marginTop: 4 }}>
+                  Vence {formatDateLong(gc.expiresAt)}
+                </div>
               </div>
-              <div style={{ fontSize: 13, color: "#6E6555" }}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
-              <div style={{ fontSize: 12, color: "#8A8275", marginTop: 4 }}>
-                {formatPrice(gc.servicePrice)} · Vence {formatDateLong(gc.expiresAt)}
-              </div>
+              <button
+                style={{ ...styles.saveBtn, background: "#25D366", width: "100%", justifyContent: "center", marginTop: 10 }}
+                onClick={() => {
+                  const link = `${BASE_URL}?giftcard=${gc.code}`;
+                  const msg = `Hola ${gc.toName}! Te comparto tu gift card de Angel Meier Masoterapia 🎁\nServicio: ${gc.serviceName}\nDe parte de: ${gc.fromName}${gc.message ? `\n"${gc.message}"` : ""}\n\nLink para usarla:\n${link}`;
+                  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+                }}
+              >
+                Enviar por WhatsApp
+              </button>
             </div>
           );
         })}
