@@ -298,10 +298,13 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
       console.error("[availability] No se pudo liberar el cupo:", e);
     }
   }
-  const phoneDigits = normalizePhone(phone);
-  if (phoneDigits) {
+  if (normalizePhone(phone)) {
     try {
-      await updateDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "cancelado" });
+      await Promise.allSettled(
+        phoneVariants(phone).map(v =>
+          updateDoc(doc(db, "phoneIndex", v, "bookings", apptId), { status: "cancelado" })
+        )
+      );
     } catch {}
   }
   if (giftCardCode) {
@@ -375,7 +378,9 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
   const phoneDigits = normalizePhone(phone);
   if (phoneDigits) {
     try {
-      await deleteDoc(doc(db, "phoneIndex", phoneDigits, "bookings", oldApptId));
+      await Promise.allSettled(
+        phoneVariants(phone).map(v => deleteDoc(doc(db, "phoneIndex", v, "bookings", oldApptId)))
+      );
       await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", newApptId), {
         dateKey: newAppt.dateKey,
         start: newAppt.start,
@@ -571,12 +576,13 @@ export async function upsertClientByName(name, phone) {
   const phoneDigits = normalizePhone(phone);
 
   if (phoneDigits) {
-    const qPhone = query(collection(db, "clients"), where("phoneDigits", "==", phoneDigits));
-    const snapPhone = await getDocs(qPhone);
-    if (!snapPhone.empty) {
-      const existing = snapPhone.docs[0];
+    const variants = phoneVariants(phone);
+    const snaps = await Promise.all(
+      variants.map(v => getDocs(query(collection(db, "clients"), where("phoneDigits", "==", v))))
+    );
+    const existing = snaps.flatMap(s => s.docs)[0];
+    if (existing) {
       await updateDoc(doc(db, "clients", existing.id), { phone: phone || existing.data().phone });
-      // phoneIndex ya existe para estos dígitos — no hace falta tocarlo
       return existing.id;
     }
   }
@@ -688,9 +694,18 @@ export async function getGiftCard(code) {
 }
 
 export async function getGiftCardsByPhone(phone) {
-  const digits = phone.replace(/\D/g, "");
-  const snap = await getDocs(query(collection(db, "giftCards"), where("buyerPhone", "==", digits)));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const variants = phoneVariants(phone);
+  const snaps = await Promise.all(
+    variants.map(v => getDocs(query(collection(db, "giftCards"), where("buyerPhone", "==", v))))
+  );
+  const seen = new Set();
+  const results = [];
+  for (const snap of snaps) {
+    for (const d of snap.docs) {
+      if (!seen.has(d.id)) { seen.add(d.id); results.push({ id: d.id, ...d.data() }); }
+    }
+  }
+  return results;
 }
 
 export async function activateGiftCard(code) {
