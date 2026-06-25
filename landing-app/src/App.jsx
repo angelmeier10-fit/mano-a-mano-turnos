@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { listenServices, listenBusinessInfo } from "../../shared/firestoreApi";
-import { DEFAULT_BUSINESS_INFO, GoogleFontsHref, formatPrice, formatPhoneForWhatsapp } from "../../shared/helpers";
+import { DEFAULT_BUSINESS_INFO, formatPrice, formatPhoneForWhatsapp } from "../../shared/helpers";
+
+const FONTS_HREF = "https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&family=Questrial&display=swap";
 
 const RESERVAR_URL = "/mano-a-mano-turnos/mano-a-mano-reservas/";
 const INSTAGRAM_URL = "https://www.instagram.com/angelmasaje.fit/";
@@ -21,7 +23,7 @@ const C = {
 function GoogleFontsLoader() {
   useEffect(() => {
     const link = document.createElement("link");
-    link.href = GoogleFontsHref();
+    link.href = FONTS_HREF;
     link.rel = "stylesheet";
     document.head.appendChild(link);
     return () => document.head.removeChild(link);
@@ -63,13 +65,13 @@ function Hero({ businessInfo }) {
       <div style={{ position: "relative", padding: "0 22px 52px", maxWidth: 560, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 20 }}>
           <LogoMark size={28} />
-          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.75)", letterSpacing: "0.01em" }}>
+          <span style={{ fontFamily: "'Raleway', sans-serif", fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.75)", letterSpacing: "0.01em" }}>
             {businessInfo.name}
           </span>
         </div>
 
         <h1 style={{
-          fontFamily: "'Fraunces', serif", fontWeight: 700,
+          fontFamily: "'Raleway', sans-serif", fontWeight: 700,
           fontSize: "clamp(32px, 9vw, 48px)", color: "#fff",
           margin: "0 0 14px", lineHeight: 1.1, letterSpacing: "-0.02em",
         }}>
@@ -87,7 +89,7 @@ function Hero({ businessInfo }) {
         <a href={RESERVAR_URL} style={{
           display: "flex", alignItems: "center", justifyContent: "center",
           background: C.accent, color: "#fff",
-          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 16,
+          fontFamily: "'Questrial', sans-serif", fontWeight: 700, fontSize: 16,
           padding: "17px", borderRadius: 14, textDecoration: "none",
         }}>
           Reservar mi turno
@@ -125,7 +127,7 @@ function Especialidades() {
   return (
     <section style={{ padding: "48px 20px", background: C.bg }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, color: C.dark, margin: "0 0 6px" }}>
+        <h2 style={{ fontFamily: "'Raleway', sans-serif", fontSize: 26, fontWeight: 600, color: C.dark, margin: "0 0 6px" }}>
           Especialidades
         </h2>
         <p style={{ fontSize: 14, color: C.muted, margin: "0 0 24px", lineHeight: 1.5 }}>
@@ -140,7 +142,7 @@ function Especialidades() {
             }}>
               <span style={{ fontSize: 28, lineHeight: 1, flexShrink: 0 }}>{item.icon}</span>
               <div>
-                <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 16, color: C.dark, marginBottom: 5 }}>{item.title}</div>
+                <div style={{ fontFamily: "'Raleway', sans-serif", fontWeight: 600, fontSize: 16, color: C.dark, marginBottom: 5 }}>{item.title}</div>
                 <div style={{ fontSize: 13.5, color: "#5A5248", lineHeight: 1.55 }}>{item.desc}</div>
               </div>
             </div>
@@ -155,7 +157,7 @@ function Services({ services }) {
   if (!services.length) return null;
   return (
     <section style={{ padding: "0 20px 48px", maxWidth: 560, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, margin: "0 0 20px", color: C.dark }}>
+      <h2 style={{ fontFamily: "'Raleway', sans-serif", fontSize: 26, fontWeight: 600, margin: "0 0 20px", color: C.dark }}>
         Servicios y precios
       </h2>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -173,7 +175,7 @@ function Services({ services }) {
               </div>
             </div>
             {s.price > 0 && (
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 600, color: C.dark, whiteSpace: "nowrap" }}>
+              <div style={{ fontFamily: "'Raleway', sans-serif", fontSize: 16, fontWeight: 600, color: C.dark, whiteSpace: "nowrap" }}>
                 {formatPrice(s.price)}
               </div>
             )}
@@ -184,7 +186,7 @@ function Services({ services }) {
         display: "flex", alignItems: "center", justifyContent: "center",
         marginTop: 16, padding: "14px", borderRadius: 12,
         background: C.dark, color: "#EFE9DF",
-        fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15,
+        fontFamily: "'Questrial', sans-serif", fontWeight: 700, fontSize: 15,
         textDecoration: "none",
       }}>
         Elegir servicio y reservar
@@ -204,7 +206,7 @@ function About() {
           backgroundPosition: "center top",
         }} />
         <div style={{ padding: "30px 22px 36px" }}>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, color: "#EFE9DF", margin: "0 0 14px" }}>
+          <h2 style={{ fontFamily: "'Raleway', sans-serif", fontSize: 26, fontWeight: 600, color: "#EFE9DF", margin: "0 0 14px" }}>
             Masoterapia profesional
           </h2>
           <p style={{ fontSize: 14.5, color: "#B5A98F", lineHeight: 1.75, margin: 0 }}>
@@ -225,7 +227,7 @@ function HowItWorks() {
   return (
     <section style={{ background: "#F5EFE6", padding: "48px 20px" }}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600, color: C.dark, margin: "0 0 24px" }}>
+        <h2 style={{ fontFamily: "'Raleway', sans-serif", fontSize: 26, fontWeight: 600, color: C.dark, margin: "0 0 24px" }}>
           ¿Cómo reservar?
         </h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -234,7 +236,7 @@ function HowItWorks() {
               <div style={{
                 width: 34, height: 34, borderRadius: "50%", background: C.accent,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 15, color: "#fff", flexShrink: 0,
+                fontFamily: "'Raleway', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff", flexShrink: 0,
               }}>{s.n}</div>
               <div style={{ paddingTop: 6 }}>
                 <div style={{ fontWeight: 600, fontSize: 15, color: C.dark }}>{s.title}</div>
@@ -247,7 +249,7 @@ function HowItWorks() {
           display: "flex", alignItems: "center", justifyContent: "center",
           marginTop: 28, padding: "15px", borderRadius: 12,
           background: C.accent, color: "#fff",
-          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15,
+          fontFamily: "'Questrial', sans-serif", fontWeight: 700, fontSize: 15,
           textDecoration: "none",
         }}>
           Reservar turno ahora
@@ -262,7 +264,7 @@ function InstagramSection() {
     <section style={{ background: C.bg, padding: "48px 20px" }}>
       <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>📸</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, fontWeight: 600, color: C.dark, margin: "0 0 10px" }}>
+        <h2 style={{ fontFamily: "'Raleway', sans-serif", fontSize: 24, fontWeight: 600, color: C.dark, margin: "0 0 10px" }}>
           Seguinos en Instagram
         </h2>
         <p style={{ fontSize: 14, color: C.muted, margin: "0 0 22px", lineHeight: 1.6 }}>
@@ -277,7 +279,7 @@ function InstagramSection() {
             display: "inline-flex", alignItems: "center", gap: 8,
             padding: "13px 28px", borderRadius: 12,
             border: `2px solid ${C.dark}`, color: C.dark,
-            fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 14.5,
+            fontFamily: "'Questrial', sans-serif", fontWeight: 700, fontSize: 14.5,
             textDecoration: "none",
           }}
         >
@@ -300,7 +302,7 @@ function Footer({ businessInfo }) {
       <div style={{ maxWidth: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <LogoMark size={28} />
-          <span style={{ fontFamily: "'Fraunces', serif", fontSize: 18, fontWeight: 600, color: "#EFE9DF" }}>
+          <span style={{ fontFamily: "'Raleway', sans-serif", fontSize: 18, fontWeight: 600, color: "#EFE9DF" }}>
             {businessInfo.name}
           </span>
         </div>
@@ -309,7 +311,7 @@ function Footer({ businessInfo }) {
           display: "flex", alignItems: "center", justifyContent: "center",
           padding: "15px", borderRadius: 12,
           background: C.accent, color: "#fff",
-          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 15,
+          fontFamily: "'Questrial', sans-serif", fontWeight: 700, fontSize: 15,
           textDecoration: "none",
         }}>
           Reservar turno online
@@ -324,7 +326,7 @@ function Footer({ businessInfo }) {
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               padding: "13px", borderRadius: 12,
               border: "1.5px solid #3DA854", color: "#3DA854",
-              fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14.5,
+              fontFamily: "'Questrial', sans-serif", fontWeight: 600, fontSize: 14.5,
               textDecoration: "none",
             }}
           >
@@ -344,7 +346,7 @@ function Footer({ businessInfo }) {
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             padding: "13px", borderRadius: 12,
             border: "1.5px solid #6E6358", color: "#9A9183",
-            fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14,
+            fontFamily: "'Questrial', sans-serif", fontWeight: 600, fontSize: 14,
             textDecoration: "none",
           }}
         >
@@ -375,7 +377,7 @@ export default function App() {
   }, []);
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", background: C.bg, minHeight: "100vh", color: C.dark }}>
+    <div style={{ fontFamily: "'Questrial', sans-serif", letterSpacing: "0.01em", background: C.bg, minHeight: "100vh", color: C.dark }}>
       <GoogleFontsLoader />
       <Hero businessInfo={businessInfo} />
       <Especialidades />
