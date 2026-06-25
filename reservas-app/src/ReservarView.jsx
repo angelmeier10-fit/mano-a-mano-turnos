@@ -205,23 +205,39 @@ export default function ReservarView({ services, availability, businessInfo, onB
       {phoneError && <p style={{ color: "#c0392b", fontSize: 13, marginTop: 4, marginBottom: 0 }}>{phoneError}</p>}
 
       <label style={styles.fieldLabel}>Tipo de masaje</label>
-      <div style={styles.serviceChips}>
-        {services.map(s => (
-          <button
-            key={s.id}
-            onClick={() => setServiceId(s.id)}
-            style={{
-              ...styles.serviceChip,
-              ...(serviceId === s.id ? { background: s.color, color: "#EFE9DF", borderColor: s.color } : {}),
-            }}
-          >
-            <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
-            <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
-              {s.duration} min{s.price ? ` · ${formatPrice(s.price)}` : ""}
-            </span>
-          </button>
-        ))}
-      </div>
+      {preselectedServiceId ? (
+        <div style={styles.serviceChips}>
+          {services.filter(s => s.id === preselectedServiceId).map(s => (
+            <div
+              key={s.id}
+              style={{ ...styles.serviceChip, background: s.color, color: "#EFE9DF", borderColor: s.color, cursor: "default" }}
+            >
+              <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
+              <span style={{ opacity: 0.85, fontSize: 12, fontWeight: 500 }}>
+                {s.duration} min · incluido en gift card
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={styles.serviceChips}>
+          {services.map(s => (
+            <button
+              key={s.id}
+              onClick={() => setServiceId(s.id)}
+              style={{
+                ...styles.serviceChip,
+                ...(serviceId === s.id ? { background: s.color, color: "#EFE9DF", borderColor: s.color } : {}),
+              }}
+            >
+              <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
+              <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
+                {s.duration} min{s.price ? ` · ${formatPrice(s.price)}` : ""}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {availableDates.length === 0 ? (
         <p style={styles.emptyMsg}>Por ahora no hay turnos abiertos. Escribime directamente y vemos un horario.</p>
