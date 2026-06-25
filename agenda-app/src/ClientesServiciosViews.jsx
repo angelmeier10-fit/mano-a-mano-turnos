@@ -38,8 +38,14 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
     return { sessions: hist.length, completed: completed.length, totalSpent, ausencias, isNew: hist.length <= 1 };
   }
 
+  const searchDigits = search.replace(/[^\d]/g, "");
   const filtered = clients
-    .filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(c => {
+      const nameMatch = c.name.toLowerCase().includes(search.toLowerCase());
+      const phoneMatch = searchDigits.length >= 3 &&
+        (c.phone || "").replace(/[^\d]/g, "").includes(searchDigits);
+      return nameMatch || phoneMatch;
+    })
     .sort((a,b) => a.name.localeCompare(b.name));
 
   function updateNotes(id, notes) {

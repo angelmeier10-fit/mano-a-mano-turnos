@@ -775,9 +775,14 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
   const svc = services.find(s => s.id === serviceId);
   const end = svc ? minutesToTime(timeToMinutes(start) + svc.duration) : start;
 
-  const filteredClients = clients.filter(c =>
-    c.name.toLowerCase().includes(clientName.toLowerCase()) && clientName.length > 0
-  ).slice(0, 5);
+  const clientSearchDigits = clientName.replace(/[^\d]/g, "");
+  const filteredClients = clients.filter(c => {
+    if (!clientName.length) return false;
+    const nameMatch = c.name.toLowerCase().includes(clientName.toLowerCase());
+    const phoneMatch = clientSearchDigits.length >= 3 &&
+      (c.phone || "").replace(/[^\d]/g, "").includes(clientSearchDigits);
+    return nameMatch || phoneMatch;
+  }).slice(0, 5);
 
   function handleSubmit(e) {
     e.preventDefault();

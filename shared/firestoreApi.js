@@ -236,8 +236,18 @@ export async function getMyBookingRefs(phone) {
   const phoneDigits = normalizePhone(phone);
   if (!phoneDigits) return [];
   try {
-    const snap = await getDocs(collection(db, "phoneIndex", phoneDigits, "bookings"));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const variants = phoneVariants(phone);
+    const snaps = await Promise.all(
+      variants.map(v => getDocs(collection(db, "phoneIndex", v, "bookings")))
+    );
+    const seen = new Set();
+    const results = [];
+    for (const snap of snaps) {
+      for (const d of snap.docs) {
+        if (!seen.has(d.id)) { seen.add(d.id); results.push({ id: d.id, ...d.data() }); }
+      }
+    }
+    return results;
   } catch (e) {
     console.error("[phoneIndex/bookings] No se pudo leer las reservas:", e);
     return [];
@@ -540,6 +550,18 @@ export function listenClients(callback) {
 }
 function normalizePhone(phone) {
   return (phone || "").replace(/[^\d]/g, "");
+}
+
+// Genera variantes del número para buscar en phoneIndex aunque fue guardado en otro formato.
+// Argentina: los números tienen 10 dígitos significativos (sin código de país ni 0 inicial).
+function phoneVariants(phone) {
+  const digits = normalizePhone(phone);
+  const variants = new Set([digits]);
+  if (digits.startsWith("54") && digits.length === 12) variants.add(digits.slice(2));
+  if (digits.length === 10) variants.add("54" + digits);
+  if (digits.startsWith("0") && digits.length === 11) variants.add(digits.slice(1));
+  if (digits.length === 10) variants.add("0" + digits);
+  return [...variants].filter(Boolean);
 }
 
 // Uso desde la Agenda (vos, logueado): deduplica primero por teléfono (dígitos),
