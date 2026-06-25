@@ -13,7 +13,7 @@ function GiftCardVisual({ gc, canvasRef }) {
       <div style={{ position: "relative" }}>
         <div style={styles.giftCardVisualLogo}>🤍 Angel Meier Masoterapia</div>
         <div style={styles.giftCardVisualService}>{gc.serviceName}</div>
-        <div style={{ fontSize: 15, color: "rgba(255,255,255,0.85)", marginBottom: 8, fontWeight: 600 }}>{formatPrice(gc.servicePrice)}</div>
+
         <div style={styles.giftCardVisualTo}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
         {gc.message && <div style={styles.giftCardVisualMessage}>"{gc.message}"</div>}
         <div style={styles.giftCardVisualCode}>Código: {gc.code}</div>
