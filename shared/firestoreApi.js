@@ -717,6 +717,13 @@ export async function activateGiftCard(code) {
   });
 }
 
+export async function deactivateGiftCard(code) {
+  return updateDoc(doc(db, "giftCards", code), {
+    status: "pending",
+    activatedAt: null,
+  });
+}
+
 export async function redeemGiftCard(code, apptId) {
   return updateDoc(doc(db, "giftCards", code), {
     status: "used",
