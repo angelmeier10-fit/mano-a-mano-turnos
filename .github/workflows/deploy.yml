@@ -42,13 +42,21 @@ jobs:
         run: npm run build
         working-directory: reservas-app
 
+      - name: Instalar dependencias de Landing
+        run: npm install
+        working-directory: landing-app
+
+      - name: Compilar Landing
+        run: npm run build
+        working-directory: landing-app
+
       - name: Armar carpeta de publicacion
         run: |
           mkdir -p public-site/mano-a-mano-agenda
           mkdir -p public-site/mano-a-mano-reservas
           cp -r agenda-app/dist/* public-site/mano-a-mano-agenda/
           cp -r reservas-app/dist/* public-site/mano-a-mano-reservas/
-          echo "<!doctype html><html><head><meta charset='utf-8'><title>Mano a Mano</title></head><body><h1>Mano a Mano</h1><p><a href='./mano-a-mano-agenda/'>Agenda (privada)</a></p><p><a href='./mano-a-mano-reservas/'>Reservar turno (clientes)</a></p></body></html>" > public-site/index.html
+          cp -r landing-app/dist/* public-site/
 
       - name: Preparar Pages
         uses: actions/configure-pages@v5
