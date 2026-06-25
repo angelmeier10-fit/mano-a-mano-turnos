@@ -557,16 +557,18 @@ function normalizePhone(phone) {
   return (phone || "").replace(/[^\d]/g, "");
 }
 
-// Genera variantes del número para buscar en phoneIndex aunque fue guardado en otro formato.
-// Argentina: los números tienen 10 dígitos significativos (sin código de país ni 0 inicial).
+// Genera todas las variantes del número para buscar sin importar el formato guardado.
+// Formatos argentinos: 10d local, 11d con 0, 12d con 54, 13d con 549 (WhatsApp móvil).
 function phoneVariants(phone) {
   const digits = normalizePhone(phone);
-  const variants = new Set([digits]);
-  if (digits.startsWith("54") && digits.length === 12) variants.add(digits.slice(2));
-  if (digits.length === 10) variants.add("54" + digits);
-  if (digits.startsWith("0") && digits.length === 11) variants.add(digits.slice(1));
-  if (digits.length === 10) variants.add("0" + digits);
-  return [...variants].filter(Boolean);
+  if (!digits) return [];
+  // Extraer los 10 dígitos significativos quitando prefijos conocidos
+  let core = digits;
+  if (digits.length === 13 && digits.startsWith("549")) core = digits.slice(3);
+  else if (digits.length === 12 && digits.startsWith("54")) core = digits.slice(2);
+  else if (digits.length === 11 && digits.startsWith("0")) core = digits.slice(1);
+  if (core.length !== 10) return [digits]; // formato desconocido, usar tal cual
+  return [...new Set([core, "0" + core, "54" + core, "549" + core, digits])];
 }
 
 // Uso desde la Agenda (vos, logueado): deduplica primero por teléfono (dígitos),
