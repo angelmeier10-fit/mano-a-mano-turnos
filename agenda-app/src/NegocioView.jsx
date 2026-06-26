@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Check, Download, Copy, Share2 } from "lucide-react";
 import styles from "../../shared/styles";
-import { STATUS, formatPrice } from "../../shared/helpers";
+import { STATUS, formatPrice, dateKey } from "../../shared/helpers";
 
 const RESERVAS_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
@@ -15,7 +15,7 @@ function csvEscape(value) {
 
 function downloadCsv(filename, rows) {
   const csvContent = rows.map(row => row.map(csvEscape).join(",")).join("\n");
-  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -34,6 +34,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   const [whatsapp, setWhatsapp] = useState(businessInfo?.whatsapp || "");
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [incomeDate, setIncomeDate] = useState(dateKey(new Date()));
 
   useEffect(() => {
     setName(businessInfo?.name || "");
@@ -92,6 +93,13 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     downloadCsv(`clientes_${today}.csv`, rows);
   }
 
+  const dayAppointments = appointments.filter(a => a.dateKey === incomeDate);
+  const paidAppointments = dayAppointments.filter(a => a.status === "completado");
+  const totalIncome = paidAppointments.reduce((sum, a) => {
+    const svc = services.find(s => s.id === a.serviceId);
+    return sum + (svc?.price || 0);
+  }, 0);
+
   return (
     <div style={styles.viewWrap}>
       <h2 style={styles.sectionTitle}>Mi negocio</h2>
@@ -109,6 +117,47 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
             </button>
           )}
         </div>
+      </div>
+
+      <h2 style={{ ...styles.sectionTitle, marginTop: 4 }}>Ingresos por día</h2>
+      <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "16px 14px", marginBottom: 24 }}>
+        <label style={{ ...styles.fieldLabel, display: "block", marginBottom: 8 }}>Elegí una fecha</label>
+        <input
+          type="date"
+          value={incomeDate}
+          onChange={e => setIncomeDate(e.target.value)}
+          style={{ ...styles.input, marginBottom: 14 }}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#8A8275" }}>Turnos del día</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#2A2622" }}>{dayAppointments.length}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#8A8275" }}>Completados</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#6E7F5C" }}>{paidAppointments.length}</span>
+          </div>
+          <div style={{ borderTop: "1px solid #E3DBCB", marginTop: 6, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#2A2622" }}>Total ingresado</span>
+            <span style={{ fontSize: 18, fontWeight: 800, color: "#B5654A" }}>{formatPrice(totalIncome)}</span>
+          </div>
+        </div>
+        {paidAppointments.length > 0 && (
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+            {paidAppointments.map(a => {
+              const svc = services.find(s => s.id === a.serviceId);
+              return (
+                <div key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#5A5248" }}>
+                  <span>{a.start} — {a.clientName}</span>
+                  <span>{formatPrice(svc?.price || 0)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {dayAppointments.length === 0 && (
+          <p style={{ fontSize: 12, color: "#8A8275", marginTop: 8, textAlign: "center" }}>No hay turnos registrados para esta fecha.</p>
+        )}
       </div>
 
       <p style={styles.helperText}>Esta info aparece en la app de reservas para tus clientes.</p>
