@@ -396,53 +396,62 @@ export function AgendaView({
                         <Plus size={14} />
                       </button>
                     )}
-                    {dayAppts.map(a => {
-                      const svc = services.find(s => s.id === a.serviceId) || {};
-                      const maxDur = Math.max(...services.map(s => s.duration), 60);
-                      const thickness = 3 + Math.round((svc.duration / maxDur) * 7);
-                      return (
-                        <button
-                          key={a.id}
-                          onClick={() => openEditAppt(a)}
-                          style={{
-                            ...styles.apptCard,
-                            background: STATUS_BG[a.status]?.bg || "#FAF7F1",
-                            borderLeftWidth: thickness,
-                            borderLeftColor: STATUS_BG[a.status]?.border || "#B5654A",
-                            opacity: a.status === "cancelado" ? 0.65 : 1,
-                          }}
-                        >
-                          <div style={styles.apptTopRow}>
-                            <span style={styles.apptTime}>{a.start}–{a.end}</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_BG[a.status]?.border, letterSpacing: "0.02em" }}>
-                              {STATUS[a.status]?.label}
-                            </span>
+                    {[
+                      ...dayAppts.map(a => ({ type: "appt", start: a.start, data: a })),
+                      ...openSlots.map(s => ({ type: "slot", start: s.start, data: s })),
+                    ]
+                      .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start))
+                      .map(item => {
+                        if (item.type === "appt") {
+                          const a = item.data;
+                          const svc = services.find(s => s.id === a.serviceId) || {};
+                          const maxDur = Math.max(...services.map(s => s.duration), 60);
+                          const thickness = 3 + Math.round((svc.duration / maxDur) * 7);
+                          return (
+                            <button
+                              key={a.id}
+                              onClick={() => openEditAppt(a)}
+                              style={{
+                                ...styles.apptCard,
+                                background: STATUS_BG[a.status]?.bg || "#FAF7F1",
+                                borderLeftWidth: thickness,
+                                borderLeftColor: STATUS_BG[a.status]?.border || "#B5654A",
+                              }}
+                            >
+                              <div style={styles.apptTopRow}>
+                                <span style={styles.apptTime}>{a.start}–{a.end}</span>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_BG[a.status]?.border, letterSpacing: "0.02em" }}>
+                                  {STATUS[a.status]?.label}
+                                </span>
+                              </div>
+                              <div style={styles.apptClient}>{a.clientName}</div>
+                              <div style={styles.apptService}>
+                                {svc.name}
+                                {a.paidByGiftCard && <span style={{ marginLeft: 5, fontSize: 10, background: "#EBF3E6", color: "#4A5A40", borderRadius: 6, padding: "1px 6px", fontWeight: 700 }}>🎁 Gift Card</span>}
+                              </div>
+                            </button>
+                          );
+                        }
+                        const slot = item.data;
+                        return (
+                          <div key={slot.id} style={styles.openSlotCard}>
+                            <div style={styles.openSlotInfo}>
+                              <Clock size={12} color="#6E7F5C" />
+                              <span>{slot.start}–{slot.end}</span>
+                              <span style={styles.openSlotTag}>Cupo libre</span>
+                            </div>
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button style={styles.slotMiniBtn} onClick={() => openNewAppt(d, slot.start, slot.id)} title="Cargar turno acá">
+                                <Plus size={12} />
+                              </button>
+                              <button style={styles.slotMiniBtnGhost} onClick={() => onRemoveSlot(slot.id)} title="Quitar cupo">
+                                <X size={12} />
+                              </button>
+                            </div>
                           </div>
-                          <div style={styles.apptClient}>{a.clientName}</div>
-                          <div style={styles.apptService}>
-                            {svc.name}
-                            {a.paidByGiftCard && <span style={{ marginLeft: 5, fontSize: 10, background: "#EBF3E6", color: "#4A5A40", borderRadius: 6, padding: "1px 6px", fontWeight: 700 }}>🎁 Gift Card</span>}
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {openSlots.map(slot => (
-                      <div key={slot.id} style={styles.openSlotCard}>
-                        <div style={styles.openSlotInfo}>
-                          <Clock size={12} color="#6E7F5C" />
-                          <span>{slot.start}–{slot.end}</span>
-                          <span style={styles.openSlotTag}>Cupo libre</span>
-                        </div>
-                        <div style={{ display: "flex", gap: 4 }}>
-                          <button style={styles.slotMiniBtn} onClick={() => openNewAppt(d, slot.start, slot.id)} title="Cargar turno acá">
-                            <Plus size={12} />
-                          </button>
-                          <button style={styles.slotMiniBtnGhost} onClick={() => onRemoveSlot(slot.id)} title="Quitar cupo">
-                            <X size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                        );
+                      })
+                    }
                     {(dayAppts.length > 0 || openSlots.length > 0) && (
                       <button style={styles.addMoreBtn} onClick={() => openNewAppt(d)}>
                         <Plus size={12} /> Agregar turno
