@@ -7,21 +7,25 @@ import ReservarView from "./ReservarView";
 
 function GiftCardVisual({ gc, canvasRef }) {
   return (
-    <div ref={canvasRef} style={styles.giftCardVisual}>
-      <div style={{ position: "absolute", top: "42%", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #C9A84C 15%, #F0D060 50%, #C9A84C 85%, transparent)", opacity: 0.7 }} />
-      <div style={{ position: "absolute", top: 0, bottom: 0, left: "22%", width: 2, background: "linear-gradient(180deg, transparent, #C9A84C 15%, #F0D060 50%, #C9A84C 85%, transparent)", opacity: 0.7 }} />
-      <svg style={{ position: "absolute", top: "22%", left: "12%", opacity: 0.9 }} width="60" height="50" viewBox="0 0 60 50" fill="none">
-        <path d="M30 25 C20 15, 2 10, 4 22 C6 32, 22 28, 30 25Z" fill="#C9A84C"/>
-        <path d="M30 25 C40 15, 58 10, 56 22 C54 32, 38 28, 30 25Z" fill="#C9A84C"/>
-        <path d="M30 25 C20 35, 2 40, 4 28 C6 18, 22 22, 30 25Z" fill="#B8943C"/>
-        <path d="M30 25 C40 35, 58 40, 56 28 C54 18, 38 22, 30 25Z" fill="#B8943C"/>
-        <circle cx="30" cy="25" r="4.5" fill="#D4AF37"/>
-        <circle cx="30" cy="25" r="2.5" fill="#F0D060"/>
-      </svg>
-      <div style={{ position: "absolute", top: 10, right: 20, width: 50, height: 50, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.13) 0%, transparent 70%)" }} />
-      <div style={{ position: "absolute", top: 35, right: 65, width: 28, height: 28, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.09) 0%, transparent 70%)" }} />
-      <div style={{ position: "absolute", bottom: 18, right: 35, width: 38, height: 38, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)" }} />
-      <div style={{ position: "relative", zIndex: 1 }}>
+    <div ref={canvasRef} style={{ ...styles.giftCardVisual, display: "flex", flexDirection: "column", padding: 0 }}>
+      <div style={{ position: "relative", height: 110, overflow: "hidden", flexShrink: 0 }}>
+        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1.5, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #F0D060 50%, #C9A84C 80%, transparent)" }} />
+        <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 1.5, background: "linear-gradient(180deg, transparent, #C9A84C 20%, #F0D060 50%, #C9A84C 80%, transparent)" }} />
+        <div style={{ position: "absolute", top: 8, left: 8, width: 60, height: 60, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.15) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", top: 20, right: 25, width: 40, height: 40, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", bottom: 10, right: 12, width: 55, height: 55, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%)" }} />
+        <div style={{ position: "absolute", top: 5, right: 80, width: 25, height: 25, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)" }} />
+        <svg style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }} width="72" height="60" viewBox="0 0 72 60" fill="none">
+          <path d="M36 30 C24 18, 2 12, 5 26 C7 38, 26 34, 36 30Z" fill="#C9A84C"/>
+          <path d="M36 30 C48 18, 70 12, 67 26 C65 38, 46 34, 36 30Z" fill="#C9A84C"/>
+          <path d="M36 30 C24 42, 2 48, 5 34 C7 22, 26 26, 36 30Z" fill="#A87E2A"/>
+          <path d="M36 30 C48 42, 70 48, 67 34 C65 22, 46 26, 36 30Z" fill="#A87E2A"/>
+          <ellipse cx="36" cy="30" rx="5.5" ry="5" fill="#D4AF37"/>
+          <ellipse cx="36" cy="30" rx="3" ry="2.8" fill="#F0D060"/>
+        </svg>
+      </div>
+      <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #D4AF37 50%, #C9A84C 80%, transparent)", flexShrink: 0 }} />
+      <div style={{ padding: "18px 22px 20px", flex: 1 }}>
         <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
         <div style={styles.giftCardVisualService}>{gc.serviceName}</div>
         <div style={styles.giftCardVisualTo}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
