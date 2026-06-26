@@ -1,8 +1,171 @@
 import React, { useState, useEffect } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import { formatPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
-import { getAppointmentHistory } from "../../shared/firestoreApi";
+import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
+
+const SESION_FIELDS = [
+  { key: "zones",        label: "Zonas trabajadas"          },
+  { key: "techniques",   label: "Técnicas aplicadas"        },
+  { key: "observations", label: "Observaciones / evolución" },
+  { key: "nextGoals",    label: "Próximos objetivos"        },
+];
+
+const EMPTY_SESION = { date: "", appointmentId: null, zones: "", techniques: "", observations: "", nextGoals: "" };
+
+function SessionesSection({ client, history }) {
+  const [sessions, setSessions] = useState([]);
+  const [expanded, setExpanded] = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [draft, setDraft] = useState(EMPTY_SESION);
+  const [editingId, setEditingId] = useState(null);
+
+  useEffect(() => {
+    const unsub = subscribeClientSessions(client.id, setSessions);
+    return unsub;
+  }, [client.id]);
+
+  function openNew(prefill = {}) {
+    setDraft({ ...EMPTY_SESION, ...prefill });
+    setEditingId(null);
+    setFormOpen(true);
+  }
+  function openEdit(s) {
+    setDraft({ date: s.date, appointmentId: s.appointmentId, zones: s.zones, techniques: s.techniques, observations: s.observations, nextGoals: s.nextGoals });
+    setEditingId(s.id);
+    setFormOpen(true);
+  }
+  async function save() {
+    if (!draft.date) return;
+    if (editingId) {
+      await updateClientSession(client.id, editingId, draft);
+    } else {
+      await addClientSession(client.id, draft);
+    }
+    setFormOpen(false);
+    setEditingId(null);
+    setDraft(EMPTY_SESION);
+  }
+  async function remove(sessionId) {
+    await deleteClientSession(client.id, sessionId);
+    if (expanded === sessionId) setExpanded(null);
+  }
+
+  const sessionsByAppt = new Set(sessions.filter(s => s.appointmentId).map(s => s.appointmentId));
+  const completedWithoutNotes = history.filter(h => h.status === "completado" && !sessionsByAppt.has(h.id));
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#2A2622" }}>
+          Seguimiento de sesiones{sessions.length > 0 ? ` (${sessions.length})` : ""}
+        </span>
+        <button style={styles.saveBtn} onClick={() => openNew()}>
+          <Plus size={14} /> Nueva sesión
+        </button>
+      </div>
+
+      {formOpen && (
+        <div style={{ background: "#E8E2D8", borderRadius: 10, padding: 14, marginBottom: 12 }}>
+          <div style={{ marginBottom: 10 }}>
+            <label style={styles.fieldLabel}>Fecha</label>
+            <input
+              type="date"
+              style={styles.input}
+              value={draft.date}
+              onChange={e => setDraft(d => ({ ...d, date: e.target.value }))}
+            />
+          </div>
+          {SESION_FIELDS.map(f => (
+            <div key={f.key} style={{ marginBottom: 10 }}>
+              <label style={styles.fieldLabel}>{f.label}</label>
+              <textarea
+                style={{ ...styles.input, minHeight: 55, resize: "vertical" }}
+                value={draft[f.key]}
+                onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+              />
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <button style={styles.cancelBtn} onClick={() => { setFormOpen(false); setEditingId(null); setDraft(EMPTY_SESION); }}>Cancelar</button>
+            <button style={styles.saveBtn} onClick={save} disabled={!draft.date}><Check size={15} /> Guardar</button>
+          </div>
+        </div>
+      )}
+
+      {sessions.length === 0 && !formOpen && (
+        <p style={styles.emptyMsg}>Sin registros de sesiones todavía.</p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {sessions.map(s => {
+          const isOpen = expanded === s.id;
+          const linkedAppt = history.find(h => h.id === s.appointmentId);
+          return (
+            <div key={s.id} style={{ background: "#E8E2D8", borderRadius: 10, overflow: "hidden" }}>
+              <button
+                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none",
+                  border: "none", cursor: "pointer", padding: "10px 14px", textAlign: "left" }}
+                onClick={() => setExpanded(isOpen ? null : s.id)}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#2A2622" }}>
+                    {s.date
+                      ? new Date(s.date + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })
+                      : "Sin fecha"}
+                  </div>
+                  {s.zones && <div style={{ fontSize: 12, color: "#6A6055", marginTop: 2 }}>{s.zones}</div>}
+                </div>
+                {s.appointmentId && (
+                  <span style={{ fontSize: 11, background: "#6E7F5C", color: "#EFE9DF", borderRadius: 6, padding: "2px 7px" }}>Turno</span>
+                )}
+                {isOpen ? <ChevronUp size={14} color="#8A7E70" /> : <ChevronDown size={14} color="#8A7E70" />}
+              </button>
+
+              {isOpen && (
+                <div style={{ padding: "0 14px 14px" }}>
+                  {linkedAppt && (
+                    <div style={{ fontSize: 12, color: "#6E7F5C", marginBottom: 8 }}>
+                      Turno: {linkedAppt.dateKey} · {linkedAppt.start} hs
+                    </div>
+                  )}
+                  {SESION_FIELDS.filter(f => s[f.key]?.trim()).map(f => (
+                    <div key={f.key} style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: "#8A7E70", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{f.label}</div>
+                      <div style={{ fontSize: 13, color: "#2A2622", marginTop: 2 }}>{s[f.key]}</div>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    <button style={styles.cancelBtn} onClick={() => openEdit(s)}><Pencil size={13} /> Editar</button>
+                    <button style={{ ...styles.deleteBtn, padding: "6px 12px", fontSize: 12 }} onClick={() => remove(s.id)}><Trash2 size={13} /> Eliminar</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {completedWithoutNotes.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 12, color: "#8A7E70", marginBottom: 6 }}>Agregar notas a turnos completados:</div>
+          {completedWithoutNotes.map(h => (
+            <button
+              key={h.id}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "none",
+                border: "1px solid #C8C0B4", borderRadius: 8, padding: "6px 12px",
+                cursor: "pointer", fontSize: 12, color: "#2A2622", marginBottom: 6 }}
+              onClick={() => openNew({ date: h.dateKey, appointmentId: h.id })}
+            >
+              <Plus size={12} />
+              {new Date(h.dateKey + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })} · {h.start} hs
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const ANAMNESIS_FIELDS = [
   { key: "birthDate",          label: "Fecha de nacimiento",     type: "input"    },
@@ -220,6 +383,8 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
           onChange={e => { updateNotes(selected.id, e.target.value); setSelected({ ...selected, notes: e.target.value }); }}
           placeholder="Contracturas recurrentes, lesiones, preferencias de presión…"
         />
+
+        <SessionesSection client={selected} history={history} />
 
         <label style={styles.fieldLabel}>Historial de sesiones ({history.length})</label>
         {history.length === 0 ? (
