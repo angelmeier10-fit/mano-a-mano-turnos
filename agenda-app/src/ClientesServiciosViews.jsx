@@ -4,6 +4,96 @@ import { formatPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../
 import { getAppointmentHistory } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
+const ANAMNESIS_FIELDS = [
+  { key: "birthDate",          label: "Fecha de nacimiento",     type: "input"    },
+  { key: "occupation",         label: "Ocupación",               type: "input"    },
+  { key: "consultationReason", label: "Motivo de consulta",      type: "textarea" },
+  { key: "medicalHistory",     label: "Antecedentes médicos",    type: "textarea" },
+  { key: "currentMedication",  label: "Medicación actual",       type: "textarea" },
+  { key: "painZones",          label: "Zonas de dolor o tensión",type: "textarea" },
+  { key: "contraindications",  label: "Contraindicaciones",      type: "textarea" },
+  { key: "generalNotes",       label: "Observaciones generales", type: "textarea" },
+];
+
+function AnamnesisSection({ client, onUpdateClient }) {
+  const hasData = client.anamnesis && Object.values(client.anamnesis).some(v => v?.trim());
+  const [open, setOpen] = useState(hasData);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(client.anamnesis || {});
+
+  function save() {
+    onUpdateClient(client.id, { anamnesis: draft, anamnesisUpdatedAt: Date.now() });
+    setEditing(false);
+  }
+  function cancel() {
+    setDraft(client.anamnesis || {});
+    setEditing(false);
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <button
+        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none",
+          cursor: "pointer", padding: "8px 0", color: "#2A2622", fontSize: 13, fontWeight: 600, width: "100%" }}
+        onClick={() => { if (!editing) setOpen(v => !v); }}
+      >
+        <span style={{ flex: 1, textAlign: "left" }}>Anamnesis</span>
+        {!editing && (open ? <ChevronUp size={15} /> : <ChevronDown size={15} />)}
+      </button>
+
+      {open && (
+        <div style={{ background: "#E8E2D8", borderRadius: 10, padding: 14 }}>
+          {editing ? (
+            <>
+              {ANAMNESIS_FIELDS.map(f => (
+                <div key={f.key} style={{ marginBottom: 10 }}>
+                  <label style={styles.fieldLabel}>{f.label}</label>
+                  {f.type === "textarea" ? (
+                    <textarea
+                      style={{ ...styles.input, minHeight: 60, resize: "vertical" }}
+                      value={draft[f.key] || ""}
+                      onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+                    />
+                  ) : (
+                    <input
+                      style={styles.input}
+                      value={draft[f.key] || ""}
+                      onChange={e => setDraft(d => ({ ...d, [f.key]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                <button style={styles.cancelBtn} onClick={cancel}>Cancelar</button>
+                <button style={styles.saveBtn} onClick={save}><Check size={15} /> Guardar</button>
+              </div>
+            </>
+          ) : (
+            <>
+              {!hasData ? (
+                <p style={{ ...styles.emptyMsg, marginBottom: 10 }}>Sin datos cargados todavía.</p>
+              ) : (
+                ANAMNESIS_FIELDS.filter(f => client.anamnesis?.[f.key]?.trim()).map(f => (
+                  <div key={f.key} style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: "#8A7E70", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{f.label}</div>
+                    <div style={{ fontSize: 13, color: "#2A2622", marginTop: 2 }}>{client.anamnesis[f.key]}</div>
+                  </div>
+                ))
+              )}
+              <button
+                style={{ ...styles.saveBtn, marginTop: 4 }}
+                onClick={() => { setDraft(client.anamnesis || {}); setEditing(true); }}
+              >
+                <Pencil size={14} /> {hasData ? "Editar" : "Completar anamnesis"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointments, services }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -117,6 +207,11 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
             <div style={styles.clientStatLabel}>Inasistencias</div>
           </div>
         </div>
+
+        <AnamnesisSection
+          client={selected}
+          onUpdateClient={(id, data) => { onUpdateClient(id, data); setSelected(s => ({ ...s, ...data })); }}
+        />
 
         <label style={styles.fieldLabel}>Notas clínicas</label>
         <textarea
