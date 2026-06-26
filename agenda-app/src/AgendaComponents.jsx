@@ -29,8 +29,16 @@ export function AgendaView({
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const todayKey = dateKey(new Date());
 
+  const STATUS_BG = {
+    pendiente:  { bg: "#FFF8EC", border: "#C9973A" },
+    confirmado: { bg: "#F0F5EC", border: "#6E7F5C" },
+    completado: { bg: "#F0EDE8", border: "#5A5550" },
+    cancelado:  { bg: "#FDF0EE", border: "#A6483A" },
+    ausente:    { bg: "#FDF5EC", border: "#B08A3E" },
+  };
+
   const apptsForDay = (d) => appointments
-    .filter(a => a.dateKey === dateKey(d) && a.status !== "cancelado")
+    .filter(a => a.dateKey === dateKey(d))
     .sort((a,b) => timeToMinutes(a.start) - timeToMinutes(b.start));
 
   const todayAppts = useMemo(() => appointments
@@ -399,13 +407,17 @@ export function AgendaView({
                           onClick={() => openEditAppt(a)}
                           style={{
                             ...styles.apptCard,
+                            background: STATUS_BG[a.status]?.bg || "#FAF7F1",
                             borderLeftWidth: thickness,
-                            borderLeftColor: svc.color || "#B5654A",
+                            borderLeftColor: STATUS_BG[a.status]?.border || "#B5654A",
+                            opacity: a.status === "cancelado" ? 0.65 : 1,
                           }}
                         >
                           <div style={styles.apptTopRow}>
                             <span style={styles.apptTime}>{a.start}–{a.end}</span>
-                            <span style={{ ...styles.statusDot, background: STATUS[a.status]?.color }} />
+                            <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_BG[a.status]?.border, letterSpacing: "0.02em" }}>
+                              {STATUS[a.status]?.label}
+                            </span>
                           </div>
                           <div style={styles.apptClient}>{a.clientName}</div>
                           <div style={styles.apptService}>
