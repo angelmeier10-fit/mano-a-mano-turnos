@@ -9,6 +9,33 @@ const FONTS_HREF = "https://fonts.googleapis.com/css2?family=Raleway:wght@400;50
 const HERO_PHOTO = "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=1600&q=85&fit=crop&crop=center";
 const ABOUT_PHOTO = "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=900&q=85&fit=crop&crop=center";
 
+const WA_ICON = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+    <path d="M12 0C5.373 0 0 5.373 0 12c0 2.116.552 4.106 1.524 5.832L0 24l6.336-1.498A11.942 11.942 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.795 9.795 0 01-5.004-1.374l-.36-.214-3.73.882.916-3.617-.235-.372A9.77 9.77 0 012.182 12C2.182 6.573 6.573 2.182 12 2.182S21.818 6.573 21.818 12 17.427 21.818 12 21.818z"/>
+  </svg>
+);
+
+function WaBtn({ waNumber, variant = "green", label = "Consultar por WhatsApp" }) {
+  if (!waNumber) return null;
+  const styles = {
+    green: { background: "#3DA854", color: "#fff", border: "none" },
+    ghost: { background: "transparent", color: "rgba(255,255,255,0.85)", border: "1.5px solid rgba(255,255,255,0.35)" },
+    outline: { background: "transparent", color: "#3DA854", border: "1.5px solid #3DA854" },
+  };
+  return (
+    <a
+      href={`https://wa.me/${waNumber}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "14px 28px", borderRadius: 12, fontFamily: "'Questrial', sans-serif", fontWeight: 600, fontSize: 15, textDecoration: "none", ...styles[variant] }}
+    >
+      {WA_ICON}
+      {label}
+    </a>
+  );
+}
+
 function GoogleFontsLoader() {
   useEffect(() => {
     const link = document.createElement("link");
@@ -56,7 +83,7 @@ function Navbar({ businessName }) {
   );
 }
 
-function Hero({ businessInfo }) {
+function Hero({ businessInfo, waNumber }) {
   return (
     <section className="hero">
       <div className="hero-bg" style={{ backgroundImage: `url(${HERO_PHOTO})` }} />
@@ -70,7 +97,7 @@ function Hero({ businessInfo }) {
         </p>
         <div className="hero-actions">
           <a href={RESERVAR_URL} className="btn-primary">Reservar mi turno</a>
-          <a href="#especialidades" className="btn-ghost">Ver servicios</a>
+          <WaBtn waNumber={waNumber} variant="ghost" label="Consultar por WhatsApp" />
         </div>
         {businessInfo.address && (
           <p className="hero-address">
@@ -143,7 +170,7 @@ function Beneficios() {
   );
 }
 
-function Services({ services }) {
+function Services({ services, waNumber }) {
   if (!services.length) return null;
   return (
     <section className="section srv-section" id="servicios">
@@ -165,15 +192,16 @@ function Services({ services }) {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 24 }}>
+        <div style={{ marginTop: 24, display: "flex", flexWrap: "wrap", gap: 12 }}>
           <a href={RESERVAR_URL} className="btn-primary">Reservar turno</a>
+          <WaBtn waNumber={waNumber} variant="outline" label="Consultar por WhatsApp" />
         </div>
       </div>
     </section>
   );
 }
 
-function About() {
+function About({ waNumber }) {
   return (
     <section className="section" style={{ background: "#EFE9DF" }}>
       <div className="section-inner">
@@ -185,7 +213,10 @@ function About() {
             <p>
               Especializado en masajes descontracturantes, masaje deportivo y tratamiento del dolor muscular. Técnicas manuales y con ventosas para aliviar contracturas, tensión y lesiones. Sesiones personalizadas adaptadas a cada necesidad.
             </p>
-            <a href={RESERVAR_URL} className="btn-primary" style={{ alignSelf: "flex-start" }}>Reservar mi turno</a>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+              <a href={RESERVAR_URL} className="btn-primary">Reservar mi turno</a>
+              <WaBtn waNumber={waNumber} variant="outline" label="WhatsApp" />
+            </div>
           </div>
         </div>
       </div>
@@ -219,7 +250,7 @@ function Testimonios() {
   );
 }
 
-function HowItWorks() {
+function HowItWorks({ waNumber }) {
   const steps = [
     { n: "1", title: "Elegís el servicio", desc: "Descontracturante, deportivo o tratamiento del dolor" },
     { n: "2", title: "Elegís día y horario", desc: "Ves los turnos disponibles en tiempo real" },
@@ -242,8 +273,9 @@ function HowItWorks() {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 36 }}>
+        <div style={{ marginTop: 36, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
           <a href={RESERVAR_URL} className="btn-primary">Reservar ahora</a>
+          <WaBtn waNumber={waNumber} variant="outline" label="¿Tenés dudas? Escribinos" />
         </div>
       </div>
     </section>
@@ -334,17 +366,19 @@ export default function App() {
     return () => { unsubServices(); unsubBiz(); };
   }, []);
 
+  const waNumber = formatPhoneForWhatsapp(businessInfo.whatsapp);
+
   return (
     <div>
       <GoogleFontsLoader />
       <Navbar businessName={businessInfo.name} />
-      <Hero businessInfo={businessInfo} />
+      <Hero businessInfo={businessInfo} waNumber={waNumber} />
       <Especialidades />
       <Beneficios />
-      <Services services={services} />
-      <About />
+      <Services services={services} waNumber={waNumber} />
+      <About waNumber={waNumber} />
       <Testimonios />
-      <HowItWorks />
+      <HowItWorks waNumber={waNumber} />
       <InstagramSection />
       <Footer businessInfo={businessInfo} />
     </div>
