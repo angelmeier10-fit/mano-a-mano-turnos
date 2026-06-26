@@ -667,6 +667,32 @@ export async function deleteClient(id) {
   return deleteDoc(doc(db, "clients", id));
 }
 
+export function subscribeClientSessions(clientId, callback) {
+  const q = query(
+    collection(db, "clients", clientId, "sessions"),
+    orderBy("date", "desc")
+  );
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export async function addClientSession(clientId, data) {
+  const ref = await addDoc(collection(db, "clients", clientId, "sessions"), {
+    ...data,
+    createdAt: Date.now(),
+  });
+  return ref.id;
+}
+
+export async function updateClientSession(clientId, sessionId, data) {
+  return updateDoc(doc(db, "clients", clientId, "sessions", sessionId), data);
+}
+
+export async function deleteClientSession(clientId, sessionId) {
+  return deleteDoc(doc(db, "clients", clientId, "sessions", sessionId));
+}
+
 // ---------- Info del negocio ----------
 export function listenBusinessInfo(callback) {
   return onSnapshot(doc(db, "businessInfo", "main"), (snap) => {
