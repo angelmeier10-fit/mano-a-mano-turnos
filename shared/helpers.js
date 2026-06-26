@@ -60,11 +60,11 @@ export function formatPhoneForWhatsapp(phone) {
   return "549" + d;
 }
 
-export function isPastSlot(dKey, time) {
+export function isPastSlot(dKey, time, marginMinutes = 0) {
   const now = new Date();
   if (dKey > dateKey(now)) return false;
   if (dKey < dateKey(now)) return true;
-  return timeToMinutes(time) <= now.getHours()*60 + now.getMinutes();
+  return timeToMinutes(time) <= now.getHours()*60 + now.getMinutes() + marginMinutes;
 }
 
 export function GoogleFontsHref() {

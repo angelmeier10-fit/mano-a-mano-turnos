@@ -83,7 +83,7 @@ export default function MiTurnoView({
     if (!reschedDate || !reschedSvc) return [];
     return (availabilityByDate[reschedDate] || [])
       .filter(s => !s.booked)
-      .filter(s => !isPastSlot(reschedDate, s.start))
+      .filter(s => !isPastSlot(reschedDate, s.start, 60))
       .filter(s => timeToMinutes(s.end) - timeToMinutes(s.start) >= reschedSvc.duration)
       .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
   }, [reschedDate, reschedSvc, availabilityByDate]);
