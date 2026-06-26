@@ -76,11 +76,30 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
     return (
       <div style={{ padding: "20px 16px" }}>
         <div style={{ ...styles.giftCardVisual, marginBottom: 20 }}>
-          <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
-          <div style={styles.giftCardVisualService}>{done.data.serviceName}</div>
-          <div style={styles.giftCardVisualTo}>Para {done.data.toName} · de parte de {done.data.fromName}</div>
-          {done.data.message && <div style={styles.giftCardVisualMessage}>"{done.data.message}"</div>}
-          <div style={styles.giftCardVisualCode}>Código: {done.code}</div>
+          {/* cinta horizontal dorada */}
+          <div style={{ position: "absolute", top: "42%", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #C9A84C 15%, #F0D060 50%, #C9A84C 85%, transparent)", opacity: 0.7 }} />
+          {/* cinta vertical dorada */}
+          <div style={{ position: "absolute", top: 0, bottom: 0, left: "22%", width: 2, background: "linear-gradient(180deg, transparent, #C9A84C 15%, #F0D060 50%, #C9A84C 85%, transparent)", opacity: 0.7 }} />
+          {/* moño SVG */}
+          <svg style={{ position: "absolute", top: "22%", left: "12%", opacity: 0.9 }} width="60" height="50" viewBox="0 0 60 50" fill="none">
+            <path d="M30 25 C20 15, 2 10, 4 22 C6 32, 22 28, 30 25Z" fill="#C9A84C"/>
+            <path d="M30 25 C40 15, 58 10, 56 22 C54 32, 38 28, 30 25Z" fill="#C9A84C"/>
+            <path d="M30 25 C20 35, 2 40, 4 28 C6 18, 22 22, 30 25Z" fill="#B8943C"/>
+            <path d="M30 25 C40 35, 58 40, 56 28 C54 18, 38 22, 30 25Z" fill="#B8943C"/>
+            <circle cx="30" cy="25" r="4.5" fill="#D4AF37"/>
+            <circle cx="30" cy="25" r="2.5" fill="#F0D060"/>
+          </svg>
+          {/* bokeh decorativo */}
+          <div style={{ position: "absolute", top: 10, right: 20, width: 50, height: 50, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.13) 0%, transparent 70%)" }} />
+          <div style={{ position: "absolute", top: 35, right: 65, width: 28, height: 28, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.09) 0%, transparent 70%)" }} />
+          <div style={{ position: "absolute", bottom: 18, right: 35, width: 38, height: 38, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)" }} />
+          <div style={{ position: "relative", zIndex: 1 }}>
+            <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
+            <div style={styles.giftCardVisualService}>{done.data.serviceName}</div>
+            <div style={styles.giftCardVisualTo}>Para {done.data.toName} · de parte de {done.data.fromName}</div>
+            {done.data.message && <div style={styles.giftCardVisualMessage}>"{done.data.message}"</div>}
+            <div style={styles.giftCardVisualCode}>Código: {done.code}</div>
+          </div>
         </div>
 
         <div style={{ background: "#F0F7EC", border: "1.5px solid #6E7F5C", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>

@@ -8,12 +8,22 @@ import ReservarView from "./ReservarView";
 function GiftCardVisual({ gc, canvasRef }) {
   return (
     <div ref={canvasRef} style={styles.giftCardVisual}>
-      <div style={{ position: "absolute", top: 0, right: 0, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.05)", transform: "translate(40%, -40%)" }} />
-      <div style={{ position: "absolute", bottom: 0, left: 0, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,0,0,0.08)", transform: "translate(-30%, 40%)" }} />
-      <div style={{ position: "relative" }}>
-        <div style={styles.giftCardVisualLogo}>🤍 Angel Meier Masoterapia</div>
+      <div style={{ position: "absolute", top: "42%", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, #C9A84C 15%, #F0D060 50%, #C9A84C 85%, transparent)", opacity: 0.7 }} />
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: "22%", width: 2, background: "linear-gradient(180deg, transparent, #C9A84C 15%, #F0D060 50%, #C9A84C 85%, transparent)", opacity: 0.7 }} />
+      <svg style={{ position: "absolute", top: "22%", left: "12%", opacity: 0.9 }} width="60" height="50" viewBox="0 0 60 50" fill="none">
+        <path d="M30 25 C20 15, 2 10, 4 22 C6 32, 22 28, 30 25Z" fill="#C9A84C"/>
+        <path d="M30 25 C40 15, 58 10, 56 22 C54 32, 38 28, 30 25Z" fill="#C9A84C"/>
+        <path d="M30 25 C20 35, 2 40, 4 28 C6 18, 22 22, 30 25Z" fill="#B8943C"/>
+        <path d="M30 25 C40 35, 58 40, 56 28 C54 18, 38 22, 30 25Z" fill="#B8943C"/>
+        <circle cx="30" cy="25" r="4.5" fill="#D4AF37"/>
+        <circle cx="30" cy="25" r="2.5" fill="#F0D060"/>
+      </svg>
+      <div style={{ position: "absolute", top: 10, right: 20, width: 50, height: 50, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.13) 0%, transparent 70%)" }} />
+      <div style={{ position: "absolute", top: 35, right: 65, width: 28, height: 28, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.09) 0%, transparent 70%)" }} />
+      <div style={{ position: "absolute", bottom: 18, right: 35, width: 38, height: 38, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)" }} />
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
         <div style={styles.giftCardVisualService}>{gc.serviceName}</div>
-
         <div style={styles.giftCardVisualTo}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
         {gc.message && <div style={styles.giftCardVisualMessage}>"{gc.message}"</div>}
         <div style={styles.giftCardVisualCode}>Código: {gc.code}</div>
