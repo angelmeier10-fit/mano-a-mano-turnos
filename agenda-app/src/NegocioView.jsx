@@ -26,6 +26,132 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
+function getWeekRange(d) {
+  const day = d.getDay(); // 0=dom
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const mon = new Date(d); mon.setDate(d.getDate() + diffToMon);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  return { from: dateKey(mon), to: dateKey(sun) };
+}
+
+function getMonthRange(d) {
+  const from = new Date(d.getFullYear(), d.getMonth(), 1);
+  const to = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return { from: dateKey(from), to: dateKey(to) };
+}
+
+const PERIODS = [
+  { id: "day", label: "Hoy" },
+  { id: "week", label: "Semana" },
+  { id: "month", label: "Mes" },
+  { id: "custom", label: "Rango" },
+];
+
+function IncomesPanel({ appointments, services }) {
+  const today = dateKey(new Date());
+  const [period, setPeriod] = useState("day");
+  const [customFrom, setCustomFrom] = useState(today);
+  const [customTo, setCustomTo] = useState(today);
+
+  function getRange() {
+    const now = new Date();
+    if (period === "day") return { from: today, to: today };
+    if (period === "week") return getWeekRange(now);
+    if (period === "month") return getMonthRange(now);
+    return { from: customFrom, to: customTo };
+  }
+
+  const { from, to } = getRange();
+
+  const rangeAppointments = appointments.filter(a => a.dateKey >= from && a.dateKey <= to);
+  const completed = rangeAppointments.filter(a => a.status === "completado");
+  const total = completed.reduce((sum, a) => {
+    const svc = services.find(s => s.id === a.serviceId);
+    return sum + (svc?.price || 0);
+  }, 0);
+
+  // Agrupar por día para el desglose (solo días con completados)
+  const byDay = completed.reduce((acc, a) => {
+    if (!acc[a.dateKey]) acc[a.dateKey] = { count: 0, total: 0 };
+    const svc = services.find(s => s.id === a.serviceId);
+    acc[a.dateKey].count += 1;
+    acc[a.dateKey].total += svc?.price || 0;
+    return acc;
+  }, {});
+  const dayEntries = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
+
+  const btnBase = {
+    flex: 1, padding: "7px 4px", borderRadius: 8, border: "1px solid #E3DBCB",
+    fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+  };
+  const btnActive = { ...btnBase, background: "#2A2622", color: "#EFE9DF", borderColor: "#2A2622" };
+  const btnInactive = { ...btnBase, background: "#fff", color: "#5A5248" };
+
+  return (
+    <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "16px 14px", marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {PERIODS.map(p => (
+          <button key={p.id} type="button" style={period === p.id ? btnActive : btnInactive} onClick={() => setPeriod(p.id)}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {period === "custom" && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
+          <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} style={{ ...styles.input, flex: 1, marginBottom: 0 }} />
+          <span style={{ fontSize: 12, color: "#8A8275", flexShrink: 0 }}>al</span>
+          <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} style={{ ...styles.input, flex: 1, marginBottom: 0 }} />
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 13, color: "#8A8275" }}>Turnos completados</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#6E7F5C" }}>{completed.length}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #E3DBCB", paddingTop: 10, marginTop: 4 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#2A2622" }}>Total ingresado</span>
+          <span style={{ fontSize: 20, fontWeight: 800, color: "#B5654A" }}>{formatPrice(total)}</span>
+        </div>
+      </div>
+
+      {period !== "day" && dayEntries.length > 0 && (
+        <div style={{ marginTop: 12, borderTop: "1px solid #E3DBCB", paddingTop: 10, display: "flex", flexDirection: "column", gap: 5 }}>
+          {dayEntries.map(([dk, { count, total: t }]) => {
+            const d = new Date(dk + "T00:00:00");
+            const label = d.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
+            return (
+              <div key={dk} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#5A5248" }}>
+                <span style={{ textTransform: "capitalize" }}>{label} · {count} turno{count !== 1 ? "s" : ""}</span>
+                <span style={{ fontWeight: 600 }}>{formatPrice(t)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {period === "day" && completed.length > 0 && (
+        <div style={{ marginTop: 12, borderTop: "1px solid #E3DBCB", paddingTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+          {completed.map(a => {
+            const svc = services.find(s => s.id === a.serviceId);
+            return (
+              <div key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#5A5248" }}>
+                <span>{a.start} — {a.clientName}</span>
+                <span>{formatPrice(svc?.price || 0)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {completed.length === 0 && (
+        <p style={{ fontSize: 12, color: "#8A8275", marginTop: 10, textAlign: "center" }}>Sin turnos completados en este período.</p>
+      )}
+    </div>
+  );
+}
+
 export default function NegocioView({ businessInfo, onSave, appointments = [], clients = [], services = [] }) {
   const [name, setName] = useState(businessInfo?.name || "");
   const [address, setAddress] = useState(businessInfo?.address || "");
@@ -34,7 +160,6 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   const [whatsapp, setWhatsapp] = useState(businessInfo?.whatsapp || "");
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [incomeDate, setIncomeDate] = useState(dateKey(new Date()));
 
   useEffect(() => {
     setName(businessInfo?.name || "");
@@ -93,13 +218,6 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     downloadCsv(`clientes_${today}.csv`, rows);
   }
 
-  const dayAppointments = appointments.filter(a => a.dateKey === incomeDate);
-  const paidAppointments = dayAppointments.filter(a => a.status === "completado");
-  const totalIncome = paidAppointments.reduce((sum, a) => {
-    const svc = services.find(s => s.id === a.serviceId);
-    return sum + (svc?.price || 0);
-  }, 0);
-
   return (
     <div style={styles.viewWrap}>
       <h2 style={styles.sectionTitle}>Mi negocio</h2>
@@ -119,46 +237,8 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
         </div>
       </div>
 
-      <h2 style={{ ...styles.sectionTitle, marginTop: 4 }}>Ingresos por día</h2>
-      <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "16px 14px", marginBottom: 24 }}>
-        <label style={{ ...styles.fieldLabel, display: "block", marginBottom: 8 }}>Elegí una fecha</label>
-        <input
-          type="date"
-          value={incomeDate}
-          onChange={e => setIncomeDate(e.target.value)}
-          style={{ ...styles.input, marginBottom: 14 }}
-        />
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "#8A8275" }}>Turnos del día</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#2A2622" }}>{dayAppointments.length}</span>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "#8A8275" }}>Completados</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#6E7F5C" }}>{paidAppointments.length}</span>
-          </div>
-          <div style={{ borderTop: "1px solid #E3DBCB", marginTop: 6, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#2A2622" }}>Total ingresado</span>
-            <span style={{ fontSize: 18, fontWeight: 800, color: "#B5654A" }}>{formatPrice(totalIncome)}</span>
-          </div>
-        </div>
-        {paidAppointments.length > 0 && (
-          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-            {paidAppointments.map(a => {
-              const svc = services.find(s => s.id === a.serviceId);
-              return (
-                <div key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#5A5248" }}>
-                  <span>{a.start} — {a.clientName}</span>
-                  <span>{formatPrice(svc?.price || 0)}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {dayAppointments.length === 0 && (
-          <p style={{ fontSize: 12, color: "#8A8275", marginTop: 8, textAlign: "center" }}>No hay turnos registrados para esta fecha.</p>
-        )}
-      </div>
+      <h2 style={{ ...styles.sectionTitle, marginTop: 4 }}>Ingresos</h2>
+      <IncomesPanel appointments={appointments} services={services} />
 
       <p style={styles.helperText}>Esta info aparece en la app de reservas para tus clientes.</p>
 
