@@ -5,7 +5,6 @@ import "./landing.css";
 
 const RESERVAR_URL = "/mano-a-mano-turnos/mano-a-mano-reservas/";
 const INSTAGRAM_URL = "https://www.instagram.com/angelmasaje.fit/";
-const FONTS_HREF = "https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&family=Questrial&display=swap";
 const HERO_PHOTO = "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=1600&q=85&fit=crop&crop=center";
 const ABOUT_PHOTO = "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=900&q=85&fit=crop&crop=center";
 
@@ -34,17 +33,6 @@ function WaBtn({ waNumber, variant = "green", label = "Consultar por WhatsApp" }
       {label}
     </a>
   );
-}
-
-function GoogleFontsLoader() {
-  useEffect(() => {
-    const link = document.createElement("link");
-    link.href = FONTS_HREF;
-    link.rel = "stylesheet";
-    document.head.appendChild(link);
-    return () => document.head.removeChild(link);
-  }, []);
-  return null;
 }
 
 function LogoMark({ size = 28 }) {
@@ -90,7 +78,7 @@ function Hero({ businessInfo, waNumber }) {
       <div className="hero-overlay" />
       <div className="hero-content">
         <span className="hero-tag">Don Torcuato · Buenos Aires</span>
-        <h1 className="hero-title">Masajes terapéuticos que transforman tu cuerpo</h1>
+        <h1 className="hero-title">Masajista en Don Torcuato — masajes terapéuticos profesionales</h1>
         <p className="hero-subtitle">
           Descontracturante · Deportivo · Tratamiento del dolor.<br />
           Reservá tu turno online en minutos, sin llamadas ni esperas.
@@ -370,7 +358,6 @@ export default function App() {
 
   return (
     <div>
-      <GoogleFontsLoader />
       <Navbar businessName={businessInfo.name} />
       <Hero businessInfo={businessInfo} waNumber={waNumber} />
       <Especialidades />
