@@ -31,14 +31,13 @@ export function AgendaView({
 
   const STATUS_BG = {
     pendiente:  { bg: "#FFF8EC", border: "#C9973A" },
-    confirmado: { bg: "#F0F5EC", border: "#6E7F5C" },
+    confirmado: { bg: "#EEF2FB", border: "#5B7EC9" },
     completado: { bg: "#F0EDE8", border: "#5A5550" },
-    cancelado:  { bg: "#FDF0EE", border: "#A6483A" },
     ausente:    { bg: "#FDF5EC", border: "#B08A3E" },
   };
 
   const apptsForDay = (d) => appointments
-    .filter(a => a.dateKey === dateKey(d))
+    .filter(a => a.dateKey === dateKey(d) && a.status !== "cancelado")
     .sort((a,b) => timeToMinutes(a.start) - timeToMinutes(b.start));
 
   const todayAppts = useMemo(() => appointments
