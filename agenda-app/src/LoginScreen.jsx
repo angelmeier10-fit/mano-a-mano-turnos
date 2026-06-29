@@ -23,7 +23,7 @@ export default function LoginScreen() {
   return (
     <div style={styles.wrap}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Mano a Mano</h1>
+        <h1 style={styles.title}>Angel Meier Turnos</h1>
         <p style={styles.subtitle}>Iniciá sesión para ver tu agenda</p>
         <form onSubmit={handleSubmit}>
           <label style={styles.label}>Email</label>

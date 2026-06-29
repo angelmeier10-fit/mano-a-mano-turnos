@@ -104,7 +104,7 @@ export default function App() {
                 <circle cx="14" cy="19" r="2.6" fill="#B5654A"/>
               </svg>
             </div>
-            <h1 style={styles.brandName}>{businessInfo?.name || "Mano a Mano"}</h1>
+            <h1 style={styles.brandName}>{businessInfo?.name || "Angel Meier Turnos"}</h1>
           </div>
         </header>
         <main style={styles.main}>
@@ -138,7 +138,7 @@ export default function App() {
               <circle cx="14" cy="19" r="2.6" fill="#B5654A"/>
             </svg>
           </div>
-          <h1 style={styles.brandName}>{businessInfo?.name || "Mano a Mano"}</h1>
+          <h1 style={styles.brandName}>{businessInfo?.name || "Angel Meier Turnos"}</h1>
         </div>
         <nav style={styles.tabBar}>
           <button

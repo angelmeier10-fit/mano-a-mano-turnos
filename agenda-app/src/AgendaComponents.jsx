@@ -1028,7 +1028,7 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, o
     ctx.fillRect(0, 0, W, HEADER_H);
     ctx.fillStyle = "#EFE9DF";
     ctx.font = "bold 26px Georgia, serif";
-    ctx.fillText(businessInfo?.name || "Mano a Mano", PADDING, 42);
+    ctx.fillText(businessInfo?.name || "Angel Meier Turnos", PADDING, 42);
     ctx.font = "16px Arial, sans-serif";
     ctx.fillStyle = "#B5654A";
     ctx.fillText("Turnos disponibles", PADDING, 68);
