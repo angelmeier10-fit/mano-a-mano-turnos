@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2 } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
-  formatPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
+  formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
   formatPhoneForWhatsapp, parseDateKeyAsLocal,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
@@ -71,7 +71,7 @@ export function AgendaView({
     let completedTotal = 0, upcomingTotal = 0, completedCount = 0, ausentCount = 0;
     monthAppts.forEach(a => {
       const svc = services.find(s => s.id === a.serviceId);
-      const price = svc?.price || 0;
+      const price = getAppointmentPrice(a, svc);
       if (a.status === "completado") { completedTotal += price; completedCount++; }
       else if (a.status === "confirmado") upcomingTotal += price;
       else if (a.status === "ausente") ausentCount++;
@@ -793,6 +793,7 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
   const [clientName, setClientName] = useState(base.clientName);
   const [clientPhone, setClientPhone] = useState(base.clientPhone || "");
   const [notes, setNotes] = useState(base.notes || "");
+  const [discount, setDiscount] = useState(base.discount || 0);
   const [showClientList, setShowClientList] = useState(false);
   const [showDateCalendar, setShowDateCalendar] = useState(false);
   const [repeatWeeks, setRepeatWeeks] = useState(1);
@@ -815,6 +816,7 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
     if (!clientName.trim() || !serviceId) return;
     onSave({
       dateKey: dateVal, start, end, serviceId, clientName, clientPhone, notes,
+      discount: Number(discount) || 0,
       ...(fromAvailabilityId ? { fromAvailabilityId } : {}),
       ...(!initial && repeatWeeks > 1 ? { repeatWeeks } : {}),
     });
@@ -932,6 +934,44 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
           ))}
         </div>
         <div style={styles.endTimeNote}>Finaliza a las {end}</div>
+
+        <label style={styles.fieldLabel}>Descuento / Recargo ($)</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", border: "1.5px solid #D0C5B4", borderRadius: 10, overflow: "hidden" }}>
+            <button
+              type="button"
+              onClick={() => setDiscount(d => -Math.abs(d))}
+              style={{
+                padding: "0 14px", border: "none", cursor: "pointer", fontWeight: 700,
+                ...(Number(discount) <= 0 ? { background: "#A6483A", color: "#fff" } : { background: "#fff", color: "#5A5248" }),
+              }}
+            >Recargo</button>
+            <button
+              type="button"
+              onClick={() => setDiscount(d => Math.abs(d))}
+              style={{
+                padding: "0 14px", border: "none", cursor: "pointer", fontWeight: 700,
+                ...(Number(discount) > 0 ? { background: "#6E7F5C", color: "#fff" } : { background: "#fff", color: "#5A5248" }),
+              }}
+            >Descuento</button>
+          </div>
+          <input
+            type="number"
+            min="0"
+            style={{ ...styles.input, flex: 1 }}
+            value={Math.abs(discount) || ""}
+            onChange={e => setDiscount(Number(discount) < 0 ? -Math.abs(e.target.value) : Math.abs(e.target.value))}
+            placeholder="0"
+          />
+        </div>
+        {svc && (
+          <div style={styles.endTimeNote}>
+            Precio: {formatPrice(svc.price)}
+            {Number(discount) !== 0
+              ? ` ${Number(discount) > 0 ? "−" : "+"} ${formatPrice(Math.abs(Number(discount)))} = ${formatPrice(getAppointmentPrice({ discount }, svc))}`
+              : ""}
+          </div>
+        )}
 
         {!initial && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>

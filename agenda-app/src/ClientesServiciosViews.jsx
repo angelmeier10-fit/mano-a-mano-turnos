@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
-import { formatPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
+import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
 import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
@@ -285,7 +285,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
     const completed = hist.filter(a => a.status === "completado");
     const totalSpent = completed.reduce((sum, a) => {
       const svc = services.find(s => s.id === a.serviceId);
-      return sum + (svc?.price || 0);
+      return sum + getAppointmentPrice(a, svc);
     }, 0);
     const ausencias = hist.filter(a => a.status === "ausente").length;
     return { sessions: hist.length, completed: completed.length, totalSpent, ausencias, isNew: hist.length <= 1 };
@@ -401,7 +401,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
                       {new Date(h.dateKey + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })}
                       {" · "}{h.start}–{h.end}
                     </div>
-                    <div style={styles.historyService}>{svc?.name}{svc?.price ? ` · ${formatPrice(svc.price)}` : ""}</div>
+                    <div style={styles.historyService}>{svc?.name}{svc?.price ? ` · ${formatPrice(getAppointmentPrice(h, svc))}${h.discount ? ` (${h.discount > 0 ? "desc." : "recargo"} ${formatPrice(Math.abs(h.discount))})` : ""}` : ""}</div>
                     {h.notes && <div style={styles.historyNotes}>{h.notes}</div>}
                   </div>
                   <span style={{ ...styles.historyStatusTag, color: STATUS[h.status]?.color }}>{STATUS[h.status]?.label}</span>

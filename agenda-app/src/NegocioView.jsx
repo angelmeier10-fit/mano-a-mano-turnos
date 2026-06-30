@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Check, Download, Copy, Share2 } from "lucide-react";
 import styles from "../../shared/styles";
-import { STATUS, formatPrice, dateKey } from "../../shared/helpers";
+import { STATUS, formatPrice, getAppointmentPrice, dateKey } from "../../shared/helpers";
 
 const RESERVAS_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
@@ -67,7 +67,7 @@ function IncomesPanel({ appointments, services }) {
   const completed = rangeAppointments.filter(a => a.status === "completado");
   const total = completed.reduce((sum, a) => {
     const svc = services.find(s => s.id === a.serviceId);
-    return sum + (svc?.price || 0);
+    return sum + getAppointmentPrice(a, svc);
   }, 0);
 
   // Agrupar por día para el desglose (solo días con completados)
@@ -75,7 +75,7 @@ function IncomesPanel({ appointments, services }) {
     if (!acc[a.dateKey]) acc[a.dateKey] = { count: 0, total: 0 };
     const svc = services.find(s => s.id === a.serviceId);
     acc[a.dateKey].count += 1;
-    acc[a.dateKey].total += svc?.price || 0;
+    acc[a.dateKey].total += getAppointmentPrice(a, svc);
     return acc;
   }, {});
   const dayEntries = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
@@ -138,7 +138,7 @@ function IncomesPanel({ appointments, services }) {
             return (
               <div key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#5A5248" }}>
                 <span>{a.start} — {a.clientName}</span>
-                <span>{formatPrice(svc?.price || 0)}</span>
+                <span>{formatPrice(getAppointmentPrice(a, svc))}</span>
               </div>
             );
           })}
@@ -189,7 +189,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   function exportAppointmentsCsv() {
     const sorted = [...appointments].sort((a, b) => (a.dateKey + a.start).localeCompare(b.dateKey + b.start));
     const rows = [
-      ["Fecha", "Hora inicio", "Hora fin", "Cliente", "Teléfono", "Servicio", "Precio", "Estado", "Notas"],
+      ["Fecha", "Hora inicio", "Hora fin", "Cliente", "Teléfono", "Servicio", "Precio", "Descuento", "Total cobrado", "Estado", "Notas"],
       ...sorted.map(a => {
         const svc = services.find(s => s.id === a.serviceId);
         return [
@@ -200,6 +200,8 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
           a.clientPhone || "",
           svc?.name || "",
           svc?.price || 0,
+          a.discount || 0,
+          getAppointmentPrice(a, svc),
           STATUS[a.status]?.label || a.status,
           a.notes || "",
         ];
