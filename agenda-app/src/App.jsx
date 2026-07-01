@@ -164,6 +164,7 @@ export default function App() {
             services={services}
             onUpdateClient={updateClient}
             onDeleteClient={deleteClient}
+            onAddClient={upsertClientByName}
           />
         )}
         {view === "servicios" && (

@@ -257,11 +257,15 @@ function AnamnesisSection({ client, onUpdateClient }) {
   );
 }
 
-export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointments, services }) {
+export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddClient, appointments, services }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [movements, setMovements] = useState([]);
   const [movementsLoading, setMovementsLoading] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const canImportContact = typeof navigator !== "undefined" && !!navigator.contacts?.select;
 
   useEffect(() => {
     if (!selected) { setMovements([]); return; }
@@ -307,6 +311,24 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
   function deleteClient(id) {
     onDeleteClient(id);
     setSelected(null);
+  }
+
+  async function importContact() {
+    try {
+      const [contact] = await navigator.contacts.select(["name", "tel"], { multiple: false });
+      if (!contact) return;
+      if (contact.name?.[0]) setNewName(contact.name[0]);
+      if (contact.tel?.[0]) setNewPhone(contact.tel[0]);
+    } catch {
+      // el usuario canceló el picker o no hay permiso; no hacemos nada
+    }
+  }
+
+  async function addClient(e) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    await onAddClient(newName.trim(), newPhone.trim());
+    setNewName(""); setNewPhone(""); setShowAddForm(false);
   }
 
   function downloadVCard(client) {
@@ -472,6 +494,29 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, appointm
         onChange={e => setSearch(e.target.value)}
         placeholder="Buscar cliente…"
       />
+
+      {!showAddForm ? (
+        <button style={styles.addServiceBtn} onClick={() => setShowAddForm(true)}>
+          <UserPlus size={16} /> Nuevo cliente
+        </button>
+      ) : (
+        <form style={styles.newServiceForm} onSubmit={addClient}>
+          {canImportContact && (
+            <button type="button" style={{ ...styles.addServiceBtn, marginBottom: 10 }} onClick={importContact}>
+              <UserPlus size={16} /> Importar contacto
+            </button>
+          )}
+          <label style={styles.fieldLabel}>Nombre</label>
+          <input style={styles.input} value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nombre y apellido" autoFocus />
+          <label style={styles.fieldLabel}>Teléfono</label>
+          <input style={styles.input} value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Ej: 11 2345 6789" />
+          <div style={styles.modalActions}>
+            <button type="button" style={styles.cancelBtn} onClick={() => { setShowAddForm(false); setNewName(""); setNewPhone(""); }}>Cancelar</button>
+            <button type="submit" style={styles.saveBtn}><Check size={16} /> Guardar</button>
+          </div>
+        </form>
+      )}
+
       {filtered.length === 0 ? (
         <p style={styles.emptyMsg}>{clients.length === 0 ? "Todavía no tenés clientes cargados. Aparecerán acá al crear turnos." : "Sin resultados."}</p>
       ) : (
