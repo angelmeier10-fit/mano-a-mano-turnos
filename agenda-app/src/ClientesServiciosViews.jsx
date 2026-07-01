@@ -266,6 +266,9 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const canImportContact = typeof navigator !== "undefined" && !!navigator.contacts?.select;
+  const [editingClient, setEditingClient] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
 
   useEffect(() => {
     if (!selected) { setMovements([]); return; }
@@ -331,6 +334,21 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
     setNewName(""); setNewPhone(""); setShowAddForm(false);
   }
 
+  function startEditClient(client) {
+    setEditName(client.name || "");
+    setEditPhone(client.phone || "");
+    setEditingClient(true);
+  }
+
+  function saveEditClient(e) {
+    e.preventDefault();
+    if (!editName.trim()) return;
+    const updates = { name: editName.trim(), phone: editPhone.trim() };
+    onUpdateClient(selected.id, updates);
+    setSelected(s => ({ ...s, ...updates }));
+    setEditingClient(false);
+  }
+
   function downloadVCard(client) {
     const lines = [
       "BEGIN:VCARD",
@@ -359,24 +377,40 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
         <button style={styles.backBtn} onClick={() => setSelected(null)}>
           <ChevronLeft size={16} /> Clientes
         </button>
-        <div style={styles.clientDetailHeader}>
-          <div style={styles.clientAvatar}><User size={20} color="#EFE9DF" /></div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <h2 style={styles.clientDetailName}>{selected.name}</h2>
-              {stats.isNew && <span style={styles.newBadge}><Star size={10} /> Nuevo</span>}
+        {editingClient ? (
+          <form style={styles.newServiceForm} onSubmit={saveEditClient}>
+            <label style={styles.fieldLabel}>Nombre</label>
+            <input style={styles.input} value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
+            <label style={styles.fieldLabel}>Teléfono</label>
+            <input style={styles.input} value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+            <div style={styles.modalActions}>
+              <button type="button" style={styles.cancelBtn} onClick={() => setEditingClient(false)}>Cancelar</button>
+              <button type="submit" style={styles.saveBtn}><Check size={16} /> Guardar</button>
             </div>
-            {selected.phone && <p style={styles.clientDetailPhone}>{selected.phone}</p>}
+          </form>
+        ) : (
+          <div style={styles.clientDetailHeader}>
+            <div style={styles.clientAvatar}><User size={20} color="#EFE9DF" /></div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h2 style={styles.clientDetailName}>{selected.name}</h2>
+                {stats.isNew && <span style={styles.newBadge}><Star size={10} /> Nuevo</span>}
+              </div>
+              {selected.phone && <p style={styles.clientDetailPhone}>{selected.phone}</p>}
+            </div>
+            <button onClick={() => startEditClient(selected)} style={styles.waIconBtn} title="Editar datos">
+              <Pencil size={17} />
+            </button>
+            {waLink && (
+              <a href={waLink} target="_blank" rel="noopener noreferrer" style={styles.waIconBtn}>
+                <MessageCircle size={17} />
+              </a>
+            )}
+            <button onClick={() => downloadVCard(selected)} style={styles.waIconBtn} title="Guardar contacto">
+              <UserPlus size={17} />
+            </button>
           </div>
-          {waLink && (
-            <a href={waLink} target="_blank" rel="noopener noreferrer" style={styles.waIconBtn}>
-              <MessageCircle size={17} />
-            </a>
-          )}
-          <button onClick={() => downloadVCard(selected)} style={styles.waIconBtn} title="Guardar contacto">
-            <UserPlus size={17} />
-          </button>
-        </div>
+        )}
 
         <div style={styles.clientStatsGrid}>
           <div style={styles.clientStatBox}>
