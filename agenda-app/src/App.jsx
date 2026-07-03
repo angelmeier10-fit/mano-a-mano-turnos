@@ -165,6 +165,7 @@ export default function App() {
             onUpdateClient={updateClient}
             onDeleteClient={deleteClient}
             onAddClient={upsertClientByName}
+            onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }}
           />
         )}
         {view === "servicios" && (

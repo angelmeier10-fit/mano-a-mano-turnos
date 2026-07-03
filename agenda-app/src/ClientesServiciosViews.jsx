@@ -257,7 +257,7 @@ function AnamnesisSection({ client, onUpdateClient }) {
   );
 }
 
-export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddClient, appointments, services }) {
+export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddClient, appointments, services, onOpenAppt }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [movements, setMovements] = useState([]);
@@ -450,7 +450,11 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
             {history.map(h => {
               const svc = services.find(s => s.id === h.serviceId);
               return (
-                <div key={h.id} style={styles.historyItem}>
+                <div
+                  key={h.id}
+                  style={{ ...styles.historyItem, cursor: onOpenAppt ? "pointer" : "default" }}
+                  onClick={() => onOpenAppt?.(h.id)}
+                >
                   <div style={{ width: 4, borderRadius: 2, background: svc?.color || "#B5654A", alignSelf: "stretch" }} />
                   <div style={{ flex: 1 }}>
                     <div style={styles.historyDate}>
