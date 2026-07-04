@@ -214,9 +214,18 @@ function About({ waNumber }) {
 
 function Testimonios() {
   const items = [
-    { text: "Llegué con una contractura terrible en el cuello y salí nuevo. Lo recomiendo a todos.", author: "Martín G." },
-    { text: "Muy profesional y el lugar muy cómodo. Ya reservé el próximo turno desde la app, facilísimo.", author: "Laura P." },
-    { text: "Hago crossfit y el masaje deportivo fue un cambio total en mi recuperación. 10 puntos.", author: "Diego F." },
+    { text: "Super recomendable, el mejor en la zona.", author: "Gabriel Madero" },
+    { text: "Muy buen servicio, dormí como un bb, gracias Angel.", author: "Gabriel Lastra" },
+    { text: "La verdad muy bueno, recomiendo al 100%, terminas como nuevo.", author: "Toshio Nita" },
+    { text: "Excelente profesional, muy buen servicio.", author: "Gonzalo Maurich" },
+    { text: "Ángel es muy buen masajista, ha logrado apoyarme unas contracturas crónicas. Muy buen espacio de trabajo y relajante.", author: "Javier Francisco Arjona" },
+    { text: "Increíble servicio, muy buena atención.", author: "Marcelo Fernandez" },
+    { text: "Llegué sin tener el mínimo de fuerza en mi mano izquierda debido a la fuerte contractura y salí pípí cucú. Gracias Angelito.", author: "Evita Torcuatense" },
+    { text: "Excelente atención con cordialidad y respeto, me sentí muy cómoda y tiene conocimiento del tema. El trabajo fue muy efectivo. Super recomendable.", author: "Claudia Zarratea" },
+    { text: "Excelente el servicio prestado por Angel.", author: "Micaela Cappuccino" },
+    { text: "Excelente la sesión de masajes.", author: "Miguel Curlo" },
+    { text: "Agradecida siempre por el alivio. Excelente servicio y calidad humana.", author: "Mariela Pitsch" },
+    { text: "Muy bueno, se nota cuando alguien sabe lo que hace. Muy recomendable.", author: "Jonny Gomez" },
   ];
   return (
     <section className="section" style={{ background: "#F5EFE6" }}>
