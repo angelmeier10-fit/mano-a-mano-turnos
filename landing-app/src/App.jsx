@@ -176,6 +176,9 @@ function MassageFinder({ services }) {
           {step === 1 && (
             <>
               <p className="finder-question">{zonaCopy[zona]}</p>
+              <p className="finder-info">
+                Las ventosas son copas de succión que se apoyan sobre la piel y generan un vacío suave. Eso descomprime el músculo, mejora la circulación local y ayuda a liberar contracturas más en profundidad que el masaje solo.
+              </p>
               <button className="finder-opt" onClick={() => chooseVentosas("si")}>Sí, quiero el trabajo más profundo</button>
               <button className="finder-opt" onClick={() => chooseVentosas("no")}>No, prefiero sin ventosas</button>
             </>
