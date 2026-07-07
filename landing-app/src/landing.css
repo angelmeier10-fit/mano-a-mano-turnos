@@ -273,12 +273,24 @@ body { background: #EFE9DF; }
 
 /* MASSAGE FINDER */
 .finder-section { background: #F5EFE6; }
+.finder-wrap {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  max-width: 900px;
+}
+.finder-photo {
+  background-size: cover;
+  background-position: center;
+  border-radius: 18px;
+  min-height: 220px;
+  order: -1;
+}
 .finder-card {
   background: #fff;
   border: 1px solid #E3DBCB;
   border-radius: 18px;
   padding: 28px 24px;
-  max-width: 520px;
 }
 .finder-question {
   font-family: 'Questrial', sans-serif;
@@ -534,5 +546,7 @@ body { background: #EFE9DF; }
   .about-text { padding: 56px 52px; }
   .testi-grid { grid-template-columns: repeat(3, 1fr); }
   .how-grid { grid-template-columns: repeat(3, 1fr); }
+  .finder-wrap { grid-template-columns: 1fr 1fr; align-items: stretch; }
+  .finder-photo { min-height: 100%; order: 0; }
   .footer-inner { grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 48px; }
 }

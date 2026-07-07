@@ -7,6 +7,7 @@ const RESERVAR_URL = "/mano-a-mano-turnos/mano-a-mano-reservas/";
 const INSTAGRAM_URL = "https://www.instagram.com/angelmasaje.fit/";
 const HERO_PHOTO = "https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=1600&q=85&fit=crop&crop=center";
 const ABOUT_PHOTO = "https://images.unsplash.com/photo-1519823551278-64ac92734fb1?w=900&q=85&fit=crop&crop=center";
+const VENTOSAS_PHOTO = "https://images.unsplash.com/photo-1745327883389-17150e99dcf7?w=900&q=85&fit=crop&crop=center";
 
 const WA_ICON = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -170,6 +171,8 @@ function MassageFinder({ services }) {
         <h2 className="section-title">¿No sabés qué masaje elegir?</h2>
         <p className="section-sub">Respondé dos preguntas y te decimos qué servicio te conviene.</p>
 
+        <div className="finder-wrap">
+        <div className="finder-photo" style={{ backgroundImage: `url(${VENTOSAS_PHOTO})` }} />
         <div className="finder-card">
           {step === 0 && (
             <>
@@ -204,6 +207,7 @@ function MassageFinder({ services }) {
               <button className="finder-back" onClick={reset}>← Volver a empezar</button>
             </>
           )}
+        </div>
         </div>
       </div>
     </section>
