@@ -130,7 +130,12 @@ function MassageFinder({ services }) {
   const [zona, setZona] = useState(null);
   const [result, setResult] = useState(null);
 
-  const byId = (id) => services.find((s) => s.id === id);
+  const findService = (base, ventosas) => {
+    const withVentosas = services.filter((s) => s.name.toLowerCase().includes("ventosa"));
+    const withoutVentosas = services.filter((s) => !s.name.toLowerCase().includes("ventosa"));
+    const pool = ventosas ? withVentosas : withoutVentosas;
+    return pool.find((s) => s.name.toLowerCase().includes(base));
+  };
 
   const zonaCopy = {
     medio: "Con eso alcanza el medio torso. Ahora, ¿querés sumar ventosas para un trabajo más profundo en esa zona?",
@@ -143,9 +148,8 @@ function MassageFinder({ services }) {
   };
 
   const chooseVentosas = (vent) => {
-    const idPrefix = zona === "medio" ? "medio-torso" : "cuerpo-completo";
-    const id = vent === "si" ? `${idPrefix}-ventosas` : idPrefix;
-    setResult(byId(id));
+    const base = zona === "medio" ? "medio torso" : "cuerpo completo";
+    setResult(findService(base, vent === "si"));
     setStep(2);
   };
 
@@ -183,13 +187,17 @@ function MassageFinder({ services }) {
               <button className="finder-opt" onClick={() => chooseVentosas("no")}>No, prefiero sin ventosas</button>
             </>
           )}
-          {step === 2 && result && (
+          {step === 2 && (
             <>
-              <div className="finder-result">
-                {result.id.endsWith("ventosas") && <span className="finder-badge">Recomendado</span>}
-                <h3 className="finder-result-title">{result.name}</h3>
-                <div className="finder-result-price">{formatPrice(result.price)} · {result.duration} min</div>
-              </div>
+              {result ? (
+                <div className="finder-result">
+                  {result.name.toLowerCase().includes("ventosa") && <span className="finder-badge">Recomendado</span>}
+                  <h3 className="finder-result-title">{result.name}</h3>
+                  <div className="finder-result-price">{formatPrice(result.price)} · {result.duration} min</div>
+                </div>
+              ) : (
+                <p className="finder-question">Consultanos por WhatsApp y te contamos qué servicio te conviene.</p>
+              )}
               <button className="finder-back" onClick={reset}>← Volver a empezar</button>
             </>
           )}
