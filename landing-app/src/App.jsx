@@ -130,11 +130,14 @@ function MassageFinder({ services }) {
   const [zona, setZona] = useState(null);
   const [result, setResult] = useState(null);
 
-  const findService = (base, ventosas) => {
-    const withVentosas = services.filter((s) => s.name.toLowerCase().includes("ventosa"));
-    const withoutVentosas = services.filter((s) => !s.name.toLowerCase().includes("ventosa"));
-    const pool = ventosas ? withVentosas : withoutVentosas;
-    return pool.find((s) => s.name.toLowerCase().includes(base));
+  const findService = (zonaKey, ventosas) => {
+    const durations = [...new Set(services.map((s) => s.duration))].sort((a, b) => a - b);
+    if (!durations.length) return null;
+    const targetDuration = zonaKey === "medio" ? durations[0] : durations[durations.length - 1];
+    const group = services.filter((s) => s.duration === targetDuration).sort((a, b) => a.price - b.price);
+    if (!group.length) return null;
+    if (group.length === 1) return group[0];
+    return ventosas ? group[group.length - 1] : group[0];
   };
 
   const zonaCopy = {
@@ -148,8 +151,7 @@ function MassageFinder({ services }) {
   };
 
   const chooseVentosas = (vent) => {
-    const base = zona === "medio" ? "medio torso" : "cuerpo completo";
-    setResult(findService(base, vent === "si"));
+    setResult(findService(zona, vent === "si"));
     setStep(2);
   };
 
@@ -194,6 +196,7 @@ function MassageFinder({ services }) {
                   {result.name.toLowerCase().includes("ventosa") && <span className="finder-badge">Recomendado</span>}
                   <h3 className="finder-result-title">{result.name}</h3>
                   <div className="finder-result-price">{formatPrice(result.price)} · {result.duration} min</div>
+                  <a href={RESERVAR_URL} className="btn-primary" style={{ marginTop: 16 }}>Reservar este turno</a>
                 </div>
               ) : (
                 <p className="finder-question">Consultanos por WhatsApp y te contamos qué servicio te conviene.</p>
