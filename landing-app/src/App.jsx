@@ -125,6 +125,77 @@ function Especialidades() {
   );
 }
 
+function MassageFinder({ services }) {
+  const [step, setStep] = useState(0);
+  const [zona, setZona] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const byId = (id) => services.find((s) => s.id === id);
+
+  const zonaCopy = {
+    medio: "Con eso alcanza el medio torso. Ahora, ¿querés sumar ventosas para un trabajo más profundo en esa zona?",
+    completo: "Para eso, cuerpo completo es lo que más resultado da. ¿Sumamos ventosas para profundizar el efecto?",
+  };
+
+  const chooseZona = (z) => {
+    setZona(z);
+    setStep(1);
+  };
+
+  const chooseVentosas = (vent) => {
+    const idPrefix = zona === "medio" ? "medio-torso" : "cuerpo-completo";
+    const id = vent === "si" ? `${idPrefix}-ventosas` : idPrefix;
+    setResult(byId(id));
+    setStep(2);
+  };
+
+  const reset = () => {
+    setStep(0);
+    setZona(null);
+    setResult(null);
+  };
+
+  if (!services.length) return null;
+
+  return (
+    <section className="section finder-section" id="que-masaje-elegir">
+      <div className="section-inner">
+        <span className="section-tag">Guía rápida</span>
+        <h2 className="section-title">¿No sabés qué masaje elegir?</h2>
+        <p className="section-sub">Respondé dos preguntas y te decimos qué servicio te conviene.</p>
+
+        <div className="finder-card">
+          {step === 0 && (
+            <>
+              <p className="finder-question">¿Qué zona te molesta?</p>
+              <button className="finder-opt" onClick={() => chooseZona("medio")}>Cintura, espalda y cuello/hombros</button>
+              <button className="finder-opt" onClick={() => chooseZona("medio")}>Piernas</button>
+              <button className="finder-opt" onClick={() => chooseZona("completo")}>Todo el cuerpo, o no estoy seguro</button>
+            </>
+          )}
+          {step === 1 && (
+            <>
+              <p className="finder-question">{zonaCopy[zona]}</p>
+              <button className="finder-opt" onClick={() => chooseVentosas("si")}>Sí, quiero el trabajo más profundo</button>
+              <button className="finder-opt" onClick={() => chooseVentosas("no")}>No, prefiero sin ventosas</button>
+            </>
+          )}
+          {step === 2 && result && (
+            <>
+              <div className="finder-result">
+                {result.id.endsWith("ventosas") && <span className="finder-badge">Recomendado</span>}
+                <h3 className="finder-result-title">{result.name}</h3>
+                <div className="finder-result-price">{formatPrice(result.price)} · {result.duration} min</div>
+              </div>
+              <button className="finder-back" onClick={reset}>← Volver a empezar</button>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Beneficios() {
   const items = [
     { icon: "🧘", title: "Reduce el estrés", desc: "Disminuye el cortisol y activa el sistema parasimpático" },
@@ -370,6 +441,7 @@ export default function App() {
       <Navbar businessName={businessInfo.name} />
       <Hero businessInfo={businessInfo} waNumber={waNumber} />
       <Especialidades />
+      <MassageFinder services={services} />
       <Beneficios />
       <Services services={services} waNumber={waNumber} />
       <About waNumber={waNumber} />

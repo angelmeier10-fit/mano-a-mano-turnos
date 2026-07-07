@@ -271,6 +271,81 @@ body { background: #EFE9DF; }
   line-height: 1.65;
 }
 
+/* MASSAGE FINDER */
+.finder-section { background: #F5EFE6; }
+.finder-card {
+  background: #fff;
+  border: 1px solid #E3DBCB;
+  border-radius: 18px;
+  padding: 28px 24px;
+  max-width: 520px;
+}
+.finder-question {
+  font-family: 'Questrial', sans-serif;
+  font-size: 15px;
+  color: #2A2622;
+  line-height: 1.55;
+  margin-bottom: 18px;
+}
+.finder-opt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: 'Questrial', sans-serif;
+  font-size: 14.5px;
+  color: #2A2622;
+  background: transparent;
+  border: 1.5px solid #E3DBCB;
+  border-radius: 10px;
+  padding: 13px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.finder-opt:hover { border-color: #B5654A; }
+.finder-result {
+  background: rgba(181,101,74,0.08);
+  border: 1px solid #B5654A;
+  border-radius: 14px;
+  padding: 20px;
+}
+.finder-badge {
+  display: inline-block;
+  font-family: 'Questrial', sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: #B5654A;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+.finder-result-title {
+  font-family: 'Raleway', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: #2A2622;
+  margin-bottom: 6px;
+}
+.finder-result-price {
+  font-family: 'Raleway', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #B5654A;
+}
+.finder-back {
+  display: block;
+  margin-top: 14px;
+  background: none;
+  border: none;
+  font-family: 'Questrial', sans-serif;
+  font-size: 13px;
+  color: #8A8275;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* BENEFICIOS */
 .ben-section { background: #2A2622; }
 .ben-grid {
