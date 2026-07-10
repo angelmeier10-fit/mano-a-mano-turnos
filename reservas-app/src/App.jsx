@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ReservarView from "./ReservarView";
+import QuizView from "./QuizView";
 import MiTurnoView from "./MiTurnoView";
 import GiftCardView from "./GiftCardView";
 import GiftCardRedeemView from "./GiftCardRedeemView";
@@ -71,6 +72,7 @@ export default function App() {
   const [giftCardSubview, setGiftCardSubview] = useState("menu"); // "menu" | "buy" | "lookup" | "redeem"
   const [lookupSelectedCode, setLookupSelectedCode] = useState(null);
   const [miturnoInitPhone, setMiturnoInitPhone] = useState("");
+  const [quizPreselectedServiceId, setQuizPreselectedServiceId] = useState(null);
 
   // Si la URL tiene ?giftcard=CODE, mostramos la vista de canje directamente
   const giftCardCode = getGiftCardCodeFromURL();
@@ -126,6 +128,11 @@ export default function App() {
     setCurrentView("miturno");
   }
 
+  function navigateToReservarConServicio(serviceId) {
+    setQuizPreselectedServiceId(serviceId);
+    setCurrentView("reservar");
+  }
+
   return (
     <div style={styles.app}>
       <GoogleFontsLoader />
@@ -146,6 +153,12 @@ export default function App() {
             onClick={() => setCurrentView("reservar")}
           >
             Reservar
+          </button>
+          <button
+            style={{ ...styles.tabBtn, ...(currentView === "quiz" ? styles.tabBtnActive : {}) }}
+            onClick={() => setCurrentView("quiz")}
+          >
+            ¿Qué masaje elijo?
           </button>
           <button
             style={{ ...styles.tabBtn, ...(currentView === "giftcard" ? styles.tabBtnActive : {}) }}
@@ -171,7 +184,11 @@ export default function App() {
             onUpsertClient={createClientPublic}
             onNavigateToMiTurno={navigateToMiTurno}
             onGoGiftCard={() => setCurrentView("giftcard")}
+            preselectedServiceId={quizPreselectedServiceId}
           />
+        )}
+        {currentView === "quiz" && (
+          <QuizView services={services} onReservar={navigateToReservarConServicio} />
         )}
         {currentView === "giftcard" && giftCardSubview === "menu" && (
           <GiftCardMenuView
