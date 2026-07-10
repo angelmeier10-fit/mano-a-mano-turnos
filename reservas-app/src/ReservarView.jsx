@@ -18,7 +18,7 @@ function saveBookingToLocalStorage(apptId, cancelToken, appt, serviceName) {
   } catch {}
 }
 
-export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, onBack, onGoGiftCard }) {
+export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard }) {
   const availabilityByDate = useMemo(() => {
     const map = {};
     availability.forEach(slot => {
@@ -38,7 +38,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
   const availableDatesSet = useMemo(() => new Set(availableDates), [availableDates]);
 
   const [selectedDate, setSelectedDate] = useState(null);
-  const [serviceId, setServiceId] = useState(preselectedServiceId || services[0]?.id || "");
+  const [serviceId, setServiceId] = useState(preselectedServiceId || initialServiceId || services[0]?.id || "");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [confirmed, setConfirmed] = useState(null);

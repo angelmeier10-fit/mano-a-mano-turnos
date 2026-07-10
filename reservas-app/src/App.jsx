@@ -184,7 +184,7 @@ export default function App() {
             onUpsertClient={createClientPublic}
             onNavigateToMiTurno={navigateToMiTurno}
             onGoGiftCard={() => setCurrentView("giftcard")}
-            preselectedServiceId={quizPreselectedServiceId}
+            initialServiceId={quizPreselectedServiceId}
           />
         )}
         {currentView === "quiz" && (
