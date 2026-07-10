@@ -155,10 +155,10 @@ export default function App() {
             Reservar
           </button>
           <button
-            style={{ ...styles.tabBtn, ...(currentView === "quiz" ? styles.tabBtnActive : {}) }}
+            style={{ ...styles.tabBtn, fontWeight: 700, ...(currentView === "quiz" ? styles.tabBtnActive : {}) }}
             onClick={() => setCurrentView("quiz")}
           >
-            ¿Qué masaje elijo?
+            🧭 ¿Qué masaje elijo?
           </button>
           <button
             style={{ ...styles.tabBtn, ...(currentView === "giftcard" ? styles.tabBtnActive : {}) }}
