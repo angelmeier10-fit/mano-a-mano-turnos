@@ -167,7 +167,7 @@ function SessionesSection({ client, history }) {
   );
 }
 
-const ANAMNESIS_FIELDS = [
+export const ANAMNESIS_FIELDS = [
   { key: "birthDate",          label: "Fecha de nacimiento",     type: "input"    },
   { key: "occupation",         label: "Ocupación",               type: "input"    },
   { key: "consultationReason", label: "Motivo de consulta",      type: "textarea" },

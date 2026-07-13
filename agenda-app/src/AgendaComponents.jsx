@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2 } from "lucide-react";
+import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
@@ -7,6 +7,7 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
+import { ANAMNESIS_FIELDS } from "./ClientesServiciosViews";
 import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory } from "../../shared/firestoreApi";
 
 export function AgendaView({
@@ -778,6 +779,39 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
   );
 }
 
+function TurnoAnamnesisSection({ client }) {
+  const [open, setOpen] = useState(false);
+  const hasData = client.anamnesis && Object.values(client.anamnesis).some(v => v?.trim());
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <button
+        type="button"
+        style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none",
+          cursor: "pointer", padding: "8px 0", color: "#2A2622", fontSize: 13, fontWeight: 600, width: "100%" }}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span style={{ flex: 1, textAlign: "left" }}>Anamnesis</span>
+        {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+      </button>
+      {open && (
+        <div style={{ background: "#E8E2D8", borderRadius: 10, padding: 14 }}>
+          {!hasData ? (
+            <p style={styles.emptyMsg}>Sin anamnesis cargada.</p>
+          ) : (
+            ANAMNESIS_FIELDS.filter(f => client.anamnesis?.[f.key]?.trim()).map(f => (
+              <div key={f.key} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 11, color: "#8A7E70", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{f.label}</div>
+                <div style={{ fontSize: 13, color: "#2A2622", marginTop: 2 }}>{client.anamnesis[f.key]}</div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo }) {
   const base = initial || {
     dateKey: prefill?.dateKey || dateKey(new Date()),
@@ -801,6 +835,13 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
 
   const svc = services.find(s => s.id === serviceId);
   const end = svc ? minutesToTime(timeToMinutes(start) + svc.duration) : start;
+
+  const matchedClient = clients.find(c => {
+    if (clientPhone.trim()) {
+      return (c.phone || "").replace(/[^\d]/g, "") === clientPhone.replace(/[^\d]/g, "") && clientPhone.replace(/[^\d]/g, "");
+    }
+    return c.name.trim().toLowerCase() === clientName.trim().toLowerCase();
+  });
 
   const clientSearchDigits = clientName.replace(/[^\d]/g, "");
   const filteredClients = clients.filter(c => {
@@ -890,6 +931,8 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
 
         <label style={styles.fieldLabel}>Teléfono (WhatsApp)</label>
         <input style={styles.input} value={clientPhone} onChange={e => setClientPhone(e.target.value)} placeholder="11 1234 5678" />
+
+        {matchedClient && <TurnoAnamnesisSection client={matchedClient} />}
 
         <div style={styles.fieldRow}>
           <div style={{ flex: 1 }}>
