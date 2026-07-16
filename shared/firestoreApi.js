@@ -608,6 +608,8 @@ export async function upsertClientByName(name, phone) {
     phone: phone || "",
     phoneDigits,
     notes: "",
+    discountType: "",
+    discountValue: 0,
     createdAt: Date.now(),
   });
   if (phoneDigits) {
@@ -637,6 +639,8 @@ export async function createClientPublic(name, phone) {
       phone: phone || "",
       phoneDigits,
       notes: "",
+      discountType: "",
+      discountValue: 0,
       createdAt: Date.now(),
     });
     if (phoneDigits) {
@@ -653,7 +657,33 @@ export async function createClientPublic(name, phone) {
   }
 }
 export async function updateClient(id, data) {
+  if ("discountType" in data || "discountValue" in data) {
+    const snap = await getDoc(doc(db, "clients", id));
+    const phoneDigits = data.phoneDigits ?? snap.data()?.phoneDigits;
+    if (phoneDigits) {
+      const discountType = data.discountType ?? snap.data()?.discountType ?? "";
+      if (discountType) {
+        const discountValue = data.discountValue ?? snap.data()?.discountValue ?? 0;
+        await setDoc(doc(db, "clientDiscounts", phoneDigits), { discountType, discountValue });
+      } else {
+        await deleteDoc(doc(db, "clientDiscounts", phoneDigits)).catch(() => {});
+      }
+    }
+  }
   return updateDoc(doc(db, "clients", id), data);
+}
+
+// Lectura pública de solo consulta (sin crear nada): usada por reservas-app para
+// mostrar el descuento VIP del cliente apenas completa el teléfono.
+export async function getClientDiscountPublic(phone) {
+  const phoneDigits = normalizePhone(phone);
+  if (!phoneDigits) return null;
+  try {
+    const snap = await getDoc(doc(db, "clientDiscounts", phoneDigits));
+    return snap.exists() ? snap.data() : null;
+  } catch {
+    return null;
+  }
 }
 export async function deleteClient(id) {
   try {

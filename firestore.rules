@@ -111,5 +111,12 @@ service cloud.firestore {
     match /phoneIndex/{phoneDigitsId}/bookings/{apptId} {
       allow read, write: if true;
     }
+
+    // Índice liviano público con el descuento VIP del cliente, sin datos sensibles.
+    // ID del documento = dígitos del teléfono.
+    match /clientDiscounts/{phoneDigitsId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
   }
 }

@@ -3,7 +3,9 @@ import { Calendar, Clock, Check, MessageCircle, CalendarDays, List } from "lucid
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
+  applyClientDiscount,
 } from "../../shared/helpers";
+import { getClientDiscountPublic } from "../../shared/firestoreApi";
 import { MiniCalendar } from "../../shared/MiniCalendar";
 import styles from "../../shared/styles";
 
@@ -41,6 +43,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
   const [serviceId, setServiceId] = useState(preselectedServiceId || initialServiceId || services[0]?.id || "");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [clientDiscount, setClientDiscount] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
   const [booking, setBooking] = useState(false);
   const [dateViewMode, setDateViewMode] = useState("list");
@@ -56,6 +59,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
   }, [services, serviceId]);
 
   const svc = services.find(s => s.id === serviceId);
+  const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount } = applyClientDiscount(svc?.price, clientDiscount);
 
   const slotsForSelectedDate = useMemo(() => {
     if (!selectedDate || !svc) return [];
@@ -90,6 +94,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
       notes: "",
       status: "pendiente",
       fromAvailabilityId: slot.id,
+      discount: svcDiscountAmount,
       ...(clientId ? { clientId } : {}),
       ...(giftCardCode ? { giftCardCode } : {}),
     };
@@ -125,7 +130,13 @@ export default function ReservarView({ services, availability, businessInfo, onB
             : <p style={{ ...styles.confirmDetail, color: "#8A8275", marginBottom: 4 }}>Te confirmamos el turno pronto por WhatsApp.</p>
           }
           <p style={styles.confirmDetail}>{cSvc?.name} · {confirmed.start} a {confirmed.end}</p>
-          {cSvc?.price && !preselectedServiceId && <p style={styles.confirmPrice}>{formatPrice(cSvc.price)}</p>}
+          {cSvc?.price && !preselectedServiceId && (
+            <p style={styles.confirmPrice}>
+              {confirmed.discount > 0
+                ? <><span style={{ textDecoration: "line-through", opacity: 0.6, marginRight: 6, fontSize: "0.8em" }}>{formatPrice(cSvc.price)}</span>{formatPrice(Math.max(0, cSvc.price - confirmed.discount))}</>
+                : formatPrice(cSvc.price)}
+            </p>
+          )}
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
           <p style={{ ...styles.confirmDetail, marginTop: 10 }}>{businessInfo?.address}</p>
           {businessInfo?.whatsapp && (
@@ -201,7 +212,17 @@ export default function ReservarView({ services, availability, businessInfo, onB
       <label style={styles.fieldLabel}>Tu nombre</label>
       <input id="client-name-input" style={styles.input} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre y apellido" />
       <label style={styles.fieldLabel}>Teléfono (WhatsApp)</label>
-      <input id="client-phone-input" style={styles.input} value={clientPhone} onChange={e => { setClientPhone(e.target.value); if (phoneError) setPhoneError(""); }} placeholder="11 1234 5678" />
+      <input
+        id="client-phone-input"
+        style={styles.input}
+        value={clientPhone}
+        onChange={e => { setClientPhone(e.target.value); if (phoneError) setPhoneError(""); }}
+        onBlur={async () => {
+          if (!clientPhone.trim()) { setClientDiscount(null); return; }
+          setClientDiscount(await getClientDiscountPublic(clientPhone));
+        }}
+        placeholder="11 1234 5678"
+      />
       {phoneError && <p style={{ color: "#c0392b", fontSize: 13, marginTop: 4, marginBottom: 0 }}>{phoneError}</p>}
 
       <label style={styles.fieldLabel}>Tipo de masaje</label>
@@ -232,7 +253,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
             >
               <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
               <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
-                {s.duration} min{s.price ? ` · ${formatPrice(s.price)}` : ""}
+                {s.duration} min{s.price ? ` · ${formatPrice(applyClientDiscount(s.price, clientDiscount).finalPrice)}` : ""}
               </span>
             </button>
           ))}
@@ -335,7 +356,13 @@ export default function ReservarView({ services, availability, businessInfo, onB
               <div style={{ fontSize: 13, color: "#5A5046" }}>
                 {formatDateLong(selectedDate)} · {selectedSlot.start} a {minutesToTime(timeToMinutes(selectedSlot.start) + (svc?.duration || 0))}
               </div>
-              {svc?.price && !preselectedServiceId && <div style={{ fontSize: 13, color: "#5A5046" }}>{formatPrice(svc.price)}</div>}
+              {svc?.price && !preselectedServiceId && (
+                <div style={{ fontSize: 13, color: "#5A5046" }}>
+                  {svcDiscountAmount > 0
+                    ? <><span style={{ textDecoration: "line-through", opacity: 0.6, marginRight: 6 }}>{formatPrice(svc.price)}</span>{formatPrice(svcFinalPrice)}</>
+                    : formatPrice(svc.price)}
+                </div>
+              )}
               <button
                 style={{ ...styles.saveBtn, marginTop: 10, opacity: booking ? 0.6 : 1 }}
                 disabled={booking}

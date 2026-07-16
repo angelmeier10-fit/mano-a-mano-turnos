@@ -269,6 +269,8 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   const [editingClient, setEditingClient] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editDiscountType, setEditDiscountType] = useState("");
+  const [editDiscountValue, setEditDiscountValue] = useState("");
 
   useEffect(() => {
     if (!selected) { setMovements([]); return; }
@@ -337,13 +339,20 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   function startEditClient(client) {
     setEditName(client.name || "");
     setEditPhone(client.phone || "");
+    setEditDiscountType(client.discountType || "");
+    setEditDiscountValue(client.discountValue ? String(client.discountValue) : "");
     setEditingClient(true);
   }
 
   function saveEditClient(e) {
     e.preventDefault();
     if (!editName.trim()) return;
-    const updates = { name: editName.trim(), phone: editPhone.trim() };
+    const updates = {
+      name: editName.trim(),
+      phone: editPhone.trim(),
+      discountType: editDiscountType,
+      discountValue: editDiscountType ? Number(editDiscountValue) || 0 : 0,
+    };
     onUpdateClient(selected.id, updates);
     setSelected(s => ({ ...s, ...updates }));
     setEditingClient(false);
@@ -383,6 +392,22 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
             <input style={styles.input} value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
             <label style={styles.fieldLabel}>Teléfono</label>
             <input style={styles.input} value={editPhone} onChange={e => setEditPhone(e.target.value)} />
+            <label style={styles.fieldLabel}>Descuento VIP</label>
+            <select style={styles.input} value={editDiscountType} onChange={e => setEditDiscountType(e.target.value)}>
+              <option value="">Sin descuento</option>
+              <option value="percent">Porcentaje (%)</option>
+              <option value="fixed">Monto fijo ($)</option>
+            </select>
+            {editDiscountType && (
+              <input
+                style={styles.input}
+                type="number"
+                min="0"
+                value={editDiscountValue}
+                onChange={e => setEditDiscountValue(e.target.value)}
+                placeholder={editDiscountType === "percent" ? "Ej: 10" : "Ej: 5000"}
+              />
+            )}
             <div style={styles.modalActions}>
               <button type="button" style={styles.cancelBtn} onClick={() => setEditingClient(false)}>Cancelar</button>
               <button type="submit" style={styles.saveBtn}><Check size={16} /> Guardar</button>
