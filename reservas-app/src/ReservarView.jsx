@@ -59,7 +59,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
   }, [services, serviceId]);
 
   const svc = services.find(s => s.id === serviceId);
-  const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount } = applyClientDiscount(svc?.price, clientDiscount);
+  const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount } = applyClientDiscount(svc?.price, clientDiscount, serviceId);
 
   const slotsForSelectedDate = useMemo(() => {
     if (!selectedDate || !svc) return [];
@@ -253,7 +253,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
             >
               <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
               <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
-                {s.duration} min{s.price ? ` · ${formatPrice(applyClientDiscount(s.price, clientDiscount).finalPrice)}` : ""}
+                {s.duration} min{s.price ? ` · ${formatPrice(applyClientDiscount(s.price, clientDiscount, s.id).finalPrice)}` : ""}
               </span>
             </button>
           ))}

@@ -269,8 +269,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   const [editingClient, setEditingClient] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
-  const [editDiscountType, setEditDiscountType] = useState("");
-  const [editDiscountValue, setEditDiscountValue] = useState("");
+  const [editDiscounts, setEditDiscounts] = useState({});
 
   useEffect(() => {
     if (!selected) { setMovements([]); return; }
@@ -339,9 +338,25 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   function startEditClient(client) {
     setEditName(client.name || "");
     setEditPhone(client.phone || "");
-    setEditDiscountType(client.discountType || "");
-    setEditDiscountValue(client.discountValue ? String(client.discountValue) : "");
+    setEditDiscounts(client.discounts || {});
     setEditingClient(true);
+  }
+
+  function setServiceDiscountType(serviceId, discountType) {
+    setEditDiscounts(prev => {
+      if (!discountType) {
+        const { [serviceId]: _omit, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [serviceId]: { discountType, discountValue: prev[serviceId]?.discountValue || 0 } };
+    });
+  }
+
+  function setServiceDiscountValue(serviceId, discountValue) {
+    setEditDiscounts(prev => ({
+      ...prev,
+      [serviceId]: { ...prev[serviceId], discountValue: Number(discountValue) || 0 },
+    }));
   }
 
   function saveEditClient(e) {
@@ -350,8 +365,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
     const updates = {
       name: editName.trim(),
       phone: editPhone.trim(),
-      discountType: editDiscountType,
-      discountValue: editDiscountType ? Number(editDiscountValue) || 0 : 0,
+      discounts: editDiscounts,
     };
     onUpdateClient(selected.id, updates);
     setSelected(s => ({ ...s, ...updates }));
@@ -392,22 +406,36 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
             <input style={styles.input} value={editName} onChange={e => setEditName(e.target.value)} autoFocus />
             <label style={styles.fieldLabel}>Teléfono</label>
             <input style={styles.input} value={editPhone} onChange={e => setEditPhone(e.target.value)} />
-            <label style={styles.fieldLabel}>Descuento VIP</label>
-            <select style={styles.input} value={editDiscountType} onChange={e => setEditDiscountType(e.target.value)}>
-              <option value="">Sin descuento</option>
-              <option value="percent">Porcentaje (%)</option>
-              <option value="fixed">Monto fijo ($)</option>
-            </select>
-            {editDiscountType && (
-              <input
-                style={styles.input}
-                type="number"
-                min="0"
-                value={editDiscountValue}
-                onChange={e => setEditDiscountValue(e.target.value)}
-                placeholder={editDiscountType === "percent" ? "Ej: 10" : "Ej: 5000"}
-              />
-            )}
+            <label style={styles.fieldLabel}>Descuento VIP por servicio</label>
+            {services.map(service => {
+              const d = editDiscounts[service.id];
+              return (
+                <div key={service.id} style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#2A2622" }}>{service.name}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select
+                      style={{ ...styles.input, flex: 1 }}
+                      value={d?.discountType || ""}
+                      onChange={e => setServiceDiscountType(service.id, e.target.value)}
+                    >
+                      <option value="">Sin descuento</option>
+                      <option value="percent">Porcentaje (%)</option>
+                      <option value="fixed">Monto fijo ($)</option>
+                    </select>
+                    {d?.discountType && (
+                      <input
+                        style={{ ...styles.input, flex: 1 }}
+                        type="number"
+                        min="0"
+                        value={d.discountValue || ""}
+                        onChange={e => setServiceDiscountValue(service.id, e.target.value)}
+                        placeholder={d.discountType === "percent" ? "Ej: 10" : "Ej: 5000"}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
             <div style={styles.modalActions}>
               <button type="button" style={styles.cancelBtn} onClick={() => setEditingClient(false)}>Cancelar</button>
               <button type="submit" style={styles.saveBtn}><Check size={16} /> Guardar</button>
@@ -434,6 +462,21 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
             <button onClick={() => downloadVCard(selected)} style={styles.waIconBtn} title="Guardar contacto">
               <UserPlus size={17} />
             </button>
+          </div>
+        )}
+
+        {!editingClient && selected.discounts && Object.keys(selected.discounts).length > 0 && (
+          <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#8A8275", textTransform: "uppercase" }}>Descuento VIP</span>
+            {Object.entries(selected.discounts).map(([serviceId, d]) => {
+              const service = services.find(s => s.id === serviceId);
+              if (!service) return null;
+              return (
+                <span key={serviceId} style={{ fontSize: 13, color: "#2A2622" }}>
+                  {service.name} · {d.discountType === "percent" ? `${d.discountValue}% off` : `${formatPrice(d.discountValue)} off`}
+                </span>
+              );
+            })}
           </div>
         )}
 

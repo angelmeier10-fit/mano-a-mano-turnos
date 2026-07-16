@@ -608,8 +608,6 @@ export async function upsertClientByName(name, phone) {
     phone: phone || "",
     phoneDigits,
     notes: "",
-    discountType: "",
-    discountValue: 0,
     createdAt: Date.now(),
   });
   if (phoneDigits) {
@@ -639,8 +637,6 @@ export async function createClientPublic(name, phone) {
       phone: phone || "",
       phoneDigits,
       notes: "",
-      discountType: "",
-      discountValue: 0,
       createdAt: Date.now(),
     });
     if (phoneDigits) {
@@ -657,14 +653,12 @@ export async function createClientPublic(name, phone) {
   }
 }
 export async function updateClient(id, data) {
-  if ("discountType" in data || "discountValue" in data) {
+  if ("discounts" in data) {
     const snap = await getDoc(doc(db, "clients", id));
     const phoneDigits = data.phoneDigits ?? snap.data()?.phoneDigits;
     if (phoneDigits) {
-      const discountType = data.discountType ?? snap.data()?.discountType ?? "";
-      if (discountType) {
-        const discountValue = data.discountValue ?? snap.data()?.discountValue ?? 0;
-        await setDoc(doc(db, "clientDiscounts", phoneDigits), { discountType, discountValue });
+      if (data.discounts && Object.keys(data.discounts).length) {
+        await setDoc(doc(db, "clientDiscounts", phoneDigits), data.discounts);
       } else {
         await deleteDoc(doc(db, "clientDiscounts", phoneDigits)).catch(() => {});
       }
