@@ -39,6 +39,8 @@ export default function App() {
   const [availability, setAvailability] = useState([]);
   const [businessInfo, setBusinessInfoState] = useState(DEFAULT_BUSINESS_INFO);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [servicesLoaded, setServicesLoaded] = useState(false);
+  const seededServicesRef = React.useRef(false);
   const [giftCards, setGiftCards] = useState([]);
   const [apptNotifs, setApptNotifs] = useState([]); // [{ id, clientName, dateKey, start }]
   const [openApptId, setOpenApptId] = useState(null);
@@ -62,7 +64,7 @@ export default function App() {
   // Suscripciones en tiempo real a Firestore, solo cuando hay sesión iniciada
   useEffect(() => {
     if (!user) return;
-    const unsubServices = listenServices(setServices);
+    const unsubServices = listenServices(list => { setServices(list); setServicesLoaded(true); });
     const unsubAppts = listenAppointments(setAppointments);
     const sessionStart = Date.now();
     const unsubIncoming = listenIncomingPendingAppointments(sessionStart, (a) => {
@@ -86,16 +88,21 @@ export default function App() {
     };
   }, [user]);
 
-  // Primera vez: si no hay servicios cargados en Firestore, precargamos los por defecto
+  // Primera vez: si no hay servicios cargados en Firestore, precargamos los por defecto.
+  // Espera a que el propio listener de servicios haya emitido su primer snapshot
+  // (servicesLoaded), no solo a dataLoaded (que depende del listener de businessInfo y
+  // puede resolver antes, haciendo creer que la lista está vacía cuando en realidad
+  // todavía no llegó el primer snapshot real).
   useEffect(() => {
-    if (!user || !dataLoaded) return;
+    if (!user || !dataLoaded || !servicesLoaded || seededServicesRef.current) return;
     if (services.length === 0) {
+      seededServicesRef.current = true;
       DEFAULT_SERVICES.forEach(s => {
         const { id, ...rest } = s;
         addService(rest);
       });
     }
-  }, [user, dataLoaded, services.length]);
+  }, [user, dataLoaded, servicesLoaded, services.length]);
 
   if (!authChecked) {
     return (
