@@ -36,7 +36,10 @@ export function addDays(d, n) { const nd = new Date(d); nd.setDate(nd.getDate()+
 export function startOfWeek(d) { const nd = new Date(d); const day = nd.getDay(); return addDays(nd, -day); }
 export function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 export function formatPrice(n) { return (n || 0).toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }); }
-export function getAppointmentPrice(appt, service) { return Math.max(0, (service?.price || 0) - (appt?.discount || 0)); }
+export function getAppointmentPrice(appt, service) {
+  const basePrice = appt?.price ?? service?.price ?? 0;
+  return Math.max(0, basePrice - (appt?.discount || 0));
+}
 export function applyClientDiscount(price, discounts, serviceId) {
   const base = price || 0;
   const discount = discounts?.[serviceId];

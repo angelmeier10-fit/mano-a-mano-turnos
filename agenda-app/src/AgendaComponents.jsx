@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp, Contact } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
@@ -857,6 +857,7 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
     if (!clientName.trim() || !serviceId) return;
     onSave({
       dateKey: dateVal, start, end, serviceId, clientName, clientPhone, notes,
+      price: svc?.price || 0,
       discount: Number(discount) || 0,
       ...(fromAvailabilityId ? { fromAvailabilityId } : {}),
       ...(!initial && repeatWeeks > 1 ? { repeatWeeks } : {}),
@@ -876,6 +877,19 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
     return `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
   }
   const waLink = whatsappLink();
+  const supportsContactPicker = typeof navigator !== "undefined" && "contacts" in navigator && "ContactsManager" in window;
+
+  async function pickContact() {
+    try {
+      const [contact] = await navigator.contacts.select(["name", "tel"], { multiple: false });
+      if (!contact) return;
+      if (contact.name?.[0]) setClientName(contact.name[0]);
+      if (contact.tel?.[0]) setClientPhone(contact.tel[0]);
+      setShowClientList(false);
+    } catch (e) {
+      console.error("[pickContact] falló:", e);
+    }
+  }
 
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
@@ -903,7 +917,14 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
           </div>
         )}
 
-        <label style={styles.fieldLabel}>Cliente</label>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <label style={styles.fieldLabel}>Cliente</label>
+          {supportsContactPicker && (
+            <button type="button" style={styles.iconBtn} onClick={pickContact} title="Elegir de contactos">
+              <Contact size={18} />
+            </button>
+          )}
+        </div>
         <div style={{ position: "relative" }}>
           <input
             style={styles.input}

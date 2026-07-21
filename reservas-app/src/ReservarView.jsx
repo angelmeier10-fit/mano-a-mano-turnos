@@ -94,6 +94,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
       notes: "",
       status: "pendiente",
       fromAvailabilityId: slot.id,
+      price: svc?.price || 0,
       discount: svcDiscountAmount,
       ...(clientId ? { clientId } : {}),
       ...(giftCardCode ? { giftCardCode } : {}),
