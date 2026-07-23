@@ -98,6 +98,38 @@ service cloud.firestore {
       allow delete: if isSignedIn();
     }
 
+    // Combos de sesiones prepagas: cualquiera puede pedir uno (queda "pending" hasta que
+    // el profesional confirma el pago). Solo autenticado puede activar/canjear/borrar.
+    match /combos/{comboId} {
+      allow create: if request.resource.data.status == "pending"
+                    && request.resource.data.clientName is string
+                    && request.resource.data.clientName.size() > 0
+                    && request.resource.data.clientPhone is string
+                    && request.resource.data.clientPhone.size() > 0
+                    && (request.resource.data.totalSessions == 2 || request.resource.data.totalSessions == 3);
+      allow read: if true;
+      allow update: if isSignedIn()
+                    || (
+                      // Cliente puede canjear una sesión al reservar: baja sessionsRemaining en 1
+                      // y actualiza status/usedApptIds.
+                      resource.data.status == "active"
+                      && request.resource.data.sessionsRemaining == resource.data.sessionsRemaining - 1
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'sessionsRemaining', 'usedApptIds'])
+                    )
+                    || (
+                      // Cliente puede restaurar una sesión al cancelar: sube sessionsRemaining en 1
+                      // y vuelve a "active".
+                      request.resource.data.status == "active"
+                      && request.resource.data.sessionsRemaining == resource.data.sessionsRemaining + 1
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'sessionsRemaining', 'usedApptIds'])
+                    )
+                    || (
+                      // Cliente puede actualizar el apptId dentro de usedApptIds al reprogramar.
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedApptIds'])
+                    );
+      allow delete: if isSignedIn();
+    }
+
     // Índice liviano para deduplicar clientes desde la app pública sin exponer datos sensibles.
     // ID del documento = dígitos del teléfono. Solo contiene { clientId }.
     match /phoneIndex/{phoneDigitsId} {

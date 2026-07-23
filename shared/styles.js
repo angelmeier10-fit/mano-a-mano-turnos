@@ -504,6 +504,31 @@ const styles = {
   giftCardBannerArrow: {
     color: "#B5654A", fontSize: 18,
   },
+
+  // Combos de sesiones
+  comboBanner: {
+    display: "flex", alignItems: "center", gap: 12,
+    background: "linear-gradient(135deg, #3D4A32 0%, #4E5C3E 100%)",
+    border: "1.5px solid #6E7F5C",
+    borderRadius: 14, padding: "14px 16px", marginBottom: 16, cursor: "pointer",
+  },
+  comboBannerIcon: {
+    fontSize: 26, lineHeight: 1,
+  },
+  comboBannerText: {
+    flex: 1,
+  },
+  comboBannerTitle: {
+    fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 15,
+    color: "#EFE9DF", margin: 0,
+  },
+  comboBannerSub: {
+    fontSize: 12, color: "#C3CBB5", marginTop: 2,
+  },
+  comboBannerArrow: {
+    color: "#9AB88A", fontSize: 18,
+  },
+
   giftCardVisual: {
     background: "linear-gradient(160deg, #1C1A17 0%, #2A2622 60%, #1A1815 100%)",
     borderRadius: 18, padding: "32px 28px 26px",

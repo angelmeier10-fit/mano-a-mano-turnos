@@ -5,7 +5,7 @@ import {
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
   applyClientDiscount,
 } from "../../shared/helpers";
-import { getClientDiscountPublic } from "../../shared/firestoreApi";
+import { getClientDiscountPublic, getCombosByPhone } from "../../shared/firestoreApi";
 import { MiniCalendar } from "../../shared/MiniCalendar";
 import styles from "../../shared/styles";
 
@@ -20,7 +20,7 @@ function saveBookingToLocalStorage(apptId, cancelToken, appt, serviceName) {
   } catch {}
 }
 
-export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard }) {
+export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard, onGoCombo }) {
   const availabilityByDate = useMemo(() => {
     const map = {};
     availability.forEach(slot => {
@@ -44,6 +44,8 @@ export default function ReservarView({ services, availability, businessInfo, onB
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientDiscount, setClientDiscount] = useState(null);
+  const [myCombos, setMyCombos] = useState([]);
+  const [useCombo, setUseCombo] = useState(true);
   const [confirmed, setConfirmed] = useState(null);
   const [booking, setBooking] = useState(false);
   const [dateViewMode, setDateViewMode] = useState("list");
@@ -60,6 +62,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
 
   const svc = services.find(s => s.id === serviceId);
   const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount } = applyClientDiscount(svc?.price, clientDiscount, serviceId);
+  const matchingCombo = myCombos.find(c => c.status === "active" && c.sessionsRemaining > 0 && c.serviceId === serviceId);
 
   const slotsForSelectedDate = useMemo(() => {
     if (!selectedDate || !svc) return [];
@@ -98,6 +101,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
       discount: svcDiscountAmount,
       ...(clientId ? { clientId } : {}),
       ...(giftCardCode ? { giftCardCode } : {}),
+      ...(useCombo && matchingCombo ? { comboId: matchingCombo.id } : {}),
     };
     let result;
     try {
@@ -128,10 +132,12 @@ export default function ReservarView({ services, availability, businessInfo, onB
           <h2 style={styles.confirmTitle}>{giftCardCode ? "Turno confirmado" : "Turno pendiente de confirmación"}</h2>
           {giftCardCode
             ? <p style={{ ...styles.confirmDetail, color: "#4A5A40", fontWeight: 600, marginBottom: 4 }}>🎁 Pago con gift card</p>
+            : confirmed.comboId
+            ? <p style={{ ...styles.confirmDetail, color: "#4A5A40", fontWeight: 600, marginBottom: 4 }}>📦 Pagado con tu combo</p>
             : <p style={{ ...styles.confirmDetail, color: "#8A8275", marginBottom: 4 }}>Te confirmamos el turno pronto por WhatsApp.</p>
           }
           <p style={styles.confirmDetail}>{cSvc?.name} · {confirmed.start} a {confirmed.end}</p>
-          {cSvc?.price && !preselectedServiceId && (
+          {cSvc?.price && !preselectedServiceId && !confirmed.comboId && (
             <p style={styles.confirmPrice}>
               {confirmed.discount > 0
                 ? <><span style={{ textDecoration: "line-through", opacity: 0.6, marginRight: 6, fontSize: "0.8em" }}>{formatPrice(cSvc.price)}</span>{formatPrice(Math.max(0, cSvc.price - confirmed.discount))}</>
@@ -188,6 +194,16 @@ export default function ReservarView({ services, availability, businessInfo, onB
           <div style={styles.giftCardBannerArrow}>›</div>
         </div>
       )}
+      {!giftCardCode && onGoCombo && (
+        <div style={styles.comboBanner} onClick={onGoCombo} role="button">
+          <div style={styles.comboBannerIcon}>📦</div>
+          <div style={styles.comboBannerText}>
+            <p style={styles.comboBannerTitle}>Combos de sesiones</p>
+            <p style={styles.comboBannerSub}>Pagá por adelantado y ahorrá · válidos 60 días</p>
+          </div>
+          <div style={styles.comboBannerArrow}>›</div>
+        </div>
+      )}
       <h2 style={styles.sectionTitle}>Reservá tu sesión</h2>
       <div style={styles.businessInfoCard}>
         <div style={styles.businessInfoRow}>
@@ -219,8 +235,9 @@ export default function ReservarView({ services, availability, businessInfo, onB
         value={clientPhone}
         onChange={e => { setClientPhone(e.target.value); if (phoneError) setPhoneError(""); }}
         onBlur={async () => {
-          if (!clientPhone.trim()) { setClientDiscount(null); return; }
+          if (!clientPhone.trim()) { setClientDiscount(null); setMyCombos([]); return; }
           setClientDiscount(await getClientDiscountPublic(clientPhone));
+          try { setMyCombos(await getCombosByPhone(clientPhone)); } catch { setMyCombos([]); }
         }}
         placeholder="11 1234 5678"
       />
@@ -259,6 +276,13 @@ export default function ReservarView({ services, availability, businessInfo, onB
             </button>
           ))}
         </div>
+      )}
+
+      {matchingCombo && !preselectedServiceId && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0 16px", fontSize: 13, color: "#2A2622", cursor: "pointer" }}>
+          <input type="checkbox" checked={useCombo} onChange={e => setUseCombo(e.target.checked)} />
+          📦 Usar sesión de tu combo (te quedan {matchingCombo.sessionsRemaining}) — turno gratis
+        </label>
       )}
 
       {availableDates.length === 0 ? (

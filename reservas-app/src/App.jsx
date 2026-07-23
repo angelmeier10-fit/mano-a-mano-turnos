@@ -5,6 +5,8 @@ import MiTurnoView from "./MiTurnoView";
 import GiftCardView from "./GiftCardView";
 import GiftCardRedeemView from "./GiftCardRedeemView";
 import GiftCardLookupView from "./GiftCardLookupView";
+import ComboView from "./ComboView";
+import MisCombosView from "./MisCombosView";
 import {
   listenServices,
   listenAvailability,
@@ -54,6 +56,31 @@ function GiftCardMenuView({ onBuy, onLookup }) {
   );
 }
 
+function ComboMenuView({ onBuy, onLookup }) {
+  return (
+    <div style={{ padding: "32px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, margin: "0 0 8px", textAlign: "center" }}>Combos de sesiones</h2>
+      <p style={{ fontSize: 13, color: "#8A8275", textAlign: "center", margin: "0 0 16px" }}>
+        ¿Querés comprar sesiones por adelantado o ver cuántas te quedan?
+      </p>
+      <button
+        style={{ background: "#6E7F5C", color: "#fff", border: "none", borderRadius: 12, padding: "18px 20px", fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
+        onClick={onBuy}
+      >
+        📦 Comprar un combo
+        <div style={{ fontSize: 12, fontWeight: 400, opacity: 0.85, marginTop: 4 }}>Pagá varias sesiones por adelantado y ahorrá</div>
+      </button>
+      <button
+        style={{ background: "#fff", color: "#2A2622", border: "2px solid #D0C5B4", borderRadius: 12, padding: "18px 20px", fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
+        onClick={onLookup}
+      >
+        Ver mis combos
+        <div style={{ fontSize: 12, fontWeight: 400, color: "#8A8275", marginTop: 4 }}>Buscá por número de teléfono</div>
+      </button>
+    </div>
+  );
+}
+
 function getGiftCardCodeFromURL() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -70,6 +97,7 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [currentView, setCurrentView] = useState("reservar");
   const [giftCardSubview, setGiftCardSubview] = useState("menu"); // "menu" | "buy" | "lookup" | "redeem"
+  const [comboSubview, setComboSubview] = useState("menu"); // "menu" | "buy" | "lookup"
   const [lookupSelectedCode, setLookupSelectedCode] = useState(null);
   const [miturnoInitPhone, setMiturnoInitPhone] = useState("");
   const [quizPreselectedServiceId, setQuizPreselectedServiceId] = useState(null);
@@ -167,6 +195,12 @@ export default function App() {
             Regalar 🎁
           </button>
           <button
+            style={{ ...styles.tabBtn, ...(currentView === "combo" ? styles.tabBtnActive : {}) }}
+            onClick={() => { setCurrentView("combo"); setComboSubview("menu"); }}
+          >
+            Combos 📦
+          </button>
+          <button
             style={{ ...styles.tabBtn, ...(currentView === "miturno" ? styles.tabBtnActive : {}) }}
             onClick={() => navigateToMiTurno()}
           >
@@ -184,6 +218,7 @@ export default function App() {
             onUpsertClient={createClientPublic}
             onNavigateToMiTurno={navigateToMiTurno}
             onGoGiftCard={() => setCurrentView("giftcard")}
+            onGoCombo={() => { setCurrentView("combo"); setComboSubview("menu"); }}
             initialServiceId={quizPreselectedServiceId}
           />
         )}
@@ -218,6 +253,22 @@ export default function App() {
             onBookSlot={bookSlotAtomic}
             onUpsertClient={createClientPublic}
           />
+        )}
+        {currentView === "combo" && comboSubview === "menu" && (
+          <ComboMenuView
+            onBuy={() => setComboSubview("buy")}
+            onLookup={() => setComboSubview("lookup")}
+          />
+        )}
+        {currentView === "combo" && comboSubview === "buy" && (
+          <ComboView
+            services={services}
+            onBack={() => setComboSubview("menu")}
+            onGoReservar={() => setCurrentView("reservar")}
+          />
+        )}
+        {currentView === "combo" && comboSubview === "lookup" && (
+          <MisCombosView onBack={() => setComboSubview("menu")} />
         )}
         {currentView === "miturno" && (
           <MiTurnoView

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Calendar, Users, Settings, Sliders, LogOut, Gift, Bell } from "lucide-react";
+import { Calendar, Users, Settings, Sliders, LogOut, Gift, Bell, Package } from "lucide-react";
 import styles from "../../shared/styles";
 import { formatDateShort } from "../../shared/helpers";
 
@@ -13,7 +13,7 @@ function addSeenId(id) {
   if (!seen.includes(id)) localStorage.setItem(SEEN_KEY, JSON.stringify([...seen, id]));
 }
 
-export default function Header({ view, setView, onLogout, pendingGiftCards = 0, pendingApptsList = [], onOpenAppt }) {
+export default function Header({ view, setView, onLogout, pendingGiftCards = 0, pendingCombos = 0, pendingApptsList = [], onOpenAppt }) {
   const [open, setOpen] = useState(false);
   const [seenIds, setSeenIds] = useState(getSeenIds);
   const bellRef = useRef(null);
@@ -41,6 +41,7 @@ export default function Header({ view, setView, onLogout, pendingGiftCards = 0, 
   const tabs = [
     { id: "agenda", label: "Agenda", icon: Calendar },
     { id: "giftcards", label: "Gift Cards", icon: Gift, badge: pendingGiftCards },
+    { id: "combos", label: "Combos", icon: Package, badge: pendingCombos },
     { id: "clientes", label: "Clientes", icon: Users },
     { id: "servicios", label: "Servicios", icon: Settings },
     { id: "negocio", label: "Negocio", icon: Sliders },

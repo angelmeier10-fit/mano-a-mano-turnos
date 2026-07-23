@@ -3,7 +3,7 @@ import { auth, watchAuthState, logout } from "./auth";
 import LoginScreen from "./LoginScreen";
 import Header from "./Header";
 import { AgendaView } from "./AgendaComponents";
-import { ClientesView, ServiciosView } from "./ClientesServiciosViews";
+import { ClientesView, ServiciosView, CombosView } from "./ClientesServiciosViews";
 import NegocioView from "./NegocioView";
 import GiftCardsView from "./GiftCardsView";
 import {
@@ -12,7 +12,7 @@ import {
   listenAppointments, listenIncomingPendingAppointments, createAppointment, updateAppointment, deleteAppointment,
   listenClients, upsertClientByName, updateClient, deleteClient,
   listenBusinessInfo, setBusinessInfo, freeAvailabilitySlot,
-  listenGiftCards,
+  listenGiftCards, listenCombos,
 } from "../../shared/firestoreApi";
 import { DEFAULT_SERVICES, DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
 import styles from "../../shared/styles";
@@ -42,6 +42,7 @@ export default function App() {
   const [servicesLoaded, setServicesLoaded] = useState(false);
   const seededServicesRef = React.useRef(false);
   const [giftCards, setGiftCards] = useState([]);
+  const [combos, setCombos] = useState([]);
   const [apptNotifs, setApptNotifs] = useState([]); // [{ id, clientName, dateKey, start }]
   const [openApptId, setOpenApptId] = useState(null);
 
@@ -83,8 +84,9 @@ export default function App() {
       setDataLoaded(true);
     });
     const unsubGiftCards = listenGiftCards(setGiftCards);
+    const unsubCombos = listenCombos(setCombos);
     return () => {
-      unsubServices(); unsubAppts(); unsubIncoming(); unsubClients(); unsubAvail(); unsubBiz(); unsubGiftCards();
+      unsubServices(); unsubAppts(); unsubIncoming(); unsubClients(); unsubAvail(); unsubBiz(); unsubGiftCards(); unsubCombos();
     };
   }, [user]);
 
@@ -125,7 +127,7 @@ export default function App() {
     <div style={styles.app}>
       <GoogleFontsLoader />
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-        <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
+        <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
         {apptNotifs.map(n => (
           <div
             key={n.id}
@@ -149,6 +151,7 @@ export default function App() {
             availability={availability}
             clients={clients}
             businessInfo={businessInfo}
+            combos={combos}
             onCreateAppt={createAppointment}
             onUpdateAppt={updateAppointment}
             onDeleteAppt={deleteAppointment}
@@ -169,11 +172,15 @@ export default function App() {
             clients={clients}
             appointments={appointments}
             services={services}
+            combos={combos}
             onUpdateClient={updateClient}
             onDeleteClient={deleteClient}
             onAddClient={upsertClientByName}
             onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }}
           />
+        )}
+        {view === "combos" && (
+          <CombosView combos={combos} businessInfo={businessInfo} />
         )}
         {view === "servicios" && (
           <ServiciosView

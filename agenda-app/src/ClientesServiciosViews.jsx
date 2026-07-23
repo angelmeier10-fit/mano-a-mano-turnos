@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
-import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession } from "../../shared/firestoreApi";
+import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession, createCombo, deleteCombo, activateCombo } from "../../shared/firestoreApi";
+import { Package } from "lucide-react";
 import styles from "../../shared/styles";
 
 const SESION_FIELDS = [
@@ -257,7 +258,115 @@ function AnamnesisSection({ client, onUpdateClient }) {
   );
 }
 
-export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddClient, appointments, services, onOpenAppt }) {
+function ComboSection({ client, services, combos }) {
+  const [selling, setSelling] = useState(false);
+  const [serviceId, setServiceId] = useState(services[0]?.id || "");
+  const [sessions, setSessions] = useState(2);
+  const [price, setPrice] = useState(0);
+
+  const svc = services.find(s => s.id === serviceId);
+  const clientCombos = combos.filter(c =>
+    (c.clientId && c.clientId === client.id) ||
+    (!c.clientId && client.phone && (c.clientPhone || "").replace(/[^\d]/g, "") === (client.phone || "").replace(/[^\d]/g, ""))
+  ).sort((a, b) => b.createdAt - a.createdAt);
+
+  function openSell() {
+    setServiceId(services[0]?.id || "");
+    setSessions(2);
+    setPrice(services[0]?.price2 || 0);
+    setSelling(true);
+  }
+  function pickService(id) {
+    setServiceId(id);
+    const s = services.find(x => x.id === id);
+    setPrice(sessions === 3 ? (s?.price3 || 0) : (s?.price2 || 0));
+  }
+  function pickSessions(n) {
+    setSessions(n);
+    setPrice(n === 3 ? (svc?.price3 || 0) : (svc?.price2 || 0));
+  }
+  async function sell(e) {
+    e.preventDefault();
+    if (!serviceId || !price) return;
+    await createCombo({
+      clientId: client.id,
+      clientName: client.name,
+      clientPhone: client.phone || "",
+      serviceId,
+      serviceName: svc?.name || "",
+      totalSessions: Number(sessions),
+      pricePaid: Number(price) || 0,
+    });
+    setSelling(false);
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#2A2622" }}>
+          Combos{clientCombos.length > 0 ? ` (${clientCombos.length})` : ""}
+        </span>
+        <button style={styles.saveBtn} onClick={openSell}>
+          <Package size={14} /> Vender combo
+        </button>
+      </div>
+
+      {selling && (
+        <form style={{ background: "#E8E2D8", borderRadius: 10, padding: 14, marginBottom: 12 }} onSubmit={sell}>
+          <label style={styles.fieldLabel}>Servicio</label>
+          <select style={styles.input} value={serviceId} onChange={e => pickService(e.target.value)}>
+            {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <label style={{ ...styles.fieldLabel, marginTop: 10 }}>Sesiones</label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" style={{ ...styles.cancelBtn, ...(sessions === 2 ? { background: "#6E7F5C", color: "#fff" } : {}) }} onClick={() => pickSessions(2)}>x2</button>
+            <button type="button" style={{ ...styles.cancelBtn, ...(sessions === 3 ? { background: "#6E7F5C", color: "#fff" } : {}) }} onClick={() => pickSessions(3)}>x3</button>
+          </div>
+          <label style={{ ...styles.fieldLabel, marginTop: 10 }}>Precio ($)</label>
+          <input type="number" style={styles.input} value={price} onChange={e => setPrice(e.target.value)} min={0} step={500} />
+          <p style={{ fontSize: 11, color: "#8A7E70", marginTop: 6 }}>Vence a los 60 días de hoy.</p>
+          <div style={styles.modalActions}>
+            <button type="button" style={styles.cancelBtn} onClick={() => setSelling(false)}>Cancelar</button>
+            <button type="submit" style={styles.saveBtn}><Check size={16} /> Vender</button>
+          </div>
+        </form>
+      )}
+
+      {clientCombos.length === 0 && !selling && (
+        <p style={styles.emptyMsg}>Sin combos vendidos todavía.</p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {clientCombos.map(c => {
+          const expired = c.expiresAt < Date.now();
+          const daysLeft = Math.ceil((c.expiresAt - Date.now()) / (24 * 60 * 60 * 1000));
+          return (
+            <div key={c.id} style={{ background: "#E8E2D8", borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#2A2622" }}>{c.serviceName}</div>
+                <div style={{ fontSize: 12, color: "#6A6055" }}>
+                  {c.sessionsRemaining}/{c.totalSessions} sesiones · {formatPrice(c.pricePaid)}
+                </div>
+              </div>
+              <span style={{
+                fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px",
+                background: c.status === "completed" ? "#D8D0C4" : expired ? "#F1D9D5" : daysLeft <= 7 ? "#F5E8CF" : "#EBF3E6",
+                color: c.status === "completed" ? "#6A6055" : expired ? "#A6483A" : daysLeft <= 7 ? "#8A6A20" : "#4A5A40",
+              }}>
+                {c.status === "completed" ? "Usado" : expired ? "Vencido" : `Vence en ${daysLeft}d`}
+              </span>
+              <button style={styles.iconBtnGhost} onClick={() => deleteCombo(c.id)}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddClient, appointments, services, combos = [], onOpenAppt }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [movements, setMovements] = useState([]);
@@ -508,6 +617,8 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
           placeholder="Contracturas recurrentes, lesiones, preferencias de presión…"
         />
 
+        <ComboSection client={selected} services={services} combos={combos} />
+
         <SessionesSection client={selected} history={history} />
 
         <label style={styles.fieldLabel}>Historial de sesiones ({history.length})</label>
@@ -676,30 +787,36 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   const [name, setName] = useState("");
   const [duration, setDuration] = useState(60);
   const [price, setPrice] = useState(20000);
+  const [price2, setPrice2] = useState(0);
+  const [price3, setPrice3] = useState(0);
   const [color, setColor] = useState("#B5654A");
 
   const palette = ["#B5654A", "#6E7F5C", "#8B4226", "#4A5A6B", "#7A5C3E", "#5C4A6B"];
 
+  function resetForm() {
+    setName(""); setDuration(60); setPrice(20000); setPrice2(0); setPrice3(0); setColor("#B5654A");
+  }
+
   function addService(e) {
     e.preventDefault();
     if (!name.trim()) return;
-    onAddService({ name: name.trim(), duration: Number(duration), color, price: Number(price) || 0 });
-    setName(""); setDuration(60); setPrice(20000); setColor("#B5654A");
+    onAddService({ name: name.trim(), duration: Number(duration), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0 });
+    resetForm();
     setShowForm(false);
   }
 
   function startEdit(s) {
     setEditingService(s);
-    setName(s.name); setDuration(s.duration); setPrice(s.price || 0); setColor(s.color);
+    setName(s.name); setDuration(s.duration); setPrice(s.price || 0); setPrice2(s.price2 || 0); setPrice3(s.price3 || 0); setColor(s.color);
     setShowForm(false);
   }
 
   function saveEdit(e) {
     e.preventDefault();
     if (!name.trim()) return;
-    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), color, price: Number(price) || 0 });
+    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0 });
     setEditingService(null);
-    setName(""); setDuration(60); setPrice(20000); setColor("#B5654A");
+    resetForm();
   }
 
   return (
@@ -713,6 +830,11 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
               <div style={{ flex: 1 }}>
                 <div style={styles.serviceRowName}>{s.name}</div>
                 <div style={styles.serviceRowMeta}>{s.duration} minutos{s.price ? ` · ${formatPrice(s.price)}` : ""}</div>
+                {(s.price2 > 0 || s.price3 > 0) && (
+                  <div style={{ ...styles.serviceRowMeta, fontSize: 11, color: "#8A7E70" }}>
+                    Combos: {s.price2 > 0 ? `x2 ${formatPrice(s.price2)}` : ""}{s.price2 > 0 && s.price3 > 0 ? " · " : ""}{s.price3 > 0 ? `x3 ${formatPrice(s.price3)}` : ""}
+                  </div>
+                )}
               </div>
               <button style={styles.iconBtnGhost} onClick={() => editingService?.id === s.id ? setEditingService(null) : startEdit(s)}>
                 <Pencil size={15} />
@@ -733,6 +855,16 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
                   <div style={{ flex: 1 }}>
                     <label style={styles.fieldLabel}>Precio ($)</label>
                     <input type="number" style={styles.input} value={price} onChange={e => setPrice(e.target.value)} min={0} step={500} />
+                  </div>
+                </div>
+                <div style={styles.fieldRow}>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.fieldLabel}>Combo x2 ($)</label>
+                    <input type="number" style={styles.input} value={price2} onChange={e => setPrice2(e.target.value)} min={0} step={500} placeholder="Opcional" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.fieldLabel}>Combo x3 ($)</label>
+                    <input type="number" style={styles.input} value={price3} onChange={e => setPrice3(e.target.value)} min={0} step={500} placeholder="Opcional" />
                   </div>
                 </div>
                 <label style={styles.fieldLabel}>Color</label>
@@ -768,6 +900,16 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
             <div style={{ flex: 1 }}>
               <label style={styles.fieldLabel}>Precio ($)</label>
               <input type="number" style={styles.input} value={price} onChange={e => setPrice(e.target.value)} min={0} step={500} />
+            </div>
+          </div>
+          <div style={styles.fieldRow}>
+            <div style={{ flex: 1 }}>
+              <label style={styles.fieldLabel}>Combo x2 ($)</label>
+              <input type="number" style={styles.input} value={price2} onChange={e => setPrice2(e.target.value)} min={0} step={500} placeholder="Opcional" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={styles.fieldLabel}>Combo x3 ($)</label>
+              <input type="number" style={styles.input} value={price3} onChange={e => setPrice3(e.target.value)} min={0} step={500} placeholder="Opcional" />
             </div>
           </div>
           <label style={styles.fieldLabel}>Color</label>
@@ -827,6 +969,122 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+// ====================================================================
+// COMBOS VIEW
+// ====================================================================
+export function CombosView({ combos, businessInfo }) {
+  const now = Date.now();
+  const [confirming, setConfirming] = useState(null);
+  const pending = combos
+    .filter(c => c.status === "pending")
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const active = combos
+    .filter(c => c.status === "active")
+    .sort((a, b) => a.expiresAt - b.expiresAt);
+
+  async function handleActivate(id) {
+    setConfirming(id);
+    try {
+      await activateCombo(id);
+    } catch (e) {
+      window.alert(e.message || "No se pudo confirmar el pago.");
+    } finally {
+      setConfirming(null);
+    }
+  }
+
+  async function handleReject(id) {
+    if (!window.confirm("¿Rechazar este pedido de combo?")) return;
+    setConfirming(id);
+    try {
+      await deleteCombo(id);
+    } catch (e) {
+      window.alert(e.message || "No se pudo rechazar el pedido.");
+    } finally {
+      setConfirming(null);
+    }
+  }
+
+  function waLinkFor(c) {
+    const waPhone = formatPhoneForWhatsapp(c.clientPhone);
+    if (!waPhone) return null;
+    const expired = c.expiresAt < now;
+    const fecha = formatDateLong(new Date(c.expiresAt).toISOString().slice(0, 10));
+    const msg = expired
+      ? `Hola ${c.clientName}! Tu combo de ${c.serviceName} venció y te quedan ${c.sessionsRemaining} sesión${c.sessionsRemaining !== 1 ? "es" : ""} sin usar. ¿Coordinamos un turno?`
+      : `Hola ${c.clientName}! Te quedan ${c.sessionsRemaining} sesión${c.sessionsRemaining !== 1 ? "es" : ""} de tu combo de ${c.serviceName} que vence el ${fecha}. ¿Coordinamos un turno?`;
+    return `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
+  }
+
+  return (
+    <div style={styles.viewWrap}>
+      {pending.length > 0 && (
+        <>
+          <h2 style={styles.sectionTitle}>Pendientes de pago ({pending.length})</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+            {pending.map(c => (
+              <div key={c.id} style={{ background: "#FFF8EC", border: "1.5px solid #C9973A", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2A2622" }}>{c.clientName}</div>
+                <div style={{ fontSize: 12, color: "#6A6055", marginBottom: 8 }}>
+                  {c.serviceName} · x{c.totalSessions} · {formatPrice(c.pricePaid)} · {c.clientPhone}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    style={{ ...styles.saveBtn, padding: "6px 12px", fontSize: 12 }}
+                    onClick={() => handleActivate(c.id)}
+                    disabled={confirming === c.id}
+                  >
+                    <Check size={13} /> Confirmar pago
+                  </button>
+                  <button
+                    style={{ ...styles.cancelBtn, padding: "6px 12px", fontSize: 12 }}
+                    onClick={() => handleReject(c.id)}
+                    disabled={confirming === c.id}
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <h2 style={styles.sectionTitle}>Combos activos ({active.length})</h2>
+      {active.length === 0 ? (
+        <p style={styles.emptyMsg}>No hay combos activos.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {active.map(c => {
+            const expired = c.expiresAt < now;
+            const daysLeft = Math.ceil((c.expiresAt - now) / (24 * 60 * 60 * 1000));
+            const nearExpiry = expired || daysLeft <= 7;
+            const waLink = waLinkFor(c);
+            return (
+              <div key={c.id} style={{ background: "#E8E2D8", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2A2622" }}>{c.clientName}</div>
+                  <div style={{ fontSize: 12, color: "#6A6055" }}>
+                    {c.serviceName} · {c.sessionsRemaining}/{c.totalSessions} sesiones
+                  </div>
+                  <div style={{ fontSize: 11, color: nearExpiry ? "#A6483A" : "#8A7E70", fontWeight: nearExpiry ? 700 : 400, marginTop: 2 }}>
+                    {expired ? "Vencido" : `Vence en ${daysLeft} día${daysLeft !== 1 ? "s" : ""}`}
+                  </div>
+                </div>
+                {waLink && (
+                  <a href={waLink} target="_blank" rel="noopener noreferrer" style={styles.waIconBtn} title="Avisar por WhatsApp">
+                    <MessageCircle size={17} />
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

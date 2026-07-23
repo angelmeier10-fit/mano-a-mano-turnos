@@ -8,10 +8,10 @@ import {
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
 import { ANAMNESIS_FIELDS } from "./ClientesServiciosViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession } from "../../shared/firestoreApi";
 
 export function AgendaView({
-  services, appointments, availability, clients, businessInfo,
+  services, appointments, availability, clients, businessInfo, combos = [],
   onCreateAppt, onUpdateAppt, onDeleteAppt,
   onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch, onFreeSlot,
   upsertClientByName, pendingGiftCards = 0, onGoGiftCards,
@@ -109,6 +109,10 @@ export function AgendaView({
     setShowApptForm(true);
   }
   function deleteAppt(id, clientPhone) {
+    const appt = appointments.find(a => a.id === id);
+    if (appt?.paidByCombo && appt.comboId) {
+      restoreComboSession(appt.comboId, id).catch((e) => console.error("[deleteAppt] restoreComboSession falló:", e));
+    }
     onDeleteAppt(id);
     deleteBookingRef(clientPhone, id).catch((e) => console.error("[deleteAppt] deleteBookingRef falló:", e));
   }
@@ -119,6 +123,9 @@ export function AgendaView({
         try { await onFreeSlot(fromAvailabilityId); } catch (e) {
           console.error("No se pudo liberar el cupo:", e);
         }
+      }
+      if (appt?.paidByCombo && appt.comboId) {
+        restoreComboSession(appt.comboId, id).catch((e) => console.error("[setApptStatus] restoreComboSession falló:", e));
       }
       markBookingRefCancelled(clientPhone, id).catch(() => {});
       if (appt) {
@@ -220,7 +227,10 @@ export function AgendaView({
         const dKey = i === 0 ? data.dateKey : dateKey(addDays(baseDate, 7 * i));
         const dup = appointments.find(a => a.status !== "cancelado" && a.dateKey === dKey && a.start === data.start);
         if (dup) { alert(`Ya existe un turno a las ${data.start} el ${dKey}. Se omitió esa semana.`); continue; }
-        onCreateAppt({ status: "confirmado", ...data, dateKey: dKey, ...(clientId ? { clientId } : {}) });
+        const ref = await onCreateAppt({ status: "confirmado", ...data, dateKey: dKey, ...(clientId ? { clientId } : {}) });
+        if (data.comboId && ref?.id) {
+          redeemComboSession(data.comboId, ref.id).catch((e) => console.error("[saveAppt] redeemComboSession falló:", e));
+        }
       }
     }
     setShowApptForm(false);
@@ -429,6 +439,7 @@ export function AgendaView({
                               <div style={styles.apptService}>
                                 {svc.name}
                                 {a.paidByGiftCard && <span style={{ marginLeft: 5, fontSize: 10, background: "#EBF3E6", color: "#4A5A40", borderRadius: 6, padding: "1px 6px", fontWeight: 700 }}>🎁 Gift Card</span>}
+                                {a.paidByCombo && <span style={{ marginLeft: 5, fontSize: 10, background: "#EAE3F5", color: "#4A3E6B", borderRadius: 6, padding: "1px 6px", fontWeight: 700 }}>📦 Combo</span>}
                               </div>
                             </button>
                           );
@@ -471,6 +482,7 @@ export function AgendaView({
           key={editingAppt ? `edit-${editingAppt.id}` : `new-${prefillSlot?.dateKey}-${prefillSlot?.clientName || ""}`}
           services={services}
           clients={clients}
+          combos={combos}
           businessInfo={businessInfo}
           initial={editingAppt}
           prefill={prefillSlot}
@@ -812,7 +824,7 @@ function TurnoAnamnesisSection({ client }) {
   );
 }
 
-function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo }) {
+function ApptFormModal({ services, clients, combos = [], initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo }) {
   const base = initial || {
     dateKey: prefill?.dateKey || dateKey(new Date()),
     start: prefill?.start || "10:00",
@@ -828,6 +840,7 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
   const [clientPhone, setClientPhone] = useState(base.clientPhone || "");
   const [notes, setNotes] = useState(base.notes || "");
   const [discount, setDiscount] = useState(base.discount || 0);
+  const [useCombo, setUseCombo] = useState(!!base.comboId);
   const [showClientList, setShowClientList] = useState(false);
   const [showDateCalendar, setShowDateCalendar] = useState(false);
   const [repeatWeeks, setRepeatWeeks] = useState(1);
@@ -835,6 +848,11 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
 
   const svc = services.find(s => s.id === serviceId);
   const end = svc ? minutesToTime(timeToMinutes(start) + svc.duration) : start;
+
+  const availableCombo = combos.find(c =>
+    c.status === "active" && c.sessionsRemaining > 0 && c.serviceId === serviceId &&
+    clientPhone.trim() && (c.clientPhone || "").replace(/[^\d]/g, "") === clientPhone.replace(/[^\d]/g, "")
+  );
 
   const matchedClient = clients.find(c => {
     if (clientPhone.trim()) {
@@ -855,10 +873,12 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
   function handleSubmit(e) {
     e.preventDefault();
     if (!clientName.trim() || !serviceId) return;
+    const paidByCombo = !initial && useCombo && !!availableCombo;
     onSave({
       dateKey: dateVal, start, end, serviceId, clientName, clientPhone, notes,
-      price: svc?.price || 0,
-      discount: Number(discount) || 0,
+      price: paidByCombo ? 0 : (svc?.price || 0),
+      discount: paidByCombo ? 0 : (Number(discount) || 0),
+      ...(paidByCombo ? { paidByCombo: true, comboId: availableCombo.id } : {}),
       ...(fromAvailabilityId ? { fromAvailabilityId } : {}),
       ...(!initial && repeatWeeks > 1 ? { repeatWeeks } : {}),
     });
@@ -998,6 +1018,13 @@ function ApptFormModal({ services, clients, initial, prefill, onClose, onSave, o
           ))}
         </div>
         <div style={styles.endTimeNote}>Finaliza a las {end}</div>
+
+        {!initial && availableCombo && (
+          <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 0", fontSize: 13, color: "#2A2622", cursor: "pointer" }}>
+            <input type="checkbox" checked={useCombo} onChange={e => setUseCombo(e.target.checked)} />
+            📦 Usar combo (quedan {availableCombo.sessionsRemaining}, vence {new Date(availableCombo.expiresAt).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })})
+          </label>
+        )}
 
         <label style={styles.fieldLabel}>Descuento / Recargo ($)</label>
         <div style={{ display: "flex", gap: 8 }}>

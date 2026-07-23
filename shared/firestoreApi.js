@@ -177,6 +177,7 @@ export async function bookSlotAtomic(appt) {
   const cancelToken = generateCancelToken();
   const slotId = appt.fromAvailabilityId;
   const giftCardCode = appt.giftCardCode || null;
+  const comboId = appt.comboId || null;
 
   const apptData = {
     ...appt,
@@ -184,11 +185,13 @@ export async function bookSlotAtomic(appt) {
     cancelProof: null,
     createdAt: Date.now(),
     ...(giftCardCode ? { paidByGiftCard: true, giftCardCode } : {}),
+    ...(comboId ? { paidByCombo: true, comboId } : {}),
   };
 
   if (!slotId) {
     const ref = await addDoc(collection(db, "appointments"), apptData);
     if (giftCardCode) await redeemGiftCard(giftCardCode, ref.id);
+    if (comboId) await redeemComboSession(comboId, ref.id);
     return { apptId: ref.id, cancelToken };
   }
 
@@ -206,6 +209,7 @@ export async function bookSlotAtomic(appt) {
   });
 
   if (giftCardCode) await redeemGiftCard(giftCardCode, apptId);
+  if (comboId) await redeemComboSession(comboId, apptId);
 
   // Guardar referencia en phoneIndex/bookings (best-effort, no bloquea la reserva)
   const phoneDigits = normalizePhone(appt.clientPhone);
@@ -286,6 +290,7 @@ export async function getAppointmentHistory(clientId) {
 export async function cancelAppointmentPublic(apptId, cancelToken, availabilitySlotId, phone, historyData) {
   const apptSnap = await getDoc(doc(db, "appointments", apptId));
   const giftCardCode = apptSnap.exists() ? apptSnap.data().giftCardCode : null;
+  const comboId = apptSnap.exists() ? apptSnap.data().comboId : null;
 
   await updateDoc(doc(db, "appointments", apptId), {
     status: "cancelado",
@@ -314,6 +319,13 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
       console.error("[giftCard] No se pudo restaurar la gift card:", e);
     }
   }
+  if (comboId) {
+    try {
+      await restoreComboSession(comboId, apptId);
+    } catch (e) {
+      console.error("[combo] No se pudo restaurar la sesión del combo:", e);
+    }
+  }
 
   if (historyData) {
     addAppointmentHistory({
@@ -335,6 +347,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
 
   const oldApptSnap = await getDoc(oldApptRef);
   const giftCardCode = oldApptSnap.exists() ? oldApptSnap.data().giftCardCode : null;
+  const comboId = oldApptSnap.exists() ? oldApptSnap.data().comboId : null;
   const newSlotRef = doc(db, "availability", newAppt.fromAvailabilityId);
   const newApptRef = doc(collection(db, "appointments"));
   const newApptId = newApptRef.id;
@@ -363,6 +376,13 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
       await updateGiftCardApptId(giftCardCode, newApptId);
     } catch (e) {
       console.error("[giftCard] No se pudo actualizar apptId en gift card:", e);
+    }
+  }
+  if (comboId) {
+    try {
+      await updateComboApptId(comboId, oldApptId, newApptId);
+    } catch (e) {
+      console.error("[combo] No se pudo actualizar apptId en el combo:", e);
     }
   }
 
@@ -796,4 +816,94 @@ export async function restoreGiftCard(code) {
 
 export async function updateGiftCardApptId(code, newApptId) {
   return updateDoc(doc(db, "giftCards", code), { apptId: newApptId });
+}
+
+// ---------- Combos de sesiones prepagas ----------
+const COMBO_VALID_DAYS = 60;
+
+export async function createCombo(data) {
+  const now = Date.now();
+  return addDoc(collection(db, "combos"), {
+    ...data,
+    sessionsRemaining: data.totalSessions,
+    usedApptIds: [],
+    status: data.status || "active",
+    createdAt: now,
+    expiresAt: now + COMBO_VALID_DAYS * 24 * 60 * 60 * 1000,
+  });
+}
+
+export async function activateCombo(comboId) {
+  return updateDoc(doc(db, "combos", comboId), {
+    status: "active",
+    activatedAt: Date.now(),
+  });
+}
+
+export function listenCombos(callback) {
+  return onSnapshot(
+    query(collection(db, "combos"), orderBy("createdAt", "desc")),
+    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+}
+
+export async function getCombosByPhone(phone) {
+  const variants = phoneVariants(phone);
+  const snaps = await Promise.all(
+    variants.map(v => getDocs(query(collection(db, "combos"), where("clientPhone", "==", v))))
+  );
+  const seen = new Set();
+  const results = [];
+  for (const snap of snaps) {
+    for (const d of snap.docs) {
+      if (!seen.has(d.id)) { seen.add(d.id); results.push({ id: d.id, ...d.data() }); }
+    }
+  }
+  return results;
+}
+
+export async function updateComboApptId(comboId, oldApptId, newApptId) {
+  const comboRef = doc(db, "combos", comboId);
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(comboRef);
+    if (!snap.exists()) return;
+    const combo = snap.data();
+    transaction.update(comboRef, {
+      usedApptIds: (combo.usedApptIds || []).map(id => id === oldApptId ? newApptId : id),
+    });
+  });
+}
+
+export async function redeemComboSession(comboId, apptId) {
+  const comboRef = doc(db, "combos", comboId);
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(comboRef);
+    if (!snap.exists()) throw new Error("El combo ya no existe.");
+    const combo = snap.data();
+    if (combo.sessionsRemaining <= 0) throw new Error("El combo no tiene sesiones disponibles.");
+    const sessionsRemaining = combo.sessionsRemaining - 1;
+    transaction.update(comboRef, {
+      sessionsRemaining,
+      usedApptIds: [...(combo.usedApptIds || []), apptId],
+      status: sessionsRemaining === 0 ? "completed" : "active",
+    });
+  });
+}
+
+export async function restoreComboSession(comboId, apptId) {
+  const comboRef = doc(db, "combos", comboId);
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(comboRef);
+    if (!snap.exists()) return;
+    const combo = snap.data();
+    transaction.update(comboRef, {
+      sessionsRemaining: Math.min(combo.totalSessions, combo.sessionsRemaining + 1),
+      usedApptIds: (combo.usedApptIds || []).filter(id => id !== apptId),
+      status: "active",
+    });
+  });
+}
+
+export async function deleteCombo(comboId) {
+  return deleteDoc(doc(db, "combos", comboId));
 }

@@ -4,10 +4,10 @@ export const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 export const MONTH_NAMES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 export const DEFAULT_SERVICES = [
-  { id: "medio-torso", name: "Medio torso", duration: 40, color: "#B5654A", price: 20000 },
-  { id: "medio-torso-ventosas", name: "Medio torso + ventosas", duration: 40, color: "#8B4226", price: 30000 },
-  { id: "cuerpo-completo", name: "Cuerpo completo", duration: 60, color: "#6E7F5C", price: 30000 },
-  { id: "cuerpo-completo-ventosas", name: "Cuerpo completo + ventosas", duration: 60, color: "#4A5A6B", price: 40000 },
+  { id: "medio-torso", name: "Medio torso", duration: 40, color: "#B5654A", price: 25000, price2: 40000, price3: 60000 },
+  { id: "medio-torso-ventosas", name: "Medio torso + ventosas", duration: 40, color: "#8B4226", price: 35000, price2: 60000, price3: 90000 },
+  { id: "cuerpo-completo", name: "Cuerpo completo", duration: 60, color: "#6E7F5C", price: 35000, price2: 60000, price3: 90000 },
+  { id: "cuerpo-completo-ventosas", name: "Cuerpo completo + ventosas", duration: 60, color: "#4A5A6B", price: 45000, price2: 80000, price3: 120000 },
 ];
 
 export const DEFAULT_BUSINESS_INFO = {
