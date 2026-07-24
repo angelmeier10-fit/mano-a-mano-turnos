@@ -292,11 +292,14 @@ function GiftAndCombos() {
   const cards = [
     {
       icon: "🎁",
-      title: "Regalá una sesión",
-      desc: "Comprá una gift card para alguien especial. Elegís el servicio, escribís un mensaje y compartís el link — se puede usar hasta 30 días después.",
+      title: "Regalá una sesión o un combo",
+      desc: "Comprá una gift card de una sesión para alguien especial, o regalale un combo de varias sesiones a su nombre. Elegís el servicio, escribís un mensaje y compartís el link.",
       cta: "Comprar gift card →",
       href: `${RESERVAR_URL}?view=giftcard`,
       location: "gift_section",
+      extraCta: "También podés regalar un combo →",
+      extraHref: `${RESERVAR_URL}?view=combo`,
+      extraLocation: "gift_section_combo",
     },
     {
       icon: "📦",
@@ -315,17 +318,27 @@ function GiftAndCombos() {
         <p className="section-sub">Ideal para regalar, o para vos si ya sabés que vas a volver.</p>
         <div className="gift-grid">
           {cards.map((c) => (
-            <a
-              key={c.title}
-              href={c.href}
-              className="gift-card"
-              onClick={() => trackEvent("click_reservar", { location: c.location })}
-            >
+            <div key={c.title} className="gift-card">
               <span className="gift-card-icon">{c.icon}</span>
               <div className="gift-card-title">{c.title}</div>
               <div className="gift-card-desc">{c.desc}</div>
-              <span className="gift-card-cta">{c.cta}</span>
-            </a>
+              <a
+                href={c.href}
+                className="gift-card-cta"
+                onClick={() => trackEvent("click_reservar", { location: c.location })}
+              >
+                {c.cta}
+              </a>
+              {c.extraCta && (
+                <a
+                  href={c.extraHref}
+                  className="gift-card-cta"
+                  onClick={() => trackEvent("click_reservar", { location: c.extraLocation })}
+                >
+                  {c.extraCta}
+                </a>
+              )}
+            </div>
           ))}
         </div>
       </div>
