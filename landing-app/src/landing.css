@@ -432,6 +432,33 @@ body { background: #EFE9DF; }
 .srv-dur { font-family: 'Questrial', sans-serif; font-size: 12.5px; color: #8A8275; margin-top: 2px; }
 .srv-price { font-family: 'Raleway', sans-serif; font-size: 17px; font-weight: 700; color: #2A2622; white-space: nowrap; }
 
+/* GIFT CARDS Y COMBOS */
+.gift-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+.gift-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #E3DBCB;
+  border-radius: 18px;
+  padding: 26px 24px;
+  text-decoration: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.gift-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(42,38,34,0.09);
+}
+.gift-card-icon { font-size: 34px; line-height: 1; }
+.gift-card-title { font-family: 'Raleway', sans-serif; font-weight: 700; font-size: 18px; color: #2A2622; }
+.gift-card-desc { font-family: 'Questrial', sans-serif; font-size: 14px; color: #6E6358; line-height: 1.55; }
+.gift-card-cta { font-family: 'Questrial', sans-serif; font-weight: 600; font-size: 13.5px; color: #B5654A; margin-top: 4px; }
+
 /* ABOUT */
 .about-wrap {
   display: grid;
@@ -539,6 +566,7 @@ body { background: #EFE9DF; }
   .nav-links { display: flex; }
   .hero-content { padding: 0 56px 80px; }
   .esp-grid { grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .gift-grid { grid-template-columns: 1fr 1fr; gap: 18px; }
   .ben-grid { grid-template-columns: repeat(4, 1fr); }
   .srv-grid { grid-template-columns: 1fr 1fr; }
   .about-wrap { grid-template-columns: 1fr 1fr; }

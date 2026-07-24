@@ -70,6 +70,7 @@ function Navbar({ businessName }) {
         <ul className="nav-links">
           <li><a href="#especialidades">Especialidades</a></li>
           <li><a href="#servicios">Servicios</a></li>
+          <li><a href="#regalos">Gift cards y combos</a></li>
           <li><a href="#nosotros">Nosotros</a></li>
           <li><a href="#contacto">Contacto</a></li>
         </ul>
@@ -287,6 +288,51 @@ function Services({ services, waNumber }) {
   );
 }
 
+function GiftAndCombos() {
+  const cards = [
+    {
+      icon: "🎁",
+      title: "Regalá una sesión",
+      desc: "Comprá una gift card para alguien especial. Elegís el servicio, escribís un mensaje y compartís el link — se puede usar hasta 30 días después.",
+      cta: "Comprar gift card →",
+      href: `${RESERVAR_URL}?view=giftcard`,
+      location: "gift_section",
+    },
+    {
+      icon: "📦",
+      title: "Combos de sesiones",
+      desc: "Pagá varias sesiones por adelantado y ahorrá. También podés regalar un combo: queda a nombre de la persona que elijas.",
+      cta: "Ver combos →",
+      href: `${RESERVAR_URL}?view=combo`,
+      location: "combo_section",
+    },
+  ];
+  return (
+    <section className="section" id="regalos" style={{ background: "#F5EFE6" }}>
+      <div className="section-inner">
+        <span className="section-tag">Gift cards y combos</span>
+        <h2 className="section-title">Regalá o ahorrá con combos de sesiones</h2>
+        <p className="section-sub">Ideal para regalar, o para vos si ya sabés que vas a volver.</p>
+        <div className="gift-grid">
+          {cards.map((c) => (
+            <a
+              key={c.title}
+              href={c.href}
+              className="gift-card"
+              onClick={() => trackEvent("click_reservar", { location: c.location })}
+            >
+              <span className="gift-card-icon">{c.icon}</span>
+              <div className="gift-card-title">{c.title}</div>
+              <div className="gift-card-desc">{c.desc}</div>
+              <span className="gift-card-cta">{c.cta}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function About({ waNumber }) {
   return (
     <section className="section" style={{ background: "#EFE9DF" }}>
@@ -427,6 +473,8 @@ function Footer({ businessInfo }) {
           <div className="footer-heading">Reservas</div>
           <ul className="footer-links">
             <li><a href={RESERVAR_URL} onClick={() => trackEvent("click_reservar", { location: "footer" })}>Reservar turno online</a></li>
+            <li><a href={`${RESERVAR_URL}?view=giftcard`} onClick={() => trackEvent("click_reservar", { location: "footer_giftcard" })}>Gift cards</a></li>
+            <li><a href={`${RESERVAR_URL}?view=combo`} onClick={() => trackEvent("click_reservar", { location: "footer_combo" })}>Combos de sesiones</a></li>
             {waNumber && <li><a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("click_whatsapp", { label: "footer" })}>Consultas por WhatsApp</a></li>}
             <li><a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("click_instagram", { location: "footer" })}>Instagram</a></li>
           </ul>
@@ -444,7 +492,7 @@ function Footer({ businessInfo }) {
       </div>
       <hr className="footer-divider" />
       <div className="footer-copy">
-        <span>© 2025 {businessInfo.name}. Todos los derechos reservados.</span>
+        <span>© {new Date().getFullYear()} {businessInfo.name}. Todos los derechos reservados.</span>
         <a href={RESERVAR_URL} style={{ color: "#B5654A", textDecoration: "none", fontWeight: 600 }} onClick={() => trackEvent("click_reservar", { location: "footer_bottom" })}>Reservar turno →</a>
       </div>
     </footer>
@@ -471,6 +519,7 @@ export default function App() {
       <MassageFinder services={services} />
       <Beneficios />
       <Services services={services} waNumber={waNumber} />
+      <GiftAndCombos />
       <About waNumber={waNumber} />
       <Testimonios />
       <HowItWorks waNumber={waNumber} />

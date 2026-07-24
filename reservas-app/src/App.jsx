@@ -90,12 +90,21 @@ function getGiftCardCodeFromURL() {
   }
 }
 
+function getInitialViewFromURL() {
+  try {
+    const view = new URLSearchParams(window.location.search).get("view");
+    return view === "giftcard" || view === "combo" ? view : "reservar";
+  } catch {
+    return "reservar";
+  }
+}
+
 export default function App() {
   const [services, setServices] = useState([]);
   const [availability, setAvailability] = useState([]);
   const [businessInfo, setBusinessInfo] = useState(DEFAULT_BUSINESS_INFO);
   const [loaded, setLoaded] = useState(false);
-  const [currentView, setCurrentView] = useState("reservar");
+  const [currentView, setCurrentView] = useState(getInitialViewFromURL);
   const [giftCardSubview, setGiftCardSubview] = useState("menu"); // "menu" | "buy" | "lookup" | "redeem"
   const [comboSubview, setComboSubview] = useState("menu"); // "menu" | "buy" | "lookup"
   const [lookupSelectedCode, setLookupSelectedCode] = useState(null);
