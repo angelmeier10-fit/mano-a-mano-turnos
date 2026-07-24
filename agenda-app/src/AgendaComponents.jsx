@@ -227,9 +227,14 @@ export function AgendaView({
         const dKey = i === 0 ? data.dateKey : dateKey(addDays(baseDate, 7 * i));
         const dup = appointments.find(a => a.status !== "cancelado" && a.dateKey === dKey && a.start === data.start);
         if (dup) { alert(`Ya existe un turno a las ${data.start} el ${dKey}. Se omitió esa semana.`); continue; }
-        const ref = await onCreateAppt({ status: "confirmado", ...data, dateKey: dKey, ...(clientId ? { clientId } : {}) });
-        if (data.comboId && ref?.id) {
-          redeemComboSession(data.comboId, ref.id).catch((e) => console.error("[saveAppt] redeemComboSession falló:", e));
+        try {
+          const ref = await onCreateAppt({ status: "confirmado", ...data, dateKey: dKey, ...(clientId ? { clientId } : {}) });
+          if (data.comboId && ref?.id) {
+            redeemComboSession(data.comboId, ref.id).catch((e) => console.error("[saveAppt] redeemComboSession falló:", e));
+          }
+        } catch (e) {
+          alert(e.message || "No se pudo guardar el turno.");
+          return;
         }
       }
     }

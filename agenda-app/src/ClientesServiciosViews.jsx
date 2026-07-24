@@ -440,8 +440,12 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   async function addClient(e) {
     e.preventDefault();
     if (!newName.trim()) return;
-    await onAddClient(newName.trim(), newPhone.trim());
-    setNewName(""); setNewPhone(""); setShowAddForm(false);
+    try {
+      await onAddClient(newName.trim(), newPhone.trim());
+      setNewName(""); setNewPhone(""); setShowAddForm(false);
+    } catch (err) {
+      window.alert(err.message || "No se pudo guardar el contacto.");
+    }
   }
 
   function startEditClient(client) {

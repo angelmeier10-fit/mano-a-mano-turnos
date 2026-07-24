@@ -30,7 +30,7 @@ export const db = getFirestore(app);
 export function listenServices(callback) {
   return onSnapshot(collection(db, "services"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
+  }, (err) => console.error("[listenServices] snapshot error:", err));
 }
 export async function addService(service) {
   return addDoc(collection(db, "services"), service);
@@ -46,7 +46,7 @@ export async function deleteService(id) {
 export function listenAvailability(callback) {
   return onSnapshot(collection(db, "availability"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
+  }, (err) => console.error("[listenAvailability] snapshot error:", err));
 }
 export async function addAvailabilitySlot(slot) {
   // slot: { dateKey, start, end }
@@ -434,7 +434,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
 export function listenAppointments(callback) {
   return onSnapshot(collection(db, "appointments"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
+  }, (err) => console.error("[listenAppointments] snapshot error:", err));
 }
 
 // Llama a onNew solo para turnos creados después de sessionStart (evita falsos positivos por cache/reconexión).
@@ -446,7 +446,7 @@ export function listenIncomingPendingAppointments(sessionStart, onNew) {
         if (a.status === "pendiente" && a.createdAt > sessionStart) onNew(a);
       }
     });
-  });
+  }, (err) => console.error("[listenIncomingPendingAppointments] snapshot error:", err));
 }
 export async function createAppointment(appt) {
   // appt: { dateKey, start, end, serviceId, clientName, clientPhone, notes, status, fromAvailabilityId? }
@@ -571,7 +571,7 @@ export async function deleteAppointment(id) {
 export function listenClients(callback) {
   return onSnapshot(collection(db, "clients"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
+  }, (err) => console.error("[listenClients] snapshot error:", err));
 }
 function normalizePhone(phone) {
   return (phone || "").replace(/[^\d]/g, "");
@@ -718,7 +718,7 @@ export function subscribeClientSessions(clientId, callback) {
   );
   return onSnapshot(q, snap => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
+  }, (err) => console.error("[subscribeClientSessions] snapshot error:", err));
 }
 
 export async function addClientSession(clientId, data) {
@@ -741,7 +741,7 @@ export async function deleteClientSession(clientId, sessionId) {
 export function listenBusinessInfo(callback) {
   return onSnapshot(doc(db, "businessInfo", "main"), (snap) => {
     callback(snap.exists() ? snap.data() : null);
-  });
+  }, (err) => console.error("[listenBusinessInfo] snapshot error:", err));
 }
 export async function setBusinessInfo(data) {
   return setDoc(doc(db, "businessInfo", "main"), data, { merge: true });
@@ -756,7 +756,8 @@ export async function createGiftCard(data) {
 export function listenGiftCards(callback) {
   return onSnapshot(
     query(collection(db, "giftCards"), orderBy("createdAt", "desc")),
-    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    (err) => console.error("[listenGiftCards] snapshot error:", err)
   );
 }
 
@@ -843,7 +844,8 @@ export async function activateCombo(comboId) {
 export function listenCombos(callback) {
   return onSnapshot(
     query(collection(db, "combos"), orderBy("createdAt", "desc")),
-    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    (err) => console.error("[listenCombos] snapshot error:", err)
   );
 }
 
