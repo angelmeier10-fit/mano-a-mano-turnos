@@ -237,7 +237,12 @@ export default function ReservarView({ services, availability, businessInfo, onB
         onBlur={async () => {
           if (!clientPhone.trim()) { setClientDiscount(null); setMyCombos([]); return; }
           setClientDiscount(await getClientDiscountPublic(clientPhone));
-          try { setMyCombos(await getCombosByPhone(clientPhone)); } catch { setMyCombos([]); }
+          try {
+            const combos = await getCombosByPhone(clientPhone);
+            setMyCombos(combos);
+            const usable = combos.find(c => c.status === "active" && c.sessionsRemaining > 0);
+            if (usable) { setServiceId(usable.serviceId); setUseCombo(true); }
+          } catch { setMyCombos([]); }
         }}
         placeholder="11 1234 5678"
       />
@@ -279,10 +284,18 @@ export default function ReservarView({ services, availability, businessInfo, onB
       )}
 
       {matchingCombo && !preselectedServiceId && (
-        <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0 16px", fontSize: 13, color: "#2A2622", cursor: "pointer" }}>
-          <input type="checkbox" checked={useCombo} onChange={e => setUseCombo(e.target.checked)} />
-          📦 Usar sesión de tu combo (te quedan {matchingCombo.sessionsRemaining}) — turno gratis
-        </label>
+        <div style={{ background: "#EBF3E6", border: "1.5px solid #6E7F5C", borderRadius: 10, padding: "10px 14px", margin: "4px 0 16px" }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: "#3D5430", marginBottom: 4 }}>
+            📦 Tenés un combo de {matchingCombo.serviceName}
+          </div>
+          <div style={{ fontSize: 12.5, color: "#4A5A40", marginBottom: 8 }}>
+            Te quedan {matchingCombo.sessionsRemaining} sesión{matchingCombo.sessionsRemaining !== 1 ? "es" : ""}.
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#2A2622", cursor: "pointer" }}>
+            <input type="checkbox" checked={useCombo} onChange={e => setUseCombo(e.target.checked)} />
+            Usar una sesión de este combo — turno gratis
+          </label>
+        </div>
       )}
 
       {availableDates.length === 0 ? (

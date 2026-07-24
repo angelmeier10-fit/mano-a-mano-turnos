@@ -8,26 +8,32 @@ export default function ComboView({ services, onBack, onGoReservar }) {
   const comboServices = services.filter(s => s.price2 > 0 || s.price3 > 0);
   const [serviceId, setServiceId] = useState(comboServices[0]?.id || "");
   const [sessions, setSessions] = useState(2);
+  const [isGift, setIsGift] = useState(false);
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
+  const [toName, setToName] = useState("");
+  const [toPhone, setToPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(null);
 
   const svc = comboServices.find(s => s.id === serviceId);
   const price = sessions === 3 ? (svc?.price3 || 0) : (svc?.price2 || 0);
+  const canSubmit = buyerName.trim() && buyerPhone.trim() && serviceId && price
+    && (!isGift || (toName.trim() && toPhone.trim()));
 
   async function handleGenerate() {
-    if (!buyerName.trim() || !buyerPhone.trim() || !serviceId || !price || loading) return;
+    if (!canSubmit || loading) return;
     setLoading(true);
     try {
       const data = {
-        clientName: buyerName.trim(),
-        clientPhone: buyerPhone.replace(/\D/g, ""),
+        clientName: isGift ? toName.trim() : buyerName.trim(),
+        clientPhone: (isGift ? toPhone : buyerPhone).replace(/\D/g, ""),
         serviceId,
         serviceName: svc?.name || "",
         totalSessions: Number(sessions),
         pricePaid: price,
         status: "pending",
+        ...(isGift ? { fromName: buyerName.trim(), buyerPhone: buyerPhone.replace(/\D/g, "") } : {}),
       };
       await createCombo(data);
       setDone(data);
@@ -45,6 +51,9 @@ export default function ComboView({ services, onBack, onGoReservar }) {
         <div style={{ background: "#fff", borderRadius: 12, padding: "16px 18px", marginBottom: 16, border: "1px solid #E8E0D4" }}>
           <div style={{ fontWeight: 700, fontSize: 15, color: "#2A2622", marginBottom: 4 }}>{done.serviceName} · x{done.totalSessions}</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#6E7F5C" }}>{formatPrice(done.pricePaid)}</div>
+          {done.fromName && (
+            <div style={{ fontSize: 12.5, color: "#8A8275", marginTop: 6 }}>Para {done.clientName} · de parte de {done.fromName}</div>
+          )}
         </div>
 
         <div style={{ background: "#F0F7EC", border: "1.5px solid #6E7F5C", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
@@ -59,17 +68,20 @@ export default function ComboView({ services, onBack, onGoReservar }) {
         <div style={{ background: "#FFF8EC", border: "1.5px solid #C9973A", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13.5, color: "#7A5C20", marginBottom: 4 }}>Esperando confirmación de pago</div>
           <div style={{ fontSize: 12.5, color: "#8A7040" }}>
-            Podés transferir ahora o pagar en efectivo en tu primera sesión — confirmo el pago de cualquiera de las dos formas.
-            Mientras tanto ya podés reservar tu turno con normalidad.
+            {done.fromName
+              ? "Podés transferir ahora o pagar en efectivo en la primera sesión — confirmo el pago de cualquiera de las dos formas. Una vez confirmado, el destinatario ya puede reservar buscando sus combos con su teléfono."
+              : "Podés transferir ahora o pagar en efectivo en tu primera sesión — confirmo el pago de cualquiera de las dos formas. Mientras tanto ya podés reservar tu turno con normalidad."}
           </div>
         </div>
 
-        <button
-          style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", marginBottom: 10 }}
-          onClick={onGoReservar}
-        >
-          Reservar mi turno
-        </button>
+        {!done.fromName && (
+          <button
+            style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", marginBottom: 10 }}
+            onClick={onGoReservar}
+          >
+            Reservar mi turno
+          </button>
+        )}
         <button style={{ ...styles.cancelBtn, width: "100%", justifyContent: "center" }} onClick={onBack}>
           Volver al inicio
         </button>
@@ -95,6 +107,35 @@ export default function ComboView({ services, onBack, onGoReservar }) {
           <p style={{ fontSize: 13, color: "#8A8275" }}>No hay combos disponibles por el momento.</p>
         ) : (
           <>
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              <button
+                type="button"
+                onClick={() => setIsGift(false)}
+                style={{
+                  flex: 1, padding: "10px 14px", borderRadius: 10, border: "2px solid",
+                  borderColor: !isGift ? "#6E7F5C" : "#D0C5B4",
+                  background: !isGift ? "#6E7F5C" : "#fff",
+                  color: !isGift ? "#fff" : "#2A2622",
+                  fontWeight: 600, fontSize: 13, cursor: "pointer",
+                }}
+              >
+                Para mí
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsGift(true)}
+                style={{
+                  flex: 1, padding: "10px 14px", borderRadius: 10, border: "2px solid",
+                  borderColor: isGift ? "#6E7F5C" : "#D0C5B4",
+                  background: isGift ? "#6E7F5C" : "#fff",
+                  color: isGift ? "#fff" : "#2A2622",
+                  fontWeight: 600, fontSize: 13, cursor: "pointer",
+                }}
+              >
+                🎁 Es un regalo
+              </button>
+            </div>
+
             <div style={styles.fieldRow}>
               <div style={{ flex: 1 }}>
                 <label style={styles.fieldLabel}>Tu nombre</label>
@@ -105,6 +146,24 @@ export default function ComboView({ services, onBack, onGoReservar }) {
                 <input style={styles.input} placeholder="Ej: 1134567890" type="tel" value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} />
               </div>
             </div>
+
+            {isGift && (
+              <div style={styles.fieldRow}>
+                <div style={{ flex: 1 }}>
+                  <label style={styles.fieldLabel}>Nombre del destinatario</label>
+                  <input style={styles.input} placeholder="A quién se lo regalás" value={toName} onChange={e => setToName(e.target.value)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={styles.fieldLabel}>Teléfono del destinatario</label>
+                  <input style={styles.input} placeholder="Ej: 1134567890" type="tel" value={toPhone} onChange={e => setToPhone(e.target.value)} />
+                </div>
+              </div>
+            )}
+            {isGift && (
+              <p style={{ fontSize: 12, color: "#8A8275", marginTop: -8, marginBottom: 20 }}>
+                El combo queda a nombre del destinatario: podrá verlo y usarlo desde "Ver mis combos" con su propio teléfono.
+              </p>
+            )}
 
             <label style={styles.fieldLabel}>Servicio</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
@@ -153,11 +212,11 @@ export default function ComboView({ services, onBack, onGoReservar }) {
             </div>
 
             <button
-              style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", opacity: (!buyerName.trim() || !buyerPhone.trim() || !price) ? 0.5 : 1 }}
+              style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", opacity: !canSubmit ? 0.5 : 1 }}
               onClick={handleGenerate}
-              disabled={!buyerName.trim() || !buyerPhone.trim() || !price || loading}
+              disabled={!canSubmit || loading}
             >
-              <Package size={16} /> {loading ? "Enviando…" : "Pedir combo"}
+              <Package size={16} /> {loading ? "Enviando…" : isGift ? "Regalar combo" : "Pedir combo"}
             </button>
           </>
         )}

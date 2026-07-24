@@ -1032,9 +1032,12 @@ export function CombosView({ combos, businessInfo }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
             {pending.map(c => (
               <div key={c.id} style={{ background: "#FFF8EC", border: "1.5px solid #C9973A", borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2A2622" }}>{c.clientName}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2A2622" }}>
+                  {c.clientName}{c.fromName ? ` 🎁 (regalo de ${c.fromName})` : ""}
+                </div>
                 <div style={{ fontSize: 12, color: "#6A6055", marginBottom: 8 }}>
                   {c.serviceName} · x{c.totalSessions} · {formatPrice(c.pricePaid)} · {c.clientPhone}
+                  {c.fromName && c.buyerPhone ? ` · pagó ${c.buyerPhone}` : ""}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
@@ -1071,7 +1074,9 @@ export function CombosView({ combos, businessInfo }) {
             return (
               <div key={c.id} style={{ background: "#E8E2D8", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2A2622" }}>{c.clientName}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2A2622" }}>
+                    {c.clientName}{c.fromName ? " 🎁" : ""}
+                  </div>
                   <div style={{ fontSize: 12, color: "#6A6055" }}>
                     {c.serviceName} · {c.sessionsRemaining}/{c.totalSessions} sesiones
                   </div>
