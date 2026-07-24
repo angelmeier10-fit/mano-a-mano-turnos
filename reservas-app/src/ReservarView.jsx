@@ -86,6 +86,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
       }
     }
 
+    const usingCombo = useCombo && !!matchingCombo;
     const end = minutesToTime(timeToMinutes(slot.start) + svc.duration);
     const appt = {
       dateKey: selectedDate,
@@ -97,11 +98,11 @@ export default function ReservarView({ services, availability, businessInfo, onB
       notes: "",
       status: "pendiente",
       fromAvailabilityId: slot.id,
-      price: svc?.price || 0,
-      discount: svcDiscountAmount,
+      price: usingCombo ? 0 : (svc?.price || 0),
+      discount: usingCombo ? 0 : svcDiscountAmount,
       ...(clientId ? { clientId } : {}),
       ...(giftCardCode ? { giftCardCode } : {}),
-      ...(useCombo && matchingCombo ? { comboId: matchingCombo.id } : {}),
+      ...(usingCombo ? { comboId: matchingCombo.id } : {}),
     };
     let result;
     try {

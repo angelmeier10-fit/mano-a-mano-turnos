@@ -1089,6 +1089,13 @@ export function CombosView({ combos, businessInfo }) {
                     <MessageCircle size={17} />
                   </a>
                 )}
+                <button
+                  style={styles.iconBtnGhost}
+                  onClick={() => { if (window.confirm("¿Eliminar este combo?")) deleteCombo(c.id); }}
+                  title="Eliminar combo"
+                >
+                  <Trash2 size={15} />
+                </button>
               </div>
             );
           })}

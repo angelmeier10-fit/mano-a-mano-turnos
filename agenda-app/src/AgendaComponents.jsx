@@ -77,8 +77,14 @@ export function AgendaView({
       else if (a.status === "confirmado") upcomingTotal += price;
       else if (a.status === "ausente") ausentCount++;
     });
+    combos.forEach(c => {
+      if (!c.activatedAt || c.status === "pending") return;
+      const activatedDate = new Date(c.activatedAt);
+      const activatedYm = `${activatedDate.getFullYear()}-${pad(activatedDate.getMonth()+1)}`;
+      if (activatedYm === ym) completedTotal += c.pricePaid || 0;
+    });
     return { completedTotal, upcomingTotal, completedCount, ausentCount };
-  }, [appointments, services]);
+  }, [appointments, services, combos]);
 
   const availabilityByDate = useMemo(() => {
     const map = {};
@@ -1029,6 +1035,12 @@ function ApptFormModal({ services, clients, combos = [], initial, prefill, onClo
             <input type="checkbox" checked={useCombo} onChange={e => setUseCombo(e.target.checked)} />
             📦 Usar combo (quedan {availableCombo.sessionsRemaining}, vence {new Date(availableCombo.expiresAt).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })})
           </label>
+        )}
+
+        {initial?.paidByCombo && (
+          <div style={{ background: "#EBF3E6", border: "1.5px solid #6E7F5C", borderRadius: 10, padding: "8px 12px", margin: "10px 0", fontSize: 13, fontWeight: 600, color: "#3D5430" }}>
+            📦 Este turno se paga con un combo de sesiones
+          </div>
         )}
 
         <label style={styles.fieldLabel}>Descuento / Recargo ($)</label>
