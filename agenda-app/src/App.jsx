@@ -180,7 +180,7 @@ export default function App() {
           />
         )}
         {view === "combos" && (
-          <CombosView combos={combos} businessInfo={businessInfo} />
+          <CombosView combos={combos} services={services} businessInfo={businessInfo} />
         )}
         {view === "servicios" && (
           <ServiciosView

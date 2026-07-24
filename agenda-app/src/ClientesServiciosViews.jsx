@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
-import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession, createCombo, deleteCombo, activateCombo } from "../../shared/firestoreApi";
+import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession, createCombo, deleteCombo, activateCombo, updateCombo } from "../../shared/firestoreApi";
 import { Package } from "lucide-react";
 import styles from "../../shared/styles";
 
@@ -980,9 +980,10 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
 // ====================================================================
 // COMBOS VIEW
 // ====================================================================
-export function CombosView({ combos, businessInfo }) {
+export function CombosView({ combos, services = [], businessInfo }) {
   const now = Date.now();
   const [confirming, setConfirming] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const pending = combos
     .filter(c => c.status === "pending")
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -1013,6 +1014,21 @@ export function CombosView({ combos, businessInfo }) {
     }
   }
 
+  async function handleDelete(c) {
+    const msg = c.status === "active" && c.activatedAt
+      ? "¿Cancelar y eliminar este combo? Si el pago ya estaba confirmado este mes, se descuenta de lo cobrado."
+      : "¿Eliminar este combo?";
+    if (!window.confirm(msg)) return;
+    setConfirming(c.id);
+    try {
+      await deleteCombo(c.id);
+    } catch (e) {
+      window.alert(e.message || "No se pudo eliminar el combo.");
+    } finally {
+      setConfirming(null);
+    }
+  }
+
   function waLinkFor(c) {
     const waPhone = formatPhoneForWhatsapp(c.clientPhone);
     if (!waPhone) return null;
@@ -1032,29 +1048,43 @@ export function CombosView({ combos, businessInfo }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
             {pending.map(c => (
               <div key={c.id} style={{ background: "#FFF8EC", border: "1.5px solid #C9973A", borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2A2622" }}>
-                  {c.clientName}{c.fromName ? ` 🎁 (regalo de ${c.fromName})` : ""}
-                </div>
-                <div style={{ fontSize: 12, color: "#6A6055", marginBottom: 8 }}>
-                  {c.serviceName} · x{c.totalSessions} · {formatPrice(c.pricePaid)} · {c.clientPhone}
-                  {c.fromName && c.buyerPhone ? ` · pagó ${c.buyerPhone}` : ""}
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    style={{ ...styles.saveBtn, padding: "6px 12px", fontSize: 12 }}
-                    onClick={() => handleActivate(c.id)}
-                    disabled={confirming === c.id}
-                  >
-                    <Check size={13} /> Confirmar pago
-                  </button>
-                  <button
-                    style={{ ...styles.cancelBtn, padding: "6px 12px", fontSize: 12 }}
-                    onClick={() => handleReject(c.id)}
-                    disabled={confirming === c.id}
-                  >
-                    Rechazar
-                  </button>
-                </div>
+                {editingId === c.id ? (
+                  <ComboEditForm combo={c} services={services} onClose={() => setEditingId(null)} />
+                ) : (
+                  <>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2A2622" }}>
+                      {c.clientName}{c.fromName ? ` 🎁 (regalo de ${c.fromName})` : ""}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6A6055", marginBottom: 8 }}>
+                      {c.serviceName} · x{c.totalSessions} · {formatPrice(c.pricePaid)} · {c.clientPhone}
+                      {c.fromName && c.buyerPhone ? ` · pagó ${c.buyerPhone}` : ""}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        style={{ ...styles.saveBtn, padding: "6px 12px", fontSize: 12 }}
+                        onClick={() => handleActivate(c.id)}
+                        disabled={confirming === c.id}
+                      >
+                        <Check size={13} /> Confirmar pago
+                      </button>
+                      <button
+                        type="button"
+                        style={{ ...styles.iconBtnGhost, padding: "6px 8px" }}
+                        onClick={() => setEditingId(c.id)}
+                        title="Editar combo"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        style={{ ...styles.cancelBtn, padding: "6px 12px", fontSize: 12 }}
+                        onClick={() => handleReject(c.id)}
+                        disabled={confirming === c.id}
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -1071,6 +1101,13 @@ export function CombosView({ combos, businessInfo }) {
             const daysLeft = Math.ceil((c.expiresAt - now) / (24 * 60 * 60 * 1000));
             const nearExpiry = expired || daysLeft <= 7;
             const waLink = waLinkFor(c);
+            if (editingId === c.id) {
+              return (
+                <div key={c.id} style={{ background: "#E8E2D8", borderRadius: 10, padding: "12px 14px" }}>
+                  <ComboEditForm combo={c} services={services} onClose={() => setEditingId(null)} />
+                </div>
+              );
+            }
             return (
               <div key={c.id} style={{ background: "#E8E2D8", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ flex: 1 }}>
@@ -1078,7 +1115,7 @@ export function CombosView({ combos, businessInfo }) {
                     {c.clientName}{c.fromName ? " 🎁" : ""}
                   </div>
                   <div style={{ fontSize: 12, color: "#6A6055" }}>
-                    {c.serviceName} · {c.sessionsRemaining}/{c.totalSessions} sesiones
+                    {c.serviceName} · {c.sessionsRemaining}/{c.totalSessions} sesiones · {formatPrice(c.pricePaid)}
                   </div>
                   <div style={{ fontSize: 11, color: nearExpiry ? "#A6483A" : "#8A7E70", fontWeight: nearExpiry ? 700 : 400, marginTop: 2 }}>
                     {expired ? "Vencido" : `Vence en ${daysLeft} día${daysLeft !== 1 ? "s" : ""}`}
@@ -1090,9 +1127,18 @@ export function CombosView({ combos, businessInfo }) {
                   </a>
                 )}
                 <button
+                  type="button"
                   style={styles.iconBtnGhost}
-                  onClick={() => { if (window.confirm("¿Eliminar este combo?")) deleteCombo(c.id); }}
-                  title="Eliminar combo"
+                  onClick={() => setEditingId(c.id)}
+                  title="Editar combo"
+                >
+                  <Pencil size={15} />
+                </button>
+                <button
+                  style={styles.iconBtnGhost}
+                  onClick={() => handleDelete(c)}
+                  disabled={confirming === c.id}
+                  title="Cancelar / eliminar combo"
                 >
                   <Trash2 size={15} />
                 </button>
@@ -1102,5 +1148,57 @@ export function CombosView({ combos, businessInfo }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ComboEditForm({ combo, services, onClose }) {
+  const [serviceId, setServiceId] = useState(combo.serviceId);
+  const [totalSessions, setTotalSessions] = useState(combo.totalSessions);
+  const [pricePaid, setPricePaid] = useState(combo.pricePaid);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const svc = services.find(s => s.id === serviceId);
+      const used = combo.totalSessions - combo.sessionsRemaining;
+      const newTotal = Number(totalSessions) || combo.totalSessions;
+      await updateCombo(combo.id, {
+        serviceId,
+        serviceName: svc?.name || combo.serviceName,
+        totalSessions: newTotal,
+        sessionsRemaining: Math.max(0, newTotal - used),
+        pricePaid: Number(pricePaid) || 0,
+      });
+      onClose();
+    } catch (e) {
+      window.alert(e.message || "No se pudo modificar el combo.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave}>
+      <label style={styles.fieldLabel}>Servicio</label>
+      <select style={styles.input} value={serviceId} onChange={e => setServiceId(e.target.value)}>
+        {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      <div style={styles.fieldRow}>
+        <div style={{ flex: 1 }}>
+          <label style={styles.fieldLabel}>Sesiones totales</label>
+          <input type="number" style={styles.input} min={1} value={totalSessions} onChange={e => setTotalSessions(e.target.value)} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={styles.fieldLabel}>Precio pagado ($)</label>
+          <input type="number" style={styles.input} min={0} step={500} value={pricePaid} onChange={e => setPricePaid(e.target.value)} />
+        </div>
+      </div>
+      <div style={styles.modalActions}>
+        <button type="button" style={styles.cancelBtn} onClick={onClose}>Cancelar</button>
+        <button type="submit" style={styles.saveBtn} disabled={saving}><Check size={16} /> Guardar</button>
+      </div>
+    </form>
   );
 }

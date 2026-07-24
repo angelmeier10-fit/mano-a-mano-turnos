@@ -841,6 +841,10 @@ export async function activateCombo(comboId) {
   });
 }
 
+export async function updateCombo(comboId, data) {
+  return updateDoc(doc(db, "combos", comboId), data);
+}
+
 export function listenCombos(callback) {
   return onSnapshot(
     query(collection(db, "combos"), orderBy("createdAt", "desc")),
