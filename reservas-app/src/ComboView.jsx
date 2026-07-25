@@ -4,11 +4,11 @@ import { formatPrice } from "../../shared/helpers";
 import { createCombo } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
-export default function ComboView({ services, onBack, onGoReservar }) {
+export default function ComboView({ services, onBack, onGoReservar, startAsGift = false }) {
   const comboServices = services.filter(s => s.price2 > 0 || s.price3 > 0);
   const [serviceId, setServiceId] = useState(comboServices[0]?.id || "");
   const [sessions, setSessions] = useState(2);
-  const [isGift, setIsGift] = useState(false);
+  const [isGift, setIsGift] = useState(startAsGift);
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
   const [toName, setToName] = useState("");

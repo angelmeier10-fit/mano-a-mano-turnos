@@ -31,12 +31,12 @@ function GoogleFontsLoader() {
   return null;
 }
 
-function GiftCardMenuView({ onBuy, onLookup }) {
+function GiftCardMenuView({ onBuy, onLookup, onBuyCombo }) {
   return (
     <div style={{ padding: "32px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, margin: "0 0 8px", textAlign: "center" }}>Gift Cards</h2>
       <p style={{ fontSize: 13, color: "#8A8275", textAlign: "center", margin: "0 0 16px" }}>
-        ¿Querés regalar una sesión o ya tenés una gift card?
+        ¿Querés regalar una sesión, un combo, o ya tenés una gift card?
       </p>
       <button
         style={{ background: "#B5654A", color: "#fff", border: "none", borderRadius: 12, padding: "18px 20px", fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
@@ -44,6 +44,13 @@ function GiftCardMenuView({ onBuy, onLookup }) {
       >
         🎁 Regalar una sesión
         <div style={{ fontSize: 12, fontWeight: 400, opacity: 0.85, marginTop: 4 }}>Comprá una gift card para alguien especial</div>
+      </button>
+      <button
+        style={{ background: "#6E7F5C", color: "#fff", border: "none", borderRadius: 12, padding: "18px 20px", fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
+        onClick={onBuyCombo}
+      >
+        📦 Regalar un combo de sesiones
+        <div style={{ fontSize: 12, fontWeight: 400, opacity: 0.85, marginTop: 4 }}>Varias sesiones a nombre de esa persona, a un precio más conveniente</div>
       </button>
       <button
         style={{ background: "#fff", color: "#2A2622", border: "2px solid #D0C5B4", borderRadius: 12, padding: "18px 20px", fontSize: 15, fontWeight: 700, cursor: "pointer", textAlign: "left" }}
@@ -107,6 +114,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState(getInitialViewFromURL);
   const [giftCardSubview, setGiftCardSubview] = useState("menu"); // "menu" | "buy" | "lookup" | "redeem"
   const [comboSubview, setComboSubview] = useState("menu"); // "menu" | "buy" | "lookup"
+  const [comboStartAsGift, setComboStartAsGift] = useState(false);
   const [lookupSelectedCode, setLookupSelectedCode] = useState(null);
   const [miturnoInitPhone, setMiturnoInitPhone] = useState("");
   const [quizPreselectedServiceId, setQuizPreselectedServiceId] = useState(null);
@@ -238,6 +246,7 @@ export default function App() {
           <GiftCardMenuView
             onBuy={() => setGiftCardSubview("buy")}
             onLookup={() => setGiftCardSubview("lookup")}
+            onBuyCombo={() => { setCurrentView("combo"); setComboSubview("buy"); setComboStartAsGift(true); }}
           />
         )}
         {currentView === "giftcard" && giftCardSubview === "buy" && (
@@ -265,13 +274,14 @@ export default function App() {
         )}
         {currentView === "combo" && comboSubview === "menu" && (
           <ComboMenuView
-            onBuy={() => setComboSubview("buy")}
+            onBuy={() => { setComboSubview("buy"); setComboStartAsGift(false); }}
             onLookup={() => setComboSubview("lookup")}
           />
         )}
         {currentView === "combo" && comboSubview === "buy" && (
           <ComboView
             services={services}
+            startAsGift={comboStartAsGift}
             onBack={() => setComboSubview("menu")}
             onGoReservar={() => setCurrentView("reservar")}
           />
