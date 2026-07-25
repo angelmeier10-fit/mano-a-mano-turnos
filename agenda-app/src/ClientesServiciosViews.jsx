@@ -296,6 +296,7 @@ function ComboSection({ client, services, combos }) {
       serviceName: svc?.name || "",
       totalSessions: Number(sessions),
       pricePaid: Number(price) || 0,
+      activatedAt: Date.now(),
     });
     setSelling(false);
   }
