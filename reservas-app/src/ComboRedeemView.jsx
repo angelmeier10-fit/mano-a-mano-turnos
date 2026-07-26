@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Download, Check, Gift } from "lucide-react";
-import { getGiftCard } from "../../shared/firestoreApi";
-import { formatPrice, formatDateLong, dateKey } from "../../shared/helpers";
+import { Download, Check, Package } from "lucide-react";
+import { getCombo } from "../../shared/firestoreApi";
+import { formatDateLong, dateKey } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import ReservarView from "./ReservarView";
 
 const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
-function GiftCardVisual({ gc, canvasRef }) {
+function ComboVisual({ combo, canvasRef }) {
   return (
     <div ref={canvasRef} style={{ ...styles.giftCardVisual, display: "flex", flexDirection: "column", padding: 0 }}>
       <div style={{ position: "relative", height: 110, overflow: "hidden", flexShrink: 0 }}>
@@ -29,18 +29,17 @@ function GiftCardVisual({ gc, canvasRef }) {
       <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #D4AF37 50%, #C9A84C 80%, transparent)", flexShrink: 0 }} />
       <div style={{ padding: "18px 22px 20px", flex: 1 }}>
         <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
-        <div style={styles.giftCardVisualService}>{gc.serviceName}</div>
-        <div style={styles.giftCardVisualTo}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
-        {gc.message && <div style={styles.giftCardVisualMessage}>"{gc.message}"</div>}
-        <div style={styles.giftCardVisualCode}>Código: {gc.code}</div>
-        <div style={styles.giftCardVisualLink}>{`${BASE_URL}?giftcard=${gc.code}`}</div>
+        <div style={styles.giftCardVisualService}>{combo.serviceName} · x{combo.totalSessions}</div>
+        <div style={styles.giftCardVisualTo}>Para <strong>{combo.clientName}</strong>{combo.fromName ? ` · de parte de ${combo.fromName}` : ""}</div>
+        <div style={styles.giftCardVisualCode}>Código: {combo.id}</div>
+        <div style={styles.giftCardVisualLink}>{`${BASE_URL}?combo=${combo.id}`}</div>
       </div>
     </div>
   );
 }
 
-export default function GiftCardRedeemView({ code, services, availability, businessInfo, onBookSlot, onUpsertClient }) {
-  const [gc, setGc] = useState(null);
+export default function ComboRedeemView({ comboId, services, availability, businessInfo, onBookSlot, onUpsertClient }) {
+  const [combo, setCombo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
@@ -48,12 +47,12 @@ export default function GiftCardRedeemView({ code, services, availability, busin
   const cardRef = useRef(null);
 
   useEffect(() => {
-    getGiftCard(code).then(data => {
+    getCombo(comboId).then(data => {
       if (!data) setNotFound(true);
-      else setGc(data);
+      else setCombo(data);
       setLoading(false);
     });
-  }, [code]);
+  }, [comboId]);
 
   async function handleDownload() {
     if (!cardRef.current || downloading) return;
@@ -62,7 +61,7 @@ export default function GiftCardRedeemView({ code, services, availability, busin
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true });
       const link = document.createElement("a");
-      link.download = `gift-card-mano-a-mano.png`;
+      link.download = `combo-mano-a-mano.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (e) {
@@ -83,33 +82,42 @@ export default function GiftCardRedeemView({ code, services, availability, busin
   if (notFound) {
     return (
       <div style={{ padding: 32, textAlign: "center" }}>
-        <div style={{ fontSize: 40, marginBottom: 16 }}>🎁</div>
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20 }}>Gift card no encontrada</h2>
-        <p style={{ color: "#8A8275", fontSize: 13 }}>El link puede ser incorrecto o la gift card fue eliminada.</p>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>📦</div>
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20 }}>Combo no encontrado</h2>
+        <p style={{ color: "#8A8275", fontSize: 13 }}>El link puede ser incorrecto o el combo fue eliminado.</p>
       </div>
     );
   }
 
   const today = dateKey(new Date());
-  const isExpired = gc.status === "active" && today > gc.expiresAt;
-  const isUsed = gc.status === "used";
-  const isPending = gc.status === "pending";
-  const isActive = gc.status === "active" && !isExpired;
+  const isExpired = combo.status === "active" && today > combo.expiresAt;
+  const isCompleted = combo.status === "completed";
+  const isPending = combo.status === "pending";
+  const isActive = combo.status === "active" && !isExpired;
 
   if (showBooking) {
-    // Importamos ReservarView dinámicamente para el canje
-    return <BookingForGiftCard gc={gc} services={services} availability={availability} businessInfo={businessInfo} onBookSlot={onBookSlot} onUpsertClient={onUpsertClient} onBack={() => setShowBooking(false)} />;
+    return (
+      <ReservarView
+        services={services}
+        availability={availability}
+        businessInfo={businessInfo}
+        onBookSlot={onBookSlot}
+        onUpsertClient={onUpsertClient}
+        preselectedServiceId={combo.serviceId}
+        onBack={() => setShowBooking(false)}
+      />
+    );
   }
 
   return (
     <div style={{ padding: "20px 16px 40px" }}>
       <div style={{ textAlign: "center", marginBottom: 20 }}>
-        <Gift size={28} color="#B5654A" />
-        <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, margin: "8px 0 4px" }}>Gift Card</h2>
+        <Package size={28} color="#B5654A" />
+        <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, margin: "8px 0 4px" }}>Combo de sesiones</h2>
         <p style={{ fontSize: 13, color: "#8A8275", margin: 0 }}>Angel Meier · Masoterapia</p>
       </div>
 
-      <GiftCardVisual gc={gc} canvasRef={cardRef} />
+      <ComboVisual combo={combo} canvasRef={cardRef} />
 
       <button
         onClick={handleDownload}
@@ -123,54 +131,38 @@ export default function GiftCardRedeemView({ code, services, availability, busin
         <div style={{ background: "#FFF8EC", border: "1.5px solid #C9973A", borderRadius: 12, padding: "16px", marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#7A5C20", marginBottom: 4 }}>Pendiente de activación</div>
           <div style={{ fontSize: 12.5, color: "#8A7040", lineHeight: 1.5 }}>
-            Esta gift card se activará en breve. Una vez activa vas a poder usarla para reservar.
+            Este combo se activará en breve. Una vez activo vas a poder usarlo para reservar tus sesiones.
           </div>
         </div>
       )}
 
       {isExpired && (
         <div style={{ background: "#FDF0EE", border: "1.5px solid #A6483A", borderRadius: 12, padding: "16px", marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#A6483A" }}>Gift card vencida</div>
-          <div style={{ fontSize: 12.5, color: "#8A4A40", marginTop: 4 }}>Esta gift card venció el {formatDateLong(gc.expiresAt)}.</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#A6483A" }}>Combo vencido</div>
+          <div style={{ fontSize: 12.5, color: "#8A4A40", marginTop: 4 }}>Este combo venció el {formatDateLong(combo.expiresAt)}.</div>
         </div>
       )}
 
-      {isUsed && (
+      {isCompleted && (
         <div style={{ background: "#F5F5F5", border: "1.5px solid #C0B8AE", borderRadius: 12, padding: "16px", marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#6E6555" }}>Gift card ya utilizada</div>
-          <div style={{ fontSize: 12.5, color: "#8A8275", marginTop: 4 }}>Esta gift card fue canjeada por un turno.</div>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#6E6555" }}>Combo ya utilizado</div>
+          <div style={{ fontSize: 12.5, color: "#8A8275", marginTop: 4 }}>Las {combo.totalSessions} sesiones de este combo ya fueron usadas.</div>
         </div>
       )}
 
       {isActive && (
         <div style={{ marginTop: 4 }}>
           <div style={{ background: "#EBF3E6", border: "1.5px solid #9AB88A", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 12.5, color: "#4A5A40" }}>
-            <strong>Gift card activa</strong> · Válida hasta el {formatDateLong(gc.expiresAt)}
+            <strong>Combo activo</strong> · {combo.sessionsRemaining}/{combo.totalSessions} sesiones disponibles · Válido hasta el {formatDateLong(combo.expiresAt)}
           </div>
           <button
             style={{ ...styles.saveBtn, width: "100%", justifyContent: "center" }}
             onClick={() => setShowBooking(true)}
           >
-            <Check size={16} /> Reservar turno con esta gift card
+            <Check size={16} /> Reservar turno con este combo
           </button>
         </div>
       )}
     </div>
-  );
-}
-
-// Sub-componente: flujo de reserva adaptado para gift card
-function BookingForGiftCard({ gc, services, availability, businessInfo, onBookSlot, onUpsertClient, onBack }) {
-  return (
-    <ReservarView
-      services={services}
-      availability={availability}
-      businessInfo={businessInfo}
-      onBookSlot={onBookSlot}
-      onUpsertClient={onUpsertClient}
-      giftCardCode={gc.code}
-      preselectedServiceId={gc.serviceId}
-      onBack={onBack}
-    />
   );
 }

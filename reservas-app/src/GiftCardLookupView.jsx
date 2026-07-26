@@ -7,7 +7,7 @@ import styles from "../../shared/styles";
 const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
 const STATUS_LABEL = {
-  pending: { label: "Esperando pago", color: "#C9973A", bg: "#FFF8EC" },
+  pending: { label: "Pendiente de activación", color: "#C9973A", bg: "#FFF8EC" },
   active:  { label: "Activa", color: "#6E7F5C", bg: "#EBF3E6" },
   used:    { label: "Utilizada", color: "#8A8275", bg: "#F5F5F5" },
 };

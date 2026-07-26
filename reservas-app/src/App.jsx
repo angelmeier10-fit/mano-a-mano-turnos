@@ -7,6 +7,7 @@ import GiftCardRedeemView from "./GiftCardRedeemView";
 import GiftCardLookupView from "./GiftCardLookupView";
 import ComboView from "./ComboView";
 import MisCombosView from "./MisCombosView";
+import ComboRedeemView from "./ComboRedeemView";
 import {
   listenServices,
   listenAvailability,
@@ -97,6 +98,15 @@ function getGiftCardCodeFromURL() {
   }
 }
 
+function getComboCodeFromURL() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("combo") || null;
+  } catch {
+    return null;
+  }
+}
+
 function getInitialViewFromURL() {
   try {
     const view = new URLSearchParams(window.location.search).get("view");
@@ -113,14 +123,16 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [currentView, setCurrentView] = useState(getInitialViewFromURL);
   const [giftCardSubview, setGiftCardSubview] = useState("menu"); // "menu" | "buy" | "lookup" | "redeem"
-  const [comboSubview, setComboSubview] = useState("menu"); // "menu" | "buy" | "lookup"
+  const [comboSubview, setComboSubview] = useState("menu"); // "menu" | "buy" | "lookup" | "redeem"
   const [comboStartAsGift, setComboStartAsGift] = useState(false);
   const [lookupSelectedCode, setLookupSelectedCode] = useState(null);
+  const [lookupSelectedComboId, setLookupSelectedComboId] = useState(null);
   const [miturnoInitPhone, setMiturnoInitPhone] = useState("");
   const [quizPreselectedServiceId, setQuizPreselectedServiceId] = useState(null);
 
-  // Si la URL tiene ?giftcard=CODE, mostramos la vista de canje directamente
+  // Si la URL tiene ?giftcard=CODE o ?combo=CODE, mostramos la vista de canje directamente
   const giftCardCode = getGiftCardCodeFromURL();
+  const comboCode = getComboCodeFromURL();
 
   useEffect(() => {
     const unsubServices = listenServices(setServices);
@@ -157,6 +169,37 @@ export default function App() {
         <main style={styles.main}>
           <GiftCardRedeemView
             code={giftCardCode}
+            services={services}
+            availability={availability}
+            businessInfo={businessInfo}
+            onBookSlot={bookSlotAtomic}
+            onUpsertClient={createClientPublic}
+          />
+        </main>
+      </div>
+    );
+  }
+
+  // Vista de canje de combo regalado (sin tabs, pantalla completa)
+  if (comboCode) {
+    return (
+      <div style={styles.app}>
+        <GoogleFontsLoader />
+        <header style={styles.header}>
+          <div style={styles.headerTop}>
+            <div style={styles.logoMark}>
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <path d="M4 14C4 8 8.5 4 14 4C19.5 4 24 8 24 14" stroke="#B5654A" strokeWidth="2.4" strokeLinecap="round"/>
+                <path d="M7 14C7 10 10 7.5 14 7.5C18 7.5 21 10 21 14" stroke="#EFE9DF" strokeWidth="2" strokeLinecap="round" opacity="0.55"/>
+                <circle cx="14" cy="19" r="2.6" fill="#B5654A"/>
+              </svg>
+            </div>
+            <h1 style={styles.brandName}>{businessInfo?.name || "Angel Meier Turnos"}</h1>
+          </div>
+        </header>
+        <main style={styles.main}>
+          <ComboRedeemView
+            comboId={comboCode}
             services={services}
             availability={availability}
             businessInfo={businessInfo}
@@ -287,7 +330,20 @@ export default function App() {
           />
         )}
         {currentView === "combo" && comboSubview === "lookup" && (
-          <MisCombosView onBack={() => setComboSubview("menu")} />
+          <MisCombosView
+            onBack={() => setComboSubview("menu")}
+            onSelectCombo={(id) => { setLookupSelectedComboId(id); setComboSubview("redeem"); }}
+          />
+        )}
+        {currentView === "combo" && comboSubview === "redeem" && lookupSelectedComboId && (
+          <ComboRedeemView
+            comboId={lookupSelectedComboId}
+            services={services}
+            availability={availability}
+            businessInfo={businessInfo}
+            onBookSlot={bookSlotAtomic}
+            onUpsertClient={createClientPublic}
+          />
         )}
         {currentView === "miturno" && (
           <MiTurnoView

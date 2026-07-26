@@ -35,6 +35,12 @@ export function minutesToTime(min) { return `${pad(Math.floor(min/60))}:${pad(mi
 export function addDays(d, n) { const nd = new Date(d); nd.setDate(nd.getDate()+n); return nd; }
 export function startOfWeek(d) { const nd = new Date(d); const day = nd.getDay(); return addDays(nd, -day); }
 export function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+export function generateCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let c = "";
+  for (let i = 0; i < 8; i++) c += chars[Math.floor(Math.random() * chars.length)];
+  return c.slice(0, 4) + "-" + c.slice(4);
+}
 export function formatPrice(n) { return (n || 0).toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }); }
 export function getAppointmentPrice(appt, service) {
   const basePrice = appt?.price ?? service?.price ?? 0;

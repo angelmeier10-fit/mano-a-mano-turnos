@@ -11,7 +11,7 @@ import { ANAMNESIS_FIELDS } from "./ClientesServiciosViews";
 import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession } from "../../shared/firestoreApi";
 
 export function AgendaView({
-  services, appointments, availability, clients, businessInfo, combos = [],
+  services, appointments, availability, clients, businessInfo, combos = [], giftCards = [],
   onCreateAppt, onUpdateAppt, onDeleteAppt,
   onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch, onFreeSlot,
   upsertClientByName, pendingGiftCards = 0, onGoGiftCards,
@@ -83,8 +83,14 @@ export function AgendaView({
       const activatedYm = `${activatedDate.getFullYear()}-${pad(activatedDate.getMonth()+1)}`;
       if (activatedYm === ym) completedTotal += c.pricePaid || 0;
     });
+    giftCards.forEach(g => {
+      if (!g.activatedAt || g.status === "pending") return;
+      const activatedDate = new Date(g.activatedAt);
+      const activatedYm = `${activatedDate.getFullYear()}-${pad(activatedDate.getMonth()+1)}`;
+      if (activatedYm === ym) completedTotal += g.servicePrice || 0;
+    });
     return { completedTotal, upcomingTotal, completedCount, ausentCount };
-  }, [appointments, services, combos]);
+  }, [appointments, services, combos, giftCards]);
 
   const availabilityByDate = useMemo(() => {
     const map = {};

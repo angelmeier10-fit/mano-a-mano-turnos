@@ -4,7 +4,9 @@ import { getCombosByPhone } from "../../shared/firestoreApi";
 import { formatDateLong, formatPrice } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
-export default function MisCombosView({ onBack }) {
+const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
+
+export default function MisCombosView({ onBack, onSelectCombo }) {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -26,7 +28,7 @@ export default function MisCombosView({ onBack }) {
   const now = Date.now();
 
   function statusFor(c) {
-    if (c.status === "pending") return { label: "Esperando confirmación de pago", color: "#C9973A", bg: "#FFF8EC" };
+    if (c.status === "pending") return { label: "Pendiente de activación", color: "#C9973A", bg: "#FFF8EC" };
     if (c.status === "completed") return { label: "Usado", color: "#8A8275", bg: "#F5F5F5" };
     if (c.expiresAt < now) return { label: "Vencido", color: "#A6483A", bg: "#F1D9D5" };
     return { label: "Activo", color: "#6E7F5C", bg: "#EBF3E6" };
@@ -78,17 +80,34 @@ export default function MisCombosView({ onBack }) {
               key={c.id}
               style={{ background: "#fff", border: "1px solid #E8E0D4", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#2A2622" }}>{c.serviceName}</div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: s.color, background: s.bg, borderRadius: 6, padding: "2px 8px" }}>{s.label}</span>
-              </div>
-              <div style={{ fontSize: 13, color: "#6E6555" }}>
-                {c.sessionsRemaining}/{c.totalSessions} sesiones · {formatPrice(c.pricePaid)}
-              </div>
-              {c.status === "active" && (
-                <div style={{ fontSize: 12, color: "#8A8275", marginTop: 4 }}>
-                  Vence {formatDateLong(new Date(c.expiresAt).toISOString().slice(0, 10))}
+              <div
+                onClick={() => onSelectCombo && onSelectCombo(c.id)}
+                style={{ cursor: onSelectCombo ? "pointer" : "default" }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#2A2622" }}>{c.serviceName}</div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: s.color, background: s.bg, borderRadius: 6, padding: "2px 8px" }}>{s.label}</span>
                 </div>
+                <div style={{ fontSize: 13, color: "#6E6555" }}>
+                  {c.sessionsRemaining}/{c.totalSessions} sesiones · {formatPrice(c.pricePaid)}
+                </div>
+                {c.status === "active" && (
+                  <div style={{ fontSize: 12, color: "#8A8275", marginTop: 4 }}>
+                    Vence {formatDateLong(new Date(c.expiresAt).toISOString().slice(0, 10))}
+                  </div>
+                )}
+              </div>
+              {c.fromName && (
+                <button
+                  style={{ ...styles.saveBtn, background: "#25D366", width: "100%", justifyContent: "center", marginTop: 10 }}
+                  onClick={() => {
+                    const link = `${BASE_URL}?combo=${c.id}`;
+                    const msg = `Hola ${c.clientName}! Te comparto tu combo de sesiones de Angel Meier Masoterapia 📦\nServicio: ${c.serviceName} · x${c.totalSessions}\nDe parte de: ${c.fromName}\n\nLink para verlo y usarlo:\n${link}`;
+                    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+                  }}
+                >
+                  Enviar por WhatsApp
+                </button>
               )}
             </div>
           );

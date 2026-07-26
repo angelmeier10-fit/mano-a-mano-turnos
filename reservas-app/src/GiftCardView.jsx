@@ -1,17 +1,10 @@
 import React, { useState } from "react";
 import { Gift, ChevronLeft, Copy } from "lucide-react";
-import { formatPrice, formatDateLong, dateKey, addDays } from "../../shared/helpers";
+import { formatPrice, formatDateLong, dateKey, addDays, generateCode } from "../../shared/helpers";
 import { createGiftCard } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
 const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
-
-function generateCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let c = "";
-  for (let i = 0; i < 8; i++) c += chars[Math.floor(Math.random() * chars.length)];
-  return c.slice(0, 4) + "-" + c.slice(4);
-}
 
 export default function GiftCardView({ services, businessInfo, onBack }) {
   const todayStr = dateKey(new Date());
@@ -102,6 +95,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
             <div style={styles.giftCardVisualTo}>Para {done.data.toName} · de parte de {done.data.fromName}</div>
             {done.data.message && <div style={styles.giftCardVisualMessage}>"{done.data.message}"</div>}
             <div style={styles.giftCardVisualCode}>Código: {done.code}</div>
+            <div style={styles.giftCardVisualLink}>{done.link}</div>
           </div>
         </div>
 

@@ -4,6 +4,8 @@ import { formatPrice } from "../../shared/helpers";
 import { createCombo } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
+const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
+
 export default function ComboView({ services, onBack, onGoReservar, startAsGift = false }) {
   const comboServices = services.filter(s => s.price2 > 0 || s.price3 > 0);
   const [serviceId, setServiceId] = useState(comboServices[0]?.id || "");
@@ -35,14 +37,19 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
         status: "pending",
         ...(isGift ? { fromName: buyerName.trim(), buyerPhone: buyerPhone.replace(/\D/g, "") } : {}),
       };
-      await createCombo(data);
-      setDone(data);
+      const ref = await createCombo(data);
+      setDone({ ...data, id: ref.id, link: isGift ? `${BASE_URL}?combo=${ref.id}` : null });
     } catch (e) {
       console.error(e);
       window.alert("Hubo un problema al generar el pedido. Intentá de nuevo.");
     } finally {
       setLoading(false);
     }
+  }
+
+  function shareWhatsApp() {
+    const msg = `Hola ${done.clientName}! Te comparto tu combo de sesiones de Angel Meier Masoterapia 📦\nServicio: ${done.serviceName} · x${done.totalSessions}\nDe parte de: ${done.fromName}\n\nLink para verlo y usarlo:\n${done.link}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   if (done) {
@@ -73,6 +80,21 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
               : "Podés transferir ahora o pagar en efectivo en tu primera sesión — confirmo el pago de cualquiera de las dos formas. Mientras tanto ya podés reservar tu turno con normalidad."}
           </div>
         </div>
+
+        {done.link && (
+          <>
+            <div style={{ background: "#fff", borderRadius: 12, padding: "14px 16px", marginBottom: 12, border: "1px solid #E8E0D4" }}>
+              <div style={{ fontSize: 12, color: "#8A8275", marginBottom: 6 }}>Link del combo (compartir con {done.clientName}):</div>
+              <div style={{ fontSize: 13, color: "#2A2622", wordBreak: "break-all", fontWeight: 500 }}>{done.link}</div>
+            </div>
+            <button
+              style={{ ...styles.saveBtn, width: "100%", justifyContent: "center", marginBottom: 10, background: "#25D366" }}
+              onClick={shareWhatsApp}
+            >
+              Enviar link por WhatsApp a {done.clientName}
+            </button>
+          </>
+        )}
 
         {!done.fromName && (
           <button

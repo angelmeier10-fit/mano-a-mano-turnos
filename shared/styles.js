@@ -559,6 +559,11 @@ const styles = {
     color: "#C9A84C", letterSpacing: "0.18em",
     borderTop: "1px solid rgba(201,168,76,0.3)", paddingTop: 12, marginTop: 8,
   },
+  giftCardVisualLink: {
+    fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: 10.5,
+    color: "rgba(239,233,223,0.75)", wordBreak: "break-all",
+    marginTop: 6,
+  },
   giftCardStatusBadge: {
     display: "inline-block", padding: "4px 10px", borderRadius: 20,
     fontSize: 11.5, fontWeight: 700, letterSpacing: "0.04em",

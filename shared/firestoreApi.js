@@ -22,9 +22,15 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { firebaseConfig } from "./firebaseConfig";
+import { timeToMinutes } from "./helpers";
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+// Dos rangos horarios se superponen si empiezan antes de que termine el otro.
+function rangesOverlap(aStart, aEnd, bStart, bEnd) {
+  return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(bStart) < timeToMinutes(aEnd);
+}
 
 // ---------- Servicios ----------
 export function listenServices(callback) {
@@ -50,6 +56,19 @@ export function listenAvailability(callback) {
 }
 export async function addAvailabilitySlot(slot) {
   // slot: { dateKey, start, end }
+  const apptSnap = await getDocs(query(collection(db, "appointments"), where("dateKey", "==", slot.dateKey)));
+  const overlapsAppt = apptSnap.docs.some(d => {
+    const data = d.data();
+    return data.status !== "cancelado" && rangesOverlap(slot.start, slot.end, data.start, data.end);
+  });
+  if (overlapsAppt) {
+    throw new Error(`Ese horario se superpone con un turno ya tomado el ${slot.dateKey}.`);
+  }
+  const slotSnap = await getDocs(query(collection(db, "availability"), where("dateKey", "==", slot.dateKey)));
+  const overlapsSlot = slotSnap.docs.some(d => rangesOverlap(slot.start, slot.end, d.data().start, d.data().end));
+  if (overlapsSlot) {
+    throw new Error(`Ya existe un cupo que se superpone con ese horario el ${slot.dateKey}.`);
+  }
   return addDoc(collection(db, "availability"), slot);
 }
 export async function removeAvailabilitySlot(id) {
@@ -121,18 +140,30 @@ export async function addAvailabilitySlotsBatch(slots) {
   // Obtener todas las dateKeys únicas involucradas
   const dateKeys = [...new Set(slots.map(s => s.dateKey))];
 
-  // Consultar cupos existentes para esas fechas (en lotes de 30 por límite de 'in')
-  const existing = new Set();
+  // Consultar cupos y turnos existentes para esas fechas (en lotes de 30 por límite de 'in')
+  const existingSlots = [];
+  const existingAppts = [];
   for (let i = 0; i < dateKeys.length; i += 30) {
     const chunk = dateKeys.slice(i, i + 30);
     const snap = await getDocs(query(collection(db, "availability"), where("dateKey", "in", chunk)));
-    snap.forEach(d => {
-      const { dateKey, start, end } = d.data();
-      existing.add(`${dateKey}|${start}|${end}`);
+    snap.forEach(d => existingSlots.push(d.data()));
+    const apptSnap = await getDocs(query(collection(db, "appointments"), where("dateKey", "in", chunk)));
+    apptSnap.forEach(d => {
+      const data = d.data();
+      if (data.status !== "cancelado") existingAppts.push(data);
     });
   }
 
-  const newSlots = slots.filter(s => !existing.has(`${s.dateKey}|${s.start}|${s.end}`));
+  // Se descartan los cupos que se superpondrían con un cupo ya existente, con un turno
+  // ya tomado, o con otro cupo nuevo del mismo lote (evita horarios duplicados/solapados).
+  const accepted = [];
+  const newSlots = slots.filter(s => {
+    if (existingSlots.some(e => e.dateKey === s.dateKey && rangesOverlap(s.start, s.end, e.start, e.end))) return false;
+    if (existingAppts.some(a => a.dateKey === s.dateKey && rangesOverlap(s.start, s.end, a.start, a.end))) return false;
+    if (accepted.some(a => a.dateKey === s.dateKey && rangesOverlap(s.start, s.end, a.start, a.end))) return false;
+    accepted.push(s);
+    return true;
+  });
   if (newSlots.length === 0) return;
 
   const chunks = [];
@@ -189,6 +220,14 @@ export async function bookSlotAtomic(appt) {
   };
 
   if (!slotId) {
+    const apptSnap = await getDocs(query(collection(db, "appointments"), where("dateKey", "==", appt.dateKey)));
+    const overlapping = apptSnap.docs.some(d => {
+      const data = d.data();
+      return data.status !== "cancelado" && rangesOverlap(appt.start, appt.end, data.start, data.end);
+    });
+    if (overlapping) {
+      throw new Error("Este horario ya fue reservado. Por favor elegí otro.");
+    }
     const ref = await addDoc(collection(db, "appointments"), apptData);
     if (giftCardCode) await redeemGiftCard(giftCardCode, ref.id);
     if (comboId) await redeemComboSession(comboId, ref.id);
@@ -448,16 +487,38 @@ export function listenIncomingPendingAppointments(sessionStart, onNew) {
     });
   }, (err) => console.error("[listenIncomingPendingAppointments] snapshot error:", err));
 }
+export function listenIncomingPendingGiftCards(sessionStart, onNew) {
+  return onSnapshot(collection(db, "giftCards"), (snap) => {
+    snap.docChanges().forEach(change => {
+      if (change.type === "added") {
+        const gc = { id: change.doc.id, ...change.doc.data() };
+        if (gc.status === "pending" && gc.createdAt > sessionStart) onNew(gc);
+      }
+    });
+  }, (err) => console.error("[listenIncomingPendingGiftCards] snapshot error:", err));
+}
+export function listenIncomingPendingCombos(sessionStart, onNew) {
+  return onSnapshot(collection(db, "combos"), (snap) => {
+    snap.docChanges().forEach(change => {
+      if (change.type === "added") {
+        const c = { id: change.doc.id, ...change.doc.data() };
+        if (c.status === "pending" && c.createdAt > sessionStart) onNew(c);
+      }
+    });
+  }, (err) => console.error("[listenIncomingPendingCombos] snapshot error:", err));
+}
 export async function createAppointment(appt) {
   // appt: { dateKey, start, end, serviceId, clientName, clientPhone, notes, status, fromAvailabilityId? }
   const dupCheck = await getDocs(query(
     collection(db, "appointments"),
     where("dateKey", "==", appt.dateKey),
-    where("start", "==", appt.start),
   ));
-  const activeCount = dupCheck.docs.filter(d => d.data().status !== "cancelado").length;
-  if (activeCount > 0) {
-    throw new Error(`Ya existe un turno a las ${appt.start} el ${appt.dateKey}.`);
+  const overlapping = dupCheck.docs.some(d => {
+    const data = d.data();
+    return data.status !== "cancelado" && rangesOverlap(appt.start, appt.end, data.start, data.end);
+  });
+  if (overlapping) {
+    throw new Error(`Ya existe un turno que se superpone con ${appt.start}-${appt.end} el ${appt.dateKey}.`);
   }
 
   let slotId = appt.fromAvailabilityId || null;
@@ -531,11 +592,14 @@ export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityI
   const dupCheck = await getDocs(query(
     collection(db, "appointments"),
     where("dateKey", "==", newData.dateKey),
-    where("start", "==", newData.start),
   ));
-  const activeDup = dupCheck.docs.find(d => d.id !== apptId && d.data().status !== "cancelado");
+  const activeDup = dupCheck.docs.find(d => {
+    if (d.id === apptId) return false;
+    const data = d.data();
+    return data.status !== "cancelado" && rangesOverlap(newData.start, newData.end, data.start, data.end);
+  });
   if (activeDup) {
-    throw new Error(`Ya existe un turno a las ${newData.start} el ${newData.dateKey}.`);
+    throw new Error(`Ya existe un turno que se superpone con ${newData.start}-${newData.end} el ${newData.dateKey}.`);
   }
 
   const slotQuery = query(
@@ -851,6 +915,11 @@ export function listenCombos(callback) {
     (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
     (err) => console.error("[listenCombos] snapshot error:", err)
   );
+}
+
+export async function getCombo(comboId) {
+  const snap = await getDoc(doc(db, "combos", comboId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 export async function getCombosByPhone(phone) {

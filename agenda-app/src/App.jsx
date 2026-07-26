@@ -13,6 +13,7 @@ import {
   listenClients, upsertClientByName, updateClient, deleteClient,
   listenBusinessInfo, setBusinessInfo, freeAvailabilitySlot,
   listenGiftCards, listenCombos,
+  listenIncomingPendingGiftCards, listenIncomingPendingCombos,
 } from "../../shared/firestoreApi";
 import { DEFAULT_SERVICES, DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
 import styles from "../../shared/styles";
@@ -44,6 +45,7 @@ export default function App() {
   const [giftCards, setGiftCards] = useState([]);
   const [combos, setCombos] = useState([]);
   const [apptNotifs, setApptNotifs] = useState([]); // [{ id, clientName, dateKey, start }]
+  const [purchaseNotifs, setPurchaseNotifs] = useState([]); // [{ id, kind: "giftcard"|"combo", label }]
   const [openApptId, setOpenApptId] = useState(null);
 
   useEffect(() => {
@@ -85,8 +87,27 @@ export default function App() {
     });
     const unsubGiftCards = listenGiftCards(setGiftCards);
     const unsubCombos = listenCombos(setCombos);
+    const unsubIncomingGiftCards = listenIncomingPendingGiftCards(sessionStart, (gc) => {
+      setPurchaseNotifs(prev => [...prev, { id: gc.id, kind: "giftcard", label: `Gift card: ${gc.toName} · ${gc.serviceName}` }]);
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Nueva gift card comprada", {
+          body: `Para ${gc.toName} · ${gc.serviceName}`,
+          icon: "/mano-a-mano-agenda/favicon.ico",
+        });
+      }
+    });
+    const unsubIncomingCombos = listenIncomingPendingCombos(sessionStart, (c) => {
+      setPurchaseNotifs(prev => [...prev, { id: c.id, kind: "combo", label: `Combo: ${c.clientName} · ${c.serviceName} x${c.totalSessions}` }]);
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Nuevo combo comprado", {
+          body: `${c.clientName} · ${c.serviceName} x${c.totalSessions}`,
+          icon: "/mano-a-mano-agenda/favicon.ico",
+        });
+      }
+    });
     return () => {
       unsubServices(); unsubAppts(); unsubIncoming(); unsubClients(); unsubAvail(); unsubBiz(); unsubGiftCards(); unsubCombos();
+      unsubIncomingGiftCards(); unsubIncomingCombos();
     };
   }, [user]);
 
@@ -142,6 +163,19 @@ export default function App() {
             <span style={{ fontSize: 20, lineHeight: 1, opacity: 0.8 }}>×</span>
           </div>
         ))}
+        {purchaseNotifs.map(n => (
+          <div
+            key={n.id}
+            onClick={() => {
+              setPurchaseNotifs(prev => prev.filter(x => x.id !== n.id));
+              setView(n.kind === "giftcard" ? "giftcards" : "combos");
+            }}
+            style={{ background: "#6E7F5C", color: "#fff", padding: "12px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.2)" }}
+          >
+            <span style={{ fontSize: 13.5, fontWeight: 600 }}>{n.label}</span>
+            <span style={{ fontSize: 20, lineHeight: 1, opacity: 0.8 }}>×</span>
+          </div>
+        ))}
       </div>
       <main style={styles.main}>
         {view === "agenda" && (
@@ -152,6 +186,7 @@ export default function App() {
             clients={clients}
             businessInfo={businessInfo}
             combos={combos}
+            giftCards={giftCards}
             onCreateAppt={createAppointment}
             onUpdateAppt={updateAppointment}
             onDeleteAppt={deleteAppointment}
