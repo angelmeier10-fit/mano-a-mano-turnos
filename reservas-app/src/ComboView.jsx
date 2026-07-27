@@ -186,7 +186,7 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
               </div>
             )}
             {isGift && (
-              <p style={{ fontSize: 12, color: "#8A8275", marginTop: -8, marginBottom: 20 }}>
+              <p style={{ fontSize: 12, color: "#8A8275", marginTop: 4, marginBottom: 20 }}>
                 El combo queda a nombre del destinatario: podrá verlo y usarlo desde "Ver mis combos" con su propio teléfono.
               </p>
             )}

@@ -114,6 +114,22 @@ export default function App() {
     };
   }, [user]);
 
+  // Una vez que la gift card o el combo dejan de estar pendientes (se activaron o se
+  // eliminaron), la notificación correspondiente se borra sola.
+  useEffect(() => {
+    setPurchaseNotifs(prev => prev.filter(n => {
+      if (n.kind === "giftcard") {
+        const gc = giftCards.find(g => g.id === n.id);
+        return !!gc && gc.status === "pending";
+      }
+      if (n.kind === "combo") {
+        const c = combos.find(x => x.id === n.id);
+        return !!c && c.status === "pending";
+      }
+      return true;
+    }));
+  }, [giftCards, combos]);
+
   // Primera vez: si no hay servicios cargados en Firestore, precargamos los por defecto.
   // Espera a que el propio listener de servicios haya emitido su primer snapshot
   // (servicesLoaded), no solo a dataLoaded (que depende del listener de businessInfo y
