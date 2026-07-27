@@ -151,7 +151,7 @@ export default function App() {
     <div style={styles.app}>
       <GoogleFontsLoader />
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-        <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
+        <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "pending" || (c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000)).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
         {notifPermission === "default" && (
           <div
             onClick={handleEnableNotifications}
