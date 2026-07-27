@@ -736,10 +736,20 @@ export async function createClientPublic(name, phone) {
     return null;
   }
 }
+// Al editar nombre/teléfono de un cliente, propaga el cambio a todo lo que lo referencia
+// (turnos y combos desnormalizados, descuento VIP y phoneIndex indexados por teléfono).
 export async function updateClient(id, data) {
+  const snap = await getDoc(doc(db, "clients", id));
+  const current = snap.data() || {};
+  const oldPhoneDigits = current.phoneDigits || "";
+
+  const updates = { ...data };
+  const phoneChanged = "phone" in data && normalizePhone(data.phone) !== oldPhoneDigits;
+  const newPhoneDigits = phoneChanged ? normalizePhone(data.phone) : oldPhoneDigits;
+  if (phoneChanged) updates.phoneDigits = newPhoneDigits;
+
   if ("discounts" in data) {
-    const snap = await getDoc(doc(db, "clients", id));
-    const phoneDigits = data.phoneDigits ?? snap.data()?.phoneDigits;
+    const phoneDigits = updates.phoneDigits ?? oldPhoneDigits;
     if (phoneDigits) {
       if (data.discounts && Object.keys(data.discounts).length) {
         await setDoc(doc(db, "clientDiscounts", phoneDigits), data.discounts);
@@ -748,7 +758,55 @@ export async function updateClient(id, data) {
       }
     }
   }
-  return updateDoc(doc(db, "clients", id), data);
+
+  if (phoneChanged && oldPhoneDigits && newPhoneDigits) {
+    try {
+      const oldDiscountSnap = await getDoc(doc(db, "clientDiscounts", oldPhoneDigits));
+      if (oldDiscountSnap.exists() && !("discounts" in data)) {
+        await setDoc(doc(db, "clientDiscounts", newPhoneDigits), oldDiscountSnap.data());
+      }
+      if (oldDiscountSnap.exists()) {
+        await deleteDoc(doc(db, "clientDiscounts", oldPhoneDigits));
+      }
+    } catch (err) {
+      console.error("[updateClient] No se pudo migrar clientDiscounts:", err);
+    }
+    try {
+      await setDoc(doc(db, "phoneIndex", newPhoneDigits), { clientId: id });
+      await deleteDoc(doc(db, "phoneIndex", oldPhoneDigits));
+    } catch (err) {
+      console.error("[updateClient] No se pudo migrar phoneIndex:", err);
+    }
+  } else if (phoneChanged && newPhoneDigits) {
+    try {
+      await setDoc(doc(db, "phoneIndex", newPhoneDigits), { clientId: id });
+    } catch (err) {
+      console.error("[updateClient] No se pudo crear phoneIndex:", err);
+    }
+  }
+
+  await updateDoc(doc(db, "clients", id), updates);
+
+  const nameChanged = "name" in data && data.name !== current.name;
+  if (nameChanged || phoneChanged) {
+    const denormalized = {};
+    if (nameChanged) denormalized.clientName = data.name;
+    if (phoneChanged) denormalized.clientPhone = data.phone;
+
+    for (const collectionName of ["appointments", "combos"]) {
+      try {
+        const relatedSnap = await getDocs(
+          query(collection(db, collectionName), where("clientId", "==", id))
+        );
+        if (relatedSnap.empty) continue;
+        const batch = writeBatch(db);
+        relatedSnap.docs.forEach(d => batch.update(d.ref, denormalized));
+        await batch.commit();
+      } catch (err) {
+        console.error(`[updateClient] No se pudo propagar a ${collectionName}:`, err);
+      }
+    }
+  }
 }
 
 // Lectura pública de solo consulta (sin crear nada): usada por reservas-app para
