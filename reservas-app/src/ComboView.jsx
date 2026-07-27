@@ -15,6 +15,7 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
   const [buyerPhone, setBuyerPhone] = useState("");
   const [toName, setToName] = useState("");
   const [toPhone, setToPhone] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(null);
 
@@ -35,7 +36,7 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
         totalSessions: Number(sessions),
         pricePaid: price,
         status: "pending",
-        ...(isGift ? { fromName: buyerName.trim(), buyerPhone: buyerPhone.replace(/\D/g, "") } : {}),
+        ...(isGift ? { fromName: buyerName.trim(), buyerPhone: buyerPhone.replace(/\D/g, ""), message: message.trim() } : {}),
       };
       const ref = await createCombo(data);
       setDone({ ...data, id: ref.id, link: isGift ? `${BASE_URL}?combo=${ref.id}` : null });
@@ -48,7 +49,7 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
   }
 
   function shareWhatsApp() {
-    const msg = `Hola ${done.clientName}! Te comparto tu combo de sesiones de Angel Meier Masoterapia 📦\nServicio: ${done.serviceName} · x${done.totalSessions}\nDe parte de: ${done.fromName}\n\nLink para verlo y usarlo:\n${done.link}`;
+    const msg = `Hola ${done.clientName}! Te comparto tu combo de sesiones de Angel Meier Masoterapia 📦\nServicio: ${done.serviceName} · x${done.totalSessions}\nDe parte de: ${done.fromName}${done.message ? `\n"${done.message}"` : ""}\n\nLink para verlo y usarlo:\n${done.link}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
@@ -59,7 +60,10 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
           <div style={{ fontWeight: 700, fontSize: 15, color: "#2A2622", marginBottom: 4 }}>{done.serviceName} · x{done.totalSessions}</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#6E7F5C" }}>{formatPrice(done.pricePaid)}</div>
           {done.fromName && (
-            <div style={{ fontSize: 12.5, color: "#8A8275", marginTop: 6 }}>Para {done.clientName} · de parte de {done.fromName}</div>
+            <>
+              <div style={{ fontSize: 12.5, color: "#8A8275", marginTop: 6 }}>De: {done.fromName} · Para: {done.clientName}</div>
+              {done.message && <div style={{ fontSize: 12.5, color: "#8A8275", marginTop: 4, fontStyle: "italic" }}>"{done.message}"</div>}
+            </>
           )}
         </div>
 
@@ -185,6 +189,19 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
               <p style={{ fontSize: 12, color: "#8A8275", marginTop: -8, marginBottom: 20 }}>
                 El combo queda a nombre del destinatario: podrá verlo y usarlo desde "Ver mis combos" con su propio teléfono.
               </p>
+            )}
+
+            {isGift && (
+              <>
+                <label style={styles.fieldLabel}>Mensaje (opcional)</label>
+                <textarea
+                  style={{ ...styles.input, minHeight: 72, resize: "vertical", lineHeight: 1.5 }}
+                  placeholder="Un mensaje especial..."
+                  value={message}
+                  onChange={e => setMessage(e.target.value)}
+                  maxLength={200}
+                />
+              </>
             )}
 
             <label style={styles.fieldLabel}>Servicio</label>

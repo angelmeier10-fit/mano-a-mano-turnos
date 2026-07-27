@@ -56,13 +56,16 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Pedir permiso de notificaciones al loguear
-  useEffect(() => {
-    if (!user) return;
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, [user]);
+  // El permiso de notificaciones solo se puede pedir con un gesto del usuario
+  // (los navegadores ignoran/bloquean el pedido si se dispara solo al cargar la página).
+  const [notifPermission, setNotifPermission] = useState(
+    "Notification" in window ? Notification.permission : "unsupported"
+  );
+
+  function handleEnableNotifications() {
+    if (!("Notification" in window)) return;
+    Notification.requestPermission().then(setNotifPermission);
+  }
 
   // Suscripciones en tiempo real a Firestore, solo cuando hay sesión iniciada
   useEffect(() => {
@@ -149,6 +152,15 @@ export default function App() {
       <GoogleFontsLoader />
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
+        {notifPermission === "default" && (
+          <div
+            onClick={handleEnableNotifications}
+            style={{ background: "#2A2622", color: "#fff", padding: "10px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.2)" }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 600 }}>🔔 Activar notificaciones de turnos y compras nuevas</span>
+            <span style={{ fontSize: 12, opacity: 0.8 }}>Tocar para activar</span>
+          </div>
+        )}
         {apptNotifs.map(n => (
           <div
             key={n.id}

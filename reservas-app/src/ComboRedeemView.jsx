@@ -31,6 +31,7 @@ function ComboVisual({ combo, canvasRef }) {
         <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
         <div style={styles.giftCardVisualService}>{combo.serviceName} · x{combo.totalSessions}</div>
         <div style={styles.giftCardVisualTo}>Para <strong>{combo.clientName}</strong>{combo.fromName ? ` · de parte de ${combo.fromName}` : ""}</div>
+        {combo.message && <div style={styles.giftCardVisualMessage}>"{combo.message}"</div>}
         <div style={styles.giftCardVisualCode}>Código: {combo.id}</div>
         <div style={styles.giftCardVisualLink}>{`${BASE_URL}?combo=${combo.id}`}</div>
       </div>

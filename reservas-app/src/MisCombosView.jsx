@@ -102,7 +102,7 @@ export default function MisCombosView({ onBack, onSelectCombo }) {
                   style={{ ...styles.saveBtn, background: "#25D366", width: "100%", justifyContent: "center", marginTop: 10 }}
                   onClick={() => {
                     const link = `${BASE_URL}?combo=${c.id}`;
-                    const msg = `Hola ${c.clientName}! Te comparto tu combo de sesiones de Angel Meier Masoterapia 📦\nServicio: ${c.serviceName} · x${c.totalSessions}\nDe parte de: ${c.fromName}\n\nLink para verlo y usarlo:\n${link}`;
+                    const msg = `Hola ${c.clientName}! Te comparto tu combo de sesiones de Angel Meier Masoterapia 📦\nServicio: ${c.serviceName} · x${c.totalSessions}\nDe parte de: ${c.fromName}${c.message ? `\n"${c.message}"` : ""}\n\nLink para verlo y usarlo:\n${link}`;
                     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
                   }}
                 >
