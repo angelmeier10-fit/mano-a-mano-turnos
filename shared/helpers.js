@@ -124,6 +124,26 @@ export function getRecurringDateKeysByRange(weekdays, fromDate, toDate) {
 export function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 export function addMonths(d, n) { return new Date(d.getFullYear(), d.getMonth() + n, 1); }
 
+export function clientHistory(client, appointments) {
+  return appointments
+    .filter(a =>
+      (a.clientId && a.clientId === client.id) ||
+      (!a.clientId && a.clientName.trim().toLowerCase() === client.name.trim().toLowerCase())
+    )
+    .sort((a, b) => (b.dateKey + b.start).localeCompare(a.dateKey + a.start));
+}
+
+export function clientStats(client, appointments, services) {
+  const hist = clientHistory(client, appointments);
+  const completed = hist.filter(a => a.status === "completado");
+  const totalSpent = completed.reduce((sum, a) => {
+    const svc = services.find(s => s.id === a.serviceId);
+    return sum + getAppointmentPrice(a, svc);
+  }, 0);
+  const ausencias = hist.filter(a => a.status === "ausente").length;
+  return { sessions: hist.length, completed: completed.length, totalSpent, ausencias, isNew: hist.length <= 1 };
+}
+
 export function getMonthGrid(d) {
   const first = startOfMonth(d);
   const gridStart = addDays(first, -first.getDay());

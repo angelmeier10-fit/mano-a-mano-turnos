@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
-import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong } from "../../shared/helpers";
+import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp, X } from "lucide-react";
+import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong, clientHistory, clientStats } from "../../shared/helpers";
 import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession, createCombo, deleteCombo, activateCombo, updateCombo } from "../../shared/firestoreApi";
 import { Package } from "lucide-react";
 import styles from "../../shared/styles";
@@ -390,25 +390,6 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
       .finally(() => setMovementsLoading(false));
   }, [selected?.id]);
 
-  function clientHistory(client) {
-    return appointments
-      .filter(a =>
-        (a.clientId && a.clientId === client.id) ||
-        (!a.clientId && a.clientName.trim().toLowerCase() === client.name.trim().toLowerCase())
-      )
-      .sort((a,b) => (b.dateKey+b.start).localeCompare(a.dateKey+a.start));
-  }
-  function clientStats(client) {
-    const hist = clientHistory(client);
-    const completed = hist.filter(a => a.status === "completado");
-    const totalSpent = completed.reduce((sum, a) => {
-      const svc = services.find(s => s.id === a.serviceId);
-      return sum + getAppointmentPrice(a, svc);
-    }, 0);
-    const ausencias = hist.filter(a => a.status === "ausente").length;
-    return { sessions: hist.length, completed: completed.length, totalSpent, ausencias, isNew: hist.length <= 1 };
-  }
-
   const searchDigits = search.replace(/[^\d]/g, "");
   const filtered = clients
     .filter(c => {
@@ -506,8 +487,8 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   }
 
   if (selected) {
-    const history = clientHistory(selected);
-    const stats = clientStats(selected);
+    const history = clientHistory(selected, appointments);
+    const stats = clientStats(selected, appointments, services);
     const waLink = formatPhoneForWhatsapp(selected.phone) ? `https://wa.me/${formatPhoneForWhatsapp(selected.phone)}` : null;
     return (
       <div style={styles.viewWrap}>
@@ -744,7 +725,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
       ) : (
         <div style={styles.clientList}>
           {filtered.map(c => {
-            const stats = clientStats(c);
+            const stats = clientStats(c, appointments, services);
             return (
               <button key={c.id} style={styles.clientRow} onClick={() => setSelected(c)}>
                 <div style={styles.clientAvatarSm}><User size={16} color="#EFE9DF" /></div>
@@ -761,6 +742,88 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ====================================================================
+// VISTA RÁPIDA DE CLIENTE (desde el modal de turno)
+// ====================================================================
+export function ClientQuickViewModal({ client, appointments, services, onClose }) {
+  const history = clientHistory(client, appointments);
+  const stats = clientStats(client, appointments, services);
+  const waLink = formatPhoneForWhatsapp(client.phone) ? `https://wa.me/${formatPhoneForWhatsapp(client.phone)}` : null;
+
+  return (
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div style={styles.modal} onClick={e => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h3 style={styles.modalTitle}>Ficha del cliente</h3>
+          <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div style={styles.clientDetailHeader}>
+          <div style={styles.clientAvatar}><User size={20} color="#EFE9DF" /></div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h2 style={styles.clientDetailName}>{client.name}</h2>
+              {stats.isNew && <span style={styles.newBadge}><Star size={10} /> Nuevo</span>}
+            </div>
+            {client.phone && <p style={styles.clientDetailPhone}>{client.phone}</p>}
+          </div>
+          {waLink && (
+            <a href={waLink} target="_blank" rel="noopener noreferrer" style={styles.waIconBtn}>
+              <MessageCircle size={17} />
+            </a>
+          )}
+        </div>
+
+        <div style={styles.clientStatsGrid}>
+          <div style={styles.clientStatBox}>
+            <div style={styles.clientStatValue}>{stats.completed}</div>
+            <div style={styles.clientStatLabel}>Sesiones</div>
+          </div>
+          <div style={styles.clientStatBox}>
+            <div style={styles.clientStatValue}>{formatPrice(stats.totalSpent)}</div>
+            <div style={styles.clientStatLabel}>Total gastado</div>
+          </div>
+          <div style={styles.clientStatBox}>
+            <div style={{ ...styles.clientStatValue, color: stats.ausencias > 0 ? "#A6483A" : "#2A2622" }}>{stats.ausencias}</div>
+            <div style={styles.clientStatLabel}>Inasistencias</div>
+          </div>
+        </div>
+
+        {client.notes && (
+          <>
+            <label style={styles.fieldLabel}>Notas clínicas</label>
+            <p style={{ ...styles.emptyMsg, color: "#2A2622", whiteSpace: "pre-wrap" }}>{client.notes}</p>
+          </>
+        )}
+
+        <label style={styles.fieldLabel}>Historial de sesiones ({history.length})</label>
+        {history.length === 0 ? (
+          <p style={styles.emptyMsg}>Sin sesiones registradas todavía.</p>
+        ) : (
+          <div style={styles.historyList}>
+            {history.map(h => {
+              const svc = services.find(s => s.id === h.serviceId);
+              return (
+                <div key={h.id} style={styles.historyItem}>
+                  <div style={{ width: 4, borderRadius: 2, background: svc?.color || "#B5654A", alignSelf: "stretch" }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={styles.historyDate}>
+                      {new Date(h.dateKey + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })}
+                      {" · "}{h.start}–{h.end}
+                    </div>
+                    <div style={styles.historyService}>{svc?.name}{svc?.price ? ` · ${formatPrice(getAppointmentPrice(h, svc))}` : ""}</div>
+                  </div>
+                  <span style={{ ...styles.historyStatusTag, color: STATUS[h.status]?.color }}>{STATUS[h.status]?.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

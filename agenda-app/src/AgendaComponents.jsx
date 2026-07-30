@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp, Contact } from "lucide-react";
+import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp, Contact, User } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
@@ -7,7 +7,7 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
-import { ANAMNESIS_FIELDS } from "./ClientesServiciosViews";
+import { ANAMNESIS_FIELDS, ClientQuickViewModal } from "./ClientesServiciosViews";
 import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession } from "../../shared/firestoreApi";
 
 export function AgendaView({
@@ -499,6 +499,7 @@ export function AgendaView({
           key={editingAppt ? `edit-${editingAppt.id}` : `new-${prefillSlot?.dateKey}-${prefillSlot?.clientName || ""}`}
           services={services}
           clients={clients}
+          appointments={appointments}
           combos={combos}
           businessInfo={businessInfo}
           initial={editingAppt}
@@ -841,7 +842,7 @@ function TurnoAnamnesisSection({ client }) {
   );
 }
 
-function ApptFormModal({ services, clients, combos = [], initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo }) {
+function ApptFormModal({ services, clients, appointments = [], combos = [], initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo }) {
   const base = initial || {
     dateKey: prefill?.dateKey || dateKey(new Date()),
     start: prefill?.start || "10:00",
@@ -859,6 +860,7 @@ function ApptFormModal({ services, clients, combos = [], initial, prefill, onClo
   const [discount, setDiscount] = useState(base.discount || 0);
   const [useCombo, setUseCombo] = useState(!!base.comboId);
   const [showClientList, setShowClientList] = useState(false);
+  const [showClientQuickView, setShowClientQuickView] = useState(false);
   const [showDateCalendar, setShowDateCalendar] = useState(false);
   const [repeatWeeks, setRepeatWeeks] = useState(1);
   const fromAvailabilityId = initial?.fromAvailabilityId || prefill?.fromAvailabilityId || null;
@@ -956,11 +958,18 @@ function ApptFormModal({ services, clients, combos = [], initial, prefill, onClo
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <label style={styles.fieldLabel}>Cliente</label>
-          {supportsContactPicker && (
-            <button type="button" style={styles.iconBtn} onClick={pickContact} title="Elegir de contactos">
-              <Contact size={18} />
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 4 }}>
+            {matchedClient && (
+              <button type="button" style={styles.iconBtn} onClick={() => setShowClientQuickView(true)} title="Ver ficha del cliente">
+                <User size={18} />
+              </button>
+            )}
+            {supportsContactPicker && (
+              <button type="button" style={styles.iconBtn} onClick={pickContact} title="Elegir de contactos">
+                <Contact size={18} />
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ position: "relative" }}>
           <input
@@ -1125,6 +1134,16 @@ function ApptFormModal({ services, clients, combos = [], initial, prefill, onClo
           </button>
         </div>
       </form>
+      {showClientQuickView && matchedClient && (
+        <div onClick={e => e.stopPropagation()}>
+          <ClientQuickViewModal
+            client={matchedClient}
+            appointments={appointments}
+            services={services}
+            onClose={() => setShowClientQuickView(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
