@@ -189,7 +189,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   function exportAppointmentsCsv() {
     const sorted = [...appointments].sort((a, b) => (a.dateKey + a.start).localeCompare(b.dateKey + b.start));
     const rows = [
-      ["Fecha", "Hora inicio", "Hora fin", "Cliente", "Teléfono", "Servicio", "Precio", "Descuento", "Total cobrado", "Estado", "Notas"],
+      ["Fecha", "Hora inicio", "Hora fin", "Cliente", "Teléfono", "Servicio", "Precio", "Descuento", "Total cobrado", "Estado", "Notas", "Origen"],
       ...sorted.map(a => {
         const svc = services.find(s => s.id === a.serviceId);
         return [
@@ -204,6 +204,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
           getAppointmentPrice(a, svc),
           STATUS[a.status]?.label || a.status,
           a.notes || "",
+          a.source || "",
         ];
       }),
     ];

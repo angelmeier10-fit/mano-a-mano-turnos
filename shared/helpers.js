@@ -121,6 +121,31 @@ export function getRecurringDateKeysByRange(weekdays, fromDate, toDate) {
   return result;
 }
 
+const SOURCE_KEY = "mam_source";
+
+export function captureTrafficSource() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const utmSource = params.get("utm_source");
+    const fbclid = params.get("fbclid");
+    if (!utmSource && !fbclid) return;
+    const source = fbclid ? "meta_ads" : utmSource;
+    sessionStorage.setItem(SOURCE_KEY, source);
+  } catch {}
+}
+
+export function getTrafficSource() {
+  try { return sessionStorage.getItem(SOURCE_KEY) || ""; } catch { return ""; }
+}
+
+export const HOW_FOUND_OPTIONS = [
+  { id: "instagram_facebook", label: "Instagram / Facebook" },
+  { id: "google", label: "Google" },
+  { id: "recomendacion", label: "Recomendación de alguien" },
+  { id: "ya_cliente", label: "Ya soy cliente" },
+  { id: "otro", label: "Otro" },
+];
+
 export function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 export function addMonths(d, n) { return new Date(d.getFullYear(), d.getMonth() + n, 1); }
 

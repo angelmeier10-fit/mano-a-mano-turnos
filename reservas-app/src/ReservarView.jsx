@@ -3,7 +3,7 @@ import { Calendar, Clock, Check, MessageCircle, CalendarDays, List } from "lucid
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
-  applyClientDiscount,
+  applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS,
 } from "../../shared/helpers";
 import { getClientDiscountPublic, getCombosByPhone } from "../../shared/firestoreApi";
 import { MiniCalendar } from "../../shared/MiniCalendar";
@@ -51,6 +51,8 @@ export default function ReservarView({ services, availability, businessInfo, onB
   const [dateViewMode, setDateViewMode] = useState("list");
   const [phoneError, setPhoneError] = useState("");
   const [selectedSlot, setSelectedSlot] = useState(null);
+  const [howFound, setHowFound] = useState("");
+  const trafficSource = useMemo(() => getTrafficSource(), []);
 
   useEffect(() => {
     if (!selectedDate && availableDates.length > 0) setSelectedDate(availableDates[0]);
@@ -103,6 +105,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
       ...(clientId ? { clientId } : {}),
       ...(giftCardCode ? { giftCardCode } : {}),
       ...(usingCombo ? { comboId: matchingCombo.id } : {}),
+      source: trafficSource || howFound || "",
     };
     let result;
     try {
@@ -115,6 +118,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
     }
     const confirmedAppt = { ...appt, apptId: result.apptId, cancelToken: result.cancelToken };
     saveBookingToLocalStorage(result.apptId, result.cancelToken, appt, svc?.name || "");
+    if (typeof window.fbq === "function") window.fbq("track", "Schedule");
     if (businessInfo?.whatsapp) {
       const msg = `Hola! Reservé un turno de ${svc.name} para el ${formatDateLong(selectedDate)} a las ${slot.start}. Mi nombre es ${clientName.trim()}.`;
       window.open(`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}?text=${encodeURIComponent(msg)}`, "_blank");
@@ -248,6 +252,18 @@ export default function ReservarView({ services, availability, businessInfo, onB
         placeholder="11 1234 5678"
       />
       {phoneError && <p style={{ color: "#c0392b", fontSize: 13, marginTop: 4, marginBottom: 0 }}>{phoneError}</p>}
+
+      {!trafficSource && (
+        <>
+          <label style={styles.fieldLabel}>¿Cómo nos conociste?</label>
+          <select style={styles.input} value={howFound} onChange={e => setHowFound(e.target.value)}>
+            <option value="">Preferí no decir</option>
+            {HOW_FOUND_OPTIONS.map(o => (
+              <option key={o.id} value={o.id}>{o.label}</option>
+            ))}
+          </select>
+        </>
+      )}
 
       <label style={styles.fieldLabel}>Tipo de masaje</label>
       {preselectedServiceId ? (
