@@ -137,13 +137,13 @@ export default function App() {
   // todavía no llegó el primer snapshot real).
   useEffect(() => {
     if (!user || !dataLoaded || !servicesLoaded || seededServicesRef.current) return;
-    if (services.length === 0) {
-      seededServicesRef.current = true;
-      DEFAULT_SERVICES.forEach(s => {
-        const { id, ...rest } = s;
-        addService(rest);
-      });
-    }
+    seededServicesRef.current = true;
+    const existingNames = new Set(services.map(s => s.name));
+    DEFAULT_SERVICES.forEach(s => {
+      if (existingNames.has(s.name)) return;
+      const { id, ...rest } = s;
+      addService(rest);
+    });
   }, [user, dataLoaded, servicesLoaded, services.length]);
 
   if (!authChecked) {
