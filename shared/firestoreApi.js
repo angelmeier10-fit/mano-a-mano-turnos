@@ -41,6 +41,12 @@ export function listenServices(callback) {
 export async function addService(service) {
   return addDoc(collection(db, "services"), service);
 }
+// Usa un id fijo (en vez de uno autogenerado) para que sembrar los servicios
+// por defecto sea idempotente: si dos pestañas/dispositivos lo disparan a la
+// vez, ambos escriben el mismo documento en lugar de crear duplicados.
+export async function setServiceWithId(id, service) {
+  return setDoc(doc(db, "services", id), service, { merge: true });
+}
 export async function updateService(id, data) {
   return updateDoc(doc(db, "services", id), data);
 }

@@ -7,7 +7,7 @@ import { ClientesView, ServiciosView, CombosView } from "./ClientesServiciosView
 import NegocioView from "./NegocioView";
 import GiftCardsView from "./GiftCardsView";
 import {
-  listenServices, addService, updateService, deleteService,
+  listenServices, addService, setServiceWithId, updateService, deleteService,
   listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
   listenAppointments, listenIncomingPendingAppointments, createAppointment, updateAppointment, deleteAppointment,
   listenClients, upsertClientByName, updateClient, deleteClient,
@@ -138,11 +138,14 @@ export default function App() {
   useEffect(() => {
     if (!user || !dataLoaded || !servicesLoaded || seededServicesRef.current) return;
     seededServicesRef.current = true;
+    // Se escribe con el id fijo de DEFAULT_SERVICES (en vez de un id autogenerado)
+    // para que sembrar sea idempotente: si dos pestañas/dispositivos disparan esto
+    // a la vez, ambos terminan escribiendo el mismo documento en vez de duplicarlo.
     const existingNames = new Set(services.map(s => s.name));
     DEFAULT_SERVICES.forEach(s => {
       if (existingNames.has(s.name)) return;
       const { id, ...rest } = s;
-      addService(rest);
+      setServiceWithId(id, rest);
     });
   }, [user, dataLoaded, servicesLoaded, services.length]);
 
