@@ -125,7 +125,7 @@ export default function MiTurnoView({
       return;
     }
     const requiresToken = selected.requiresCancelToken !== false;
-    const token = localTokens[selected.id]?.cancelToken || null;
+    const token = selected.cancelToken || localTokens[selected.id]?.cancelToken || null;
     if (requiresToken && !token) return;
     setWorking(true);
     setWorkError(null);
@@ -169,7 +169,7 @@ export default function MiTurnoView({
       return;
     }
     const requiresToken = selected.requiresCancelToken !== false;
-    const token = localTokens[selected.id]?.cancelToken || null;
+    const token = selected.cancelToken || localTokens[selected.id]?.cancelToken || null;
     if (requiresToken && !token) return;
     setWorking(true);
     setWorkError(null);
@@ -391,7 +391,7 @@ export default function MiTurnoView({
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {bookings.map(b => {
               const svc = services.find(s => s.id === b.serviceId);
-              const hasLocalToken = !!localTokens[b.id]?.cancelToken;
+              const hasLocalToken = !!(b.cancelToken || localTokens[b.id]?.cancelToken);
               const isManual = b.requiresCancelToken === false;
               const canModify = (hasLocalToken || isManual) && isMoreThan24hAway(b.dateKey, b.start);
               const tooClose = (hasLocalToken || isManual) && !isMoreThan24hAway(b.dateKey, b.start);

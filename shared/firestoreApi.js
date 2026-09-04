@@ -270,6 +270,7 @@ export async function bookSlotAtomic(appt) {
         clientId: appt.clientId || null,
         status: apptData.status || "confirmado",
         requiresCancelToken: true,
+        cancelToken,
       });
     } catch (e) {
       console.error("[phoneIndex/bookings] No se pudo guardar la referencia:", e);
@@ -280,7 +281,8 @@ export async function bookSlotAtomic(appt) {
 }
 
 // Devuelve las referencias de reservas del cliente a partir de su teléfono.
-// No contiene cancelToken; ese vive solo en localStorage del cliente.
+// Incluye cancelToken (si la reserva lo tiene) para poder cancelar/reprogramar
+// desde cualquier dispositivo con solo conocer el teléfono.
 export async function getMyBookingRefs(phone) {
   const phoneDigits = normalizePhone(phone);
   if (!phoneDigits) return [];
@@ -456,6 +458,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
         clientId: newAppt.clientId || null,
         status: "confirmado",
         requiresCancelToken: true,
+        cancelToken: newCancelToken,
       });
     } catch {}
   }
