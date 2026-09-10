@@ -124,9 +124,7 @@ export default function MiTurnoView({
       setWorkError("Ya no es posible cancelar: faltan menos de 24 hs para el turno. Escribime por WhatsApp.");
       return;
     }
-    const requiresToken = selected.requiresCancelToken !== false;
     const token = selected.cancelToken || localTokens[selected.id]?.cancelToken || null;
-    if (requiresToken && !token) return;
     setWorking(true);
     setWorkError(null);
     try {
@@ -141,7 +139,7 @@ export default function MiTurnoView({
         serviceId: selected.serviceId || null,
         serviceName: svc?.name || "",
       };
-      await onCancelAppointment(selected.id, token, selected.fromAvailabilityId, phone, historyData);
+      await onCancelAppointment(selected.id, token, selected.fromAvailabilityId, phone, historyData, selected._phoneVariant);
       removeFromLocalStorage(selected.id);
       setDoneMsg("Tu turno fue cancelado. El cupo quedó libre para que otro cliente pueda reservarlo.");
       setStep("done");
@@ -189,6 +187,7 @@ export default function MiTurnoView({
       const result = await onReschedule({
         oldApptId: selected.id,
         oldCancelToken: token,
+        oldPhoneVariant: selected._phoneVariant,
         oldSlotId: selected.fromAvailabilityId || null,
         newAppt: {
           dateKey: reschedDate,

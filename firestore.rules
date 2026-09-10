@@ -45,6 +45,9 @@ service cloud.firestore {
       // Solo se permite cambiar status y cancelProof, y únicamente si el turno está activo.
       // - Reserva pública (tiene cancelToken): exige cancelProof correcto como prueba de identidad.
       // - Turno manual sin cancelToken (cargado por el profesional): se permite sin prueba adicional.
+      // - También se permite si cancelProof es el teléfono con el que el cliente encontró
+      //   el turno (existe phoneIndex/{cancelProof}/bookings/{apptId}): cubre turnos viejos
+      //   o desincronizados donde el cancelToken guardado no coincide.
       allow update: if !isSignedIn()
                     && (resource.data.status == "confirmado" || resource.data.status == "pendiente")
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelProof'])
@@ -52,6 +55,9 @@ service cloud.firestore {
                          (resource.data.get('cancelToken', null) != null
                           && request.resource.data.cancelProof == resource.data.cancelToken)
                          || resource.data.get('cancelToken', null) == null
+                         || (request.resource.data.cancelProof is string
+                             && request.resource.data.cancelProof.size() > 0
+                             && exists(/databases/$(database)/documents/phoneIndex/$(request.resource.data.cancelProof)/bookings/$(apptId)))
                        );
     }
 

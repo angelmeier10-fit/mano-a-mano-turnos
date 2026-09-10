@@ -293,11 +293,11 @@ export async function getMyBookingRefs(phone) {
     );
     const seen = new Set();
     const results = [];
-    for (const snap of snaps) {
+    snaps.forEach((snap, i) => {
       for (const d of snap.docs) {
-        if (!seen.has(d.id)) { seen.add(d.id); results.push({ id: d.id, ...d.data() }); }
+        if (!seen.has(d.id)) { seen.add(d.id); results.push({ id: d.id, ...d.data(), _phoneVariant: variants[i] }); }
       }
-    }
+    });
     return results;
   } catch (e) {
     console.error("[phoneIndex/bookings] No se pudo leer las reservas:", e);
@@ -334,14 +334,19 @@ export async function getAppointmentHistory(clientId) {
 // que recibió al reservar (se envía como cancelProof para que Firestore lo valide).
 // historyData es opcional: { clientId, clientPhone, clientName, originalDateKey,
 //   originalStart, originalEnd, serviceId, serviceName }
-export async function cancelAppointmentPublic(apptId, cancelToken, availabilitySlotId, phone, historyData) {
+export async function cancelAppointmentPublic(apptId, cancelToken, availabilitySlotId, phone, historyData, phoneVariant) {
   const apptSnap = await getDoc(doc(db, "appointments", apptId));
   const giftCardCode = apptSnap.exists() ? apptSnap.data().giftCardCode : null;
   const comboId = apptSnap.exists() ? apptSnap.data().comboId : null;
 
+  // Priorizamos el teléfono con el que el cliente encontró el turno como prueba
+  // (Firestore valida que phoneIndex/{proof}/bookings/{apptId} exista): es más
+  // confiable que el cancelToken, que puede desincronizarse entre colecciones.
+  const cancelProof = phoneVariant || normalizePhone(phone) || cancelToken || null;
+
   await updateDoc(doc(db, "appointments", apptId), {
     status: "cancelado",
-    cancelProof: cancelToken,
+    cancelProof,
   });
   if (availabilitySlotId) {
     try {
@@ -388,9 +393,12 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
 // Devuelve { apptId, cancelToken } del nuevo turno.
 // historyData es opcional: { clientId, clientPhone, clientName, originalDateKey,
 //   originalStart, originalEnd, serviceId, serviceName }
-export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, oldSlotId, newAppt, phone, historyData }) {
+export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, oldSlotId, newAppt, phone, historyData, oldPhoneVariant }) {
   const newCancelToken = generateCancelToken();
   const oldApptRef = doc(db, "appointments", oldApptId);
+  // Igual que en cancelAppointmentPublic: priorizamos el teléfono como prueba,
+  // más confiable que el cancelToken.
+  const oldCancelProof = oldPhoneVariant || normalizePhone(phone) || oldCancelToken || null;
 
   const oldApptSnap = await getDoc(oldApptRef);
   const giftCardCode = oldApptSnap.exists() ? oldApptSnap.data().giftCardCode : null;
@@ -407,7 +415,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
     // No incluimos el cupo viejo en la transacción: su regla exige booked:true,
     // y si ya estuviera en false (estado inconsistente) haría fallar toda la transacción.
     // Se libera best-effort después de que lo crítico ya se confirmó.
-    t.update(oldApptRef, { status: "cancelado", cancelProof: oldCancelToken });
+    t.update(oldApptRef, { status: "cancelado", cancelProof: oldCancelProof });
     t.update(newSlotRef, { booked: true });
     t.set(newApptRef, {
       ...newAppt,
