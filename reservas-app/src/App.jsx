@@ -21,6 +21,51 @@ import {
 import { DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
+function isInAppBrowser() {
+  const ua = navigator.userAgent || "";
+  return /Instagram|FBAN|FBAV/i.test(ua);
+}
+
+function InAppBrowserBanner() {
+  const [show, setShow] = useState(() => isInAppBrowser());
+  if (!show) return null;
+
+  const isAndroid = /Android/i.test(navigator.userAgent || "");
+
+  function openInBrowser() {
+    if (isAndroid) {
+      const target = window.location.href.replace(/^https?:\/\//, "");
+      window.location.href = `intent://${target}#Intent;scheme=https;package=com.android.chrome;end;`;
+    }
+  }
+
+  return (
+    <div style={{ background: "#2A2622", color: "#fff", padding: "10px 16px", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+      <span>
+        Para que todo funcione bien, abrí este link en tu navegador
+        {isAndroid ? "." : ' (tocá "•••" arriba a la derecha y elegí "Abrir en el navegador").'}
+      </span>
+      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+        {isAndroid && (
+          <button
+            onClick={openInBrowser}
+            style={{ background: "#B5654A", color: "#fff", border: "none", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            Abrir
+          </button>
+        )}
+        <button
+          onClick={() => setShow(false)}
+          style={{ background: "none", border: "none", color: "#C9C2B4", fontSize: 16, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function GoogleFontsLoader() {
   useEffect(() => {
     const link = document.createElement("link");
@@ -154,6 +199,7 @@ export default function App() {
     return (
       <div style={styles.app}>
         <GoogleFontsLoader />
+        <InAppBrowserBanner />
         <header style={styles.header}>
           <div style={styles.headerTop}>
             <div style={styles.logoMark}>
@@ -185,6 +231,7 @@ export default function App() {
     return (
       <div style={styles.app}>
         <GoogleFontsLoader />
+        <InAppBrowserBanner />
         <header style={styles.header}>
           <div style={styles.headerTop}>
             <div style={styles.logoMark}>
@@ -224,6 +271,7 @@ export default function App() {
   return (
     <div style={styles.app}>
       <GoogleFontsLoader />
+      <InAppBrowserBanner />
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.logoMark}>
