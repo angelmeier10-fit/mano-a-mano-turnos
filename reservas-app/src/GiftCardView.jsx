@@ -210,7 +210,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
 
         <label style={styles.fieldLabel}>Mensaje (opcional)</label>
         <textarea
-          style={{ ...styles.input, minHeight: 72, resize: "vertical", lineHeight: 1.5 }}
+          style={{ ...styles.input, minHeight: 72, resize: "vertical", lineHeight: 1.5, fontSize: 16 }}
           placeholder="Un mensaje especial..."
           value={message}
           onChange={e => setMessage(e.target.value)}
