@@ -60,6 +60,22 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  function handleMessageFocus(e) {
+    const el = e.target;
+    const vv = window.visualViewport;
+    if (!vv) {
+      setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+      return;
+    }
+    const scrollIfCovered = () => {
+      const rect = el.getBoundingClientRect();
+      const overlap = rect.bottom - vv.height;
+      if (overlap > 0) window.scrollBy({ top: overlap + 20, behavior: "smooth" });
+    };
+    vv.addEventListener("resize", scrollIfCovered, { once: true });
+    setTimeout(scrollIfCovered, 400);
+  }
+
   function shareWhatsApp() {
     const msg = `Hola ${done.data.toName}! Te comparto tu gift card de Angel Meier Masoterapia 🎁\nServicio: ${done.data.serviceName}\nDe parte de: ${done.data.fromName}${done.data.message ? `\n"${done.data.message}"` : ""}\n\nLink para usarla:\n${done.link}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
@@ -198,7 +214,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
           placeholder="Un mensaje especial..."
           value={message}
           onChange={e => setMessage(e.target.value)}
-          onFocus={e => setTimeout(() => e.target.scrollIntoView({ behavior: "smooth", block: "center" }), 300)}
+          onFocus={handleMessageFocus}
           maxLength={200}
         />
 
