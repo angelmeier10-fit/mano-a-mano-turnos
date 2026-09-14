@@ -153,16 +153,11 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
           Elegí el servicio, completá los datos y generamos una gift card con un link único.
         </p>
 
-        <div style={styles.fieldRow}>
-          <div style={{ flex: 1 }}>
-            <label style={styles.fieldLabel}>Tu nombre</label>
-            <input style={styles.input} placeholder="Nombre de quien compra" value={buyerName} onChange={e => setBuyerName(e.target.value)} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={styles.fieldLabel}>Tu teléfono</label>
-            <input style={styles.input} placeholder="Ej: 1134567890" type="tel" value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} />
-          </div>
-        </div>
+        <label style={styles.fieldLabel}>Tu nombre</label>
+        <input style={styles.input} placeholder="Nombre de quien compra" value={buyerName} onChange={e => setBuyerName(e.target.value)} />
+
+        <label style={styles.fieldLabel}>Tu teléfono</label>
+        <input style={styles.input} placeholder="Ej: 1134567890" type="tel" value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} />
 
         <label style={styles.fieldLabel}>Servicio</label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
@@ -203,6 +198,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
           placeholder="Un mensaje especial..."
           value={message}
           onChange={e => setMessage(e.target.value)}
+          onFocus={e => setTimeout(() => e.target.scrollIntoView({ behavior: "smooth", block: "center" }), 300)}
           maxLength={200}
         />
 
