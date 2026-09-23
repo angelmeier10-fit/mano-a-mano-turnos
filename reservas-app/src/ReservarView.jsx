@@ -70,7 +70,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
     if (!selectedDate || !svc) return [];
     return (availabilityByDate[selectedDate] || [])
       .filter(s => !s.booked)
-      .filter(s => !isPastSlot(selectedDate, s.start, 60))
+      .filter(s => !isPastSlot(selectedDate, s.start, s.allowLastMinute ? 0 : 60))
       .filter(s => timeToMinutes(s.end) - timeToMinutes(s.start) >= svc.duration)
       .sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
   }, [selectedDate, svc, availabilityByDate]);

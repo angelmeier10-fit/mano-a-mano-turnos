@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp, Contact, User } from "lucide-react";
+import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp, Contact, User, Zap } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
@@ -8,7 +8,7 @@ import {
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
 import { ANAMNESIS_FIELDS, ClientQuickViewModal } from "./ClientesServiciosViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession, setAvailabilitySlotLastMinute } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo, combos = [], giftCards = [],
@@ -470,6 +470,13 @@ export function AgendaView({
                               <span style={styles.openSlotTag}>Cupo libre</span>
                             </div>
                             <div style={{ display: "flex", gap: 4 }}>
+                              <button
+                                style={slot.allowLastMinute ? styles.slotMiniBtn : styles.slotMiniBtnGhost}
+                                onClick={() => setAvailabilitySlotLastMinute(slot.id, !slot.allowLastMinute).catch(err => alert("No se pudo actualizar el cupo: " + err.message))}
+                                title={slot.allowLastMinute ? "Visible en reservas hasta la hora de inicio (tocá para volver a ocultarlo 1 h antes)" : "Mostrar en reservas aunque falte menos de 1 h"}
+                              >
+                                <Zap size={12} />
+                              </button>
                               <button style={styles.slotMiniBtn} onClick={() => openNewAppt(d, slot.start, slot.id)} title="Cargar turno acá">
                                 <Plus size={12} />
                               </button>

@@ -83,6 +83,10 @@ export async function removeAvailabilitySlot(id) {
 export async function freeAvailabilitySlot(id) {
   return updateDoc(doc(db, "availability", id), { booked: false });
 }
+// Permite que el cupo se vea en reservas aunque falte menos de 1 hora.
+export async function setAvailabilitySlotLastMinute(id, allowLastMinute) {
+  return updateDoc(doc(db, "availability", id), { allowLastMinute });
+}
 // Marca como cancelado el registro en phoneIndex/bookings del cliente (best-effort).
 // Se usa cuando el profesional cancela un turno desde la Agenda.
 export async function markBookingRefCancelled(clientPhone, apptId) {
