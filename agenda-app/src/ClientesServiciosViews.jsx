@@ -899,8 +899,25 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
                 <div style={styles.serviceRowName}>{s.name}</div>
                 <div style={styles.serviceRowMeta}>{s.duration} minutos{s.price ? ` · ${formatPrice(s.price)}` : ""}</div>
                 {(s.price2 > 0 || s.price3 > 0) && (
-                  <div style={{ ...styles.serviceRowMeta, fontSize: 11, color: "#8A7E70" }}>
-                    Combos: {s.price2 > 0 ? `x2 ${formatPrice(s.price2)}` : ""}{s.price2 > 0 && s.price3 > 0 ? " · " : ""}{s.price3 > 0 ? `x3 ${formatPrice(s.price3)}` : ""}
+                  <div style={{ ...styles.serviceRowMeta, fontSize: 11, color: "#8A7E70", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                    Combos:
+                    {[["price2", "x2"], ["price3", "x3"]].filter(([k]) => s[k] > 0).map(([k, label]) => (
+                      <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#E8E2D8", borderRadius: 6, padding: "2px 4px 2px 7px" }}>
+                        {label} {formatPrice(s[k])}
+                        <button
+                          type="button"
+                          title={`Quitar combo ${label}`}
+                          style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex", color: "#A6483A" }}
+                          onClick={() => {
+                            if (!window.confirm(`¿Quitar el combo ${label} de ${s.name}? Ya no se va a poder comprar desde reservas.`)) return;
+                            onUpdateService(s.id, { [k]: 0 });
+                            if (editingService?.id === s.id) (k === "price2" ? setPrice2 : setPrice3)(0);
+                          }}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
