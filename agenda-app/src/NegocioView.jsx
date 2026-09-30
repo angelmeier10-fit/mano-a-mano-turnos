@@ -1,9 +1,41 @@
 import React, { useState, useEffect } from "react";
 import { Check, Download, Copy, Share2 } from "lucide-react";
 import styles from "../../shared/styles";
-import { STATUS, formatPrice, getAppointmentPrice, dateKey } from "../../shared/helpers";
+import { STATUS, formatPrice, getAppointmentPrice, dateKey, REFERRAL_AMOUNT } from "../../shared/helpers";
 
 const RESERVAS_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
+const REFERIDOS_URL = `${RESERVAS_URL}?ref=amigo`;
+
+function ShareLinkCard({ label, url, shareTitle }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyLink() {
+    navigator.clipboard.writeText(url).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function shareLink() {
+    try { await navigator.share({ url, title: shareTitle }); } catch {}
+  }
+
+  return (
+    <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "12px 14px", marginBottom: 20 }}>
+      <p style={{ fontSize: 12, color: "#8A8275", margin: "0 0 4px 0" }}>{label}</p>
+      <p style={{ fontSize: 13, color: "#2A2622", wordBreak: "break-all", margin: "0 0 10px 0", fontWeight: 500 }}>{url}</p>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" style={{ ...styles.saveBtn, flex: 1 }} onClick={copyLink}>
+          <Copy size={14} /> {copied ? "Copiado ✓" : "Copiar link"}
+        </button>
+        {"share" in navigator && (
+          <button type="button" style={{ ...styles.exportBtn, flex: 1 }} onClick={shareLink}>
+            <Share2 size={14} /> Compartir
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function csvEscape(value) {
   const str = String(value ?? "");
@@ -159,7 +191,6 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   const [hoursLabel, setHoursLabel] = useState(businessInfo?.hoursLabel || "");
   const [whatsapp, setWhatsapp] = useState(businessInfo?.whatsapp || "");
   const [saved, setSaved] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setName(businessInfo?.name || "");
@@ -168,16 +199,6 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     setHoursLabel(businessInfo?.hoursLabel || "");
     setWhatsapp(businessInfo?.whatsapp || "");
   }, [businessInfo]);
-
-  function copyLink() {
-    navigator.clipboard.writeText(RESERVAS_URL).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function shareLink() {
-    try { await navigator.share({ url: RESERVAS_URL, title: "Reservá tu sesión" }); } catch {}
-  }
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -225,20 +246,12 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     <div style={styles.viewWrap}>
       <h2 style={styles.sectionTitle}>Mi negocio</h2>
 
-      <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "12px 14px", marginBottom: 20 }}>
-        <p style={{ fontSize: 12, color: "#8A8275", margin: "0 0 4px 0" }}>Link de reservas para tus clientes</p>
-        <p style={{ fontSize: 13, color: "#2A2622", wordBreak: "break-all", margin: "0 0 10px 0", fontWeight: 500 }}>{RESERVAS_URL}</p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" style={{ ...styles.saveBtn, flex: 1 }} onClick={copyLink}>
-            <Copy size={14} /> {copied ? "Copiado ✓" : "Copiar link"}
-          </button>
-          {"share" in navigator && (
-            <button type="button" style={{ ...styles.exportBtn, flex: 1 }} onClick={shareLink}>
-              <Share2 size={14} /> Compartir
-            </button>
-          )}
-        </div>
-      </div>
+      <ShareLinkCard label="Link de reservas para tus clientes" url={RESERVAS_URL} shareTitle="Reservá tu sesión" />
+      <ShareLinkCard
+        label={`Link de referidos: ${formatPrice(REFERRAL_AMOUNT)} de descuento en la primera sesión`}
+        url={REFERIDOS_URL}
+        shareTitle="Te recomiendo este lugar de masajes"
+      />
 
       <h2 style={{ ...styles.sectionTitle, marginTop: 4 }}>Ingresos</h2>
       <IncomesPanel appointments={appointments} services={services} />
