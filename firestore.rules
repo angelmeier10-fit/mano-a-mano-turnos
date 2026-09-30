@@ -156,5 +156,12 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSignedIn();
     }
+
+    // Crédito por recomendar (copia pública de clients.referralCredit). Solo lo escribe
+    // el profesional desde la agenda; reservas-app solo lo lee para mostrar el aviso.
+    match /referralCredits/{phoneDigitsId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
   }
 }

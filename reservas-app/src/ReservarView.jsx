@@ -3,9 +3,9 @@ import { Calendar, Clock, Check, MessageCircle, CalendarDays, List } from "lucid
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
-  applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS,
+  applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS, REFERRAL_AMOUNT,
 } from "../../shared/helpers";
-import { getClientDiscountPublic, getCombosByPhone } from "../../shared/firestoreApi";
+import { getClientDiscountPublic, getCombosByPhone, isExistingClientPublic, getReferralCreditPublic } from "../../shared/firestoreApi";
 import { MiniCalendar } from "../../shared/MiniCalendar";
 import styles from "../../shared/styles";
 
@@ -20,7 +20,7 @@ function saveBookingToLocalStorage(apptId, cancelToken, appt, serviceName) {
   } catch {}
 }
 
-export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard, onGoCombo }) {
+export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard, onGoCombo, referralMode = false }) {
   const availabilityByDate = useMemo(() => {
     const map = {};
     availability.forEach(slot => {
@@ -52,6 +52,9 @@ export default function ReservarView({ services, availability, businessInfo, onB
   const [phoneError, setPhoneError] = useState("");
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [howFound, setHowFound] = useState("");
+  const [isExistingClient, setIsExistingClient] = useState(false);
+  const [referredByName, setReferredByName] = useState("");
+  const [referralCredit, setReferralCredit] = useState(0);
   const trafficSource = useMemo(() => getTrafficSource(), []);
 
   useEffect(() => {
@@ -62,8 +65,15 @@ export default function ReservarView({ services, availability, businessInfo, onB
     if (!serviceId && services.length > 0) setServiceId(services[0].id);
   }, [services, serviceId]);
 
+  const referralApplies = referralMode && !isExistingClient && !!referredByName.trim();
+  function priceWithDiscounts(price, sId) {
+    const { finalPrice, discountAmount } = applyClientDiscount(price, clientDiscount, sId);
+    const referralDiscount = referralApplies ? Math.min(REFERRAL_AMOUNT, finalPrice) : 0;
+    return { finalPrice: finalPrice - referralDiscount, discountAmount: discountAmount + referralDiscount, referralDiscount };
+  }
+
   const svc = services.find(s => s.id === serviceId);
-  const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount } = applyClientDiscount(svc?.price, clientDiscount, serviceId);
+  const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount, referralDiscount: svcReferralDiscount } = priceWithDiscounts(svc?.price, serviceId);
   const matchingCombo = myCombos.find(c => c.status === "active" && c.sessionsRemaining > 0 && c.serviceId === serviceId);
 
   const slotsForSelectedDate = useMemo(() => {
@@ -78,6 +88,18 @@ export default function ReservarView({ services, availability, businessInfo, onB
   async function bookSlot(slot) {
     if (!clientName.trim() || !clientPhone.trim() || !svc || booking) return;
     setBooking(true);
+
+    // Se re-verifica acá porque el chequeo del onBlur es asíncrono y la ficha se crea justo abajo.
+    let referralDiscount = 0;
+    if (referralApplies && !(useCombo && matchingCombo)) {
+      const existing = await isExistingClientPublic(clientPhone);
+      if (existing) {
+        setIsExistingClient(true);
+        setBooking(false);
+        return;
+      }
+      referralDiscount = svcReferralDiscount;
+    }
 
     let clientId = null;
     if (onUpsertClient) {
@@ -105,7 +127,8 @@ export default function ReservarView({ services, availability, businessInfo, onB
       ...(clientId ? { clientId } : {}),
       ...(giftCardCode ? { giftCardCode } : {}),
       ...(usingCombo ? { comboId: matchingCombo.id } : {}),
-      source: trafficSource || howFound || "",
+      ...(referralDiscount > 0 ? { referredByName: referredByName.trim(), referralDiscount } : {}),
+      source: referralMode ? "recomendacion" : (trafficSource || howFound || ""),
     };
     let result;
     try {
@@ -209,6 +232,11 @@ export default function ReservarView({ services, availability, businessInfo, onB
           <div style={styles.comboBannerArrow}>›</div>
         </div>
       )}
+      {referralMode && (
+        <div style={{ background: "#F7EDE6", border: "1.5px solid #B5654A", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 13.5, color: "#2A2622" }}>
+          <strong>Venís recomendado 🙌</strong> Tenés {formatPrice(REFERRAL_AMOUNT)} de descuento en tu primera sesión. Completá quién te recomendó más abajo.
+        </div>
+      )}
       <h2 style={styles.sectionTitle}>Reservá tu sesión</h2>
       <div style={styles.businessInfoCard}>
         <div style={styles.businessInfoRow}>
@@ -240,8 +268,10 @@ export default function ReservarView({ services, availability, businessInfo, onB
         value={clientPhone}
         onChange={e => { setClientPhone(e.target.value); if (phoneError) setPhoneError(""); }}
         onBlur={async () => {
-          if (!clientPhone.trim()) { setClientDiscount(null); setMyCombos([]); return; }
+          if (!clientPhone.trim()) { setClientDiscount(null); setMyCombos([]); setIsExistingClient(false); setReferralCredit(0); return; }
           setClientDiscount(await getClientDiscountPublic(clientPhone));
+          setReferralCredit(await getReferralCreditPublic(clientPhone));
+          if (referralMode) setIsExistingClient(await isExistingClientPublic(clientPhone));
           try {
             const combos = await getCombosByPhone(clientPhone);
             setMyCombos(combos);
@@ -253,7 +283,30 @@ export default function ReservarView({ services, availability, businessInfo, onB
       />
       {phoneError && <p style={{ color: "#c0392b", fontSize: 13, marginTop: 4, marginBottom: 0 }}>{phoneError}</p>}
 
-      {!trafficSource && (
+      {referralCredit > 0 && (
+        <div style={{ background: "#EBF3E6", border: "1.5px solid #6E7F5C", borderRadius: 10, padding: "10px 14px", margin: "10px 0 4px", fontSize: 13, color: "#3D5430" }}>
+          <strong>Tenés {formatPrice(referralCredit)} de crédito por recomendar.</strong> Se descuentan {formatPrice(Math.min(REFERRAL_AMOUNT, referralCredit))} de tu próximo turno al momento de pagar.
+        </div>
+      )}
+
+      {referralMode && (
+        <>
+          <label style={styles.fieldLabel}>¿Quién te recomendó?</label>
+          <input
+            style={styles.input}
+            value={referredByName}
+            onChange={e => setReferredByName(e.target.value)}
+            placeholder="Nombre de quien te pasó el link"
+          />
+          {isExistingClient && (
+            <p style={{ color: "#8A8275", fontSize: 12.5, marginTop: 4, marginBottom: 0 }}>
+              El descuento por recomendación es para la primera sesión. ¡Gracias por volver!
+            </p>
+          )}
+        </>
+      )}
+
+      {!trafficSource && !referralMode && (
         <>
           <label style={styles.fieldLabel}>¿Cómo nos conociste?</label>
           <select style={styles.input} value={howFound} onChange={e => setHowFound(e.target.value)}>
@@ -293,7 +346,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
             >
               <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
               <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
-                {s.duration} min{s.price ? ` · ${formatPrice(applyClientDiscount(s.price, clientDiscount, s.id).finalPrice)}` : ""}
+                {s.duration} min{s.price ? ` · ${formatPrice(priceWithDiscounts(s.price, s.id).finalPrice)}` : ""}
               </span>
             </button>
           ))}

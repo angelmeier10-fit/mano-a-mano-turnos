@@ -3,12 +3,12 @@ import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, Mes
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
-  formatPhoneForWhatsapp, parseDateKeyAsLocal,
+  formatPhoneForWhatsapp, parseDateKeyAsLocal, REFERRAL_AMOUNT,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
 import { ANAMNESIS_FIELDS, ClientQuickViewModal } from "./ClientesServiciosViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession, setAvailabilitySlotLastMinute } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession, setAvailabilitySlotLastMinute, setReferralCredit, updateAppointment } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo, combos = [], giftCards = [],
@@ -129,7 +129,24 @@ export function AgendaView({
     deleteBookingRef(clientPhone, id).catch((e) => console.error("[deleteAppt] deleteBookingRef falló:", e));
   }
   async function setApptStatus(id, status, fromAvailabilityId, clientPhone, appt) {
-    await onUpdateAppt(id, { status });
+    const updates = { status };
+    const client = appt?.clientId ? clients.find(c => c.id === appt.clientId) : null;
+    const wasCompleted = appt?.status === "completado";
+    if (status === "completado" && !wasCompleted && client && !appt.referralCreditApplied
+        && !appt.paidByCombo && !appt.paidByGiftCard) {
+      const svc = services.find(s => s.id === appt.serviceId);
+      const applied = Math.min(REFERRAL_AMOUNT, client.referralCredit || 0, getAppointmentPrice(appt, svc));
+      if (applied > 0) {
+        updates.discount = (appt.discount || 0) + applied;
+        updates.referralCreditApplied = applied;
+        await setReferralCredit(client.id, (client.referralCredit || 0) - applied);
+      }
+    } else if (wasCompleted && status !== "completado" && appt.referralCreditApplied && client) {
+      updates.discount = (appt.discount || 0) - appt.referralCreditApplied;
+      updates.referralCreditApplied = 0;
+      await setReferralCredit(client.id, (client.referralCredit || 0) + appt.referralCreditApplied);
+    }
+    await onUpdateAppt(id, updates);
     if (status === "cancelado") {
       if (fromAvailabilityId && onFreeSlot) {
         try { await onFreeSlot(fromAvailabilityId); } catch (e) {
@@ -849,6 +866,57 @@ function TurnoAnamnesisSection({ client }) {
   );
 }
 
+// Turno que llegó por el link de referidos: una vez completado, se elige a qué cliente
+// corresponde el nombre que escribió y se le acredita el descuento para su próximo turno.
+function ReferralSection({ appt, clients }) {
+  const [referrerId, setReferrerId] = useState("");
+  const [creditedId, setCreditedId] = useState(appt.referrerClientId || null);
+  const [saving, setSaving] = useState(false);
+
+  const firstWord = appt.referredByName.trim().split(/\s+/)[0].toLowerCase();
+  const candidates = clients
+    .filter(c => c.id !== appt.clientId)
+    .map(c => ({ ...c, matches: c.name.toLowerCase().includes(firstWord) }))
+    .sort((a, b) => (b.matches - a.matches) || a.name.localeCompare(b.name));
+  const credited = creditedId ? clients.find(c => c.id === creditedId) : null;
+
+  async function credit() {
+    const referrer = clients.find(c => c.id === referrerId);
+    if (!referrer || saving) return;
+    setSaving(true);
+    try {
+      await setReferralCredit(referrer.id, (referrer.referralCredit || 0) + REFERRAL_AMOUNT);
+      await updateAppointment(appt.id, { referrerClientId: referrer.id });
+      setCreditedId(referrer.id);
+    } catch (e) {
+      console.error("[referidos] No se pudo acreditar:", e);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div style={{ background: "#F7EDE6", border: "1.5px solid #D9B5A3", borderRadius: 10, padding: "10px 12px", margin: "6px 0 14px", fontSize: 13 }}>
+      <div style={{ fontWeight: 700, color: "#2A2622" }}>Recomendado por: {appt.referredByName}</div>
+      {credited ? (
+        <div style={{ color: "#3D5430", marginTop: 4 }}>Crédito de {formatPrice(REFERRAL_AMOUNT)} acreditado a {credited.name}.</div>
+      ) : appt.status !== "completado" ? (
+        <div style={{ color: "#8A8275", marginTop: 4 }}>Cuando el turno esté completado vas a poder acreditarle {formatPrice(REFERRAL_AMOUNT)} a quien lo recomendó.</div>
+      ) : (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <select style={{ ...styles.input, flex: 1, margin: 0 }} value={referrerId} onChange={e => setReferrerId(e.target.value)}>
+            <option value="">Elegí el cliente…</option>
+            {candidates.map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ""}</option>)}
+          </select>
+          <button type="button" disabled={!referrerId || saving} onClick={credit}
+            style={{ ...styles.saveBtn, width: "auto", padding: "0 14px", margin: 0, opacity: !referrerId || saving ? 0.5 : 1 }}>
+            Acreditar {formatPrice(REFERRAL_AMOUNT)}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ApptFormModal({ services, clients, appointments = [], combos = [], initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo }) {
   const base = initial || {
     dateKey: prefill?.dateKey || dateKey(new Date()),
@@ -1102,6 +1170,14 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
               : ""}
           </div>
         )}
+
+        {initial?.referralCreditApplied > 0 && (
+          <div style={{ fontSize: 12.5, color: "#3D5430", margin: "6px 0 10px" }}>
+            Incluye {formatPrice(initial.referralCreditApplied)} de crédito por recomendar.
+          </div>
+        )}
+
+        {initial?.referredByName && <ReferralSection appt={initial} clients={clients} />}
 
         {!initial && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>

@@ -1,3 +1,26 @@
+# Sistema de referidos (link general ?ref + crédito para quien recomienda)
+
+## Plan
+- [x] `shared/helpers.js`: constante `REFERRAL_AMOUNT = 5000`
+- [x] `shared/firestoreApi.js`: `isExistingClientPublic`, `getReferralCreditPublic`, `setReferralCredit`
+- [x] `shared/firestoreApi.js`: `updateClient` migra `referralCredits` al cambiar teléfono
+- [x] `shared/firestoreApi.js`: `rescheduleAppointmentPublic` conserva `price`, `discount`, `referredByName`
+- [x] `reservas-app/src/App.jsx`: leer `?ref` y pasar `referralMode` a ReservarView principal
+- [x] `reservas-app/src/ReservarView.jsx`: banner, campo "¿Quién te recomendó?", descuento solo a clientes nuevos, aviso de crédito
+- [x] `agenda-app/src/AgendaComponents.jsx`: aplicar/revertir crédito al completar; "Recomendado por" + acreditar a un cliente
+- [x] `agenda-app/src/ClientesServiciosViews.jsx`: mostrar crédito en ficha
+- [x] `firestore.rules`: `referralCredits` (publicar a mano en Console)
+- [x] Build de ambas apps
+- [ ] Prueba end-to-end (reservar con ?ref, completar, acreditar, consumir crédito) — escribe en la base real
+
+## Review
+- El crédito se consume en la agenda al marcar "completado" (y se devuelve si se des-completa); reservas nunca escribe créditos.
+- Reprogramar conserva precio/descuento si el servicio no cambia; si cambia, conserva solo el descuento de referido (`referralDiscount`). Esto también corrige que el descuento VIP se perdía al reprogramar.
+- Verificado: build de ambas apps OK; en dev, `?ref=amigo` muestra el banner y el campo "¿Quién te recomendó?".
+- Pendiente: publicar `firestore.rules` en Console y probar el flujo completo.
+
+---
+
 # Gift cards / combos: notificación, combo con link, wording, cobrado
 
 ## Plan

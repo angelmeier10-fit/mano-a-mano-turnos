@@ -405,8 +405,21 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
   const oldCancelProof = oldPhoneVariant || normalizePhone(phone) || oldCancelToken || null;
 
   const oldApptSnap = await getDoc(oldApptRef);
-  const giftCardCode = oldApptSnap.exists() ? oldApptSnap.data().giftCardCode : null;
-  const comboId = oldApptSnap.exists() ? oldApptSnap.data().comboId : null;
+  const oldAppt = oldApptSnap.exists() ? oldApptSnap.data() : {};
+  const giftCardCode = oldAppt.giftCardCode || null;
+  const comboId = oldAppt.comboId || null;
+  // El turno nuevo mantiene precio y descuentos del original. Si cambió el servicio,
+  // el precio y el descuento VIP (que es por servicio) no aplican, pero el de referido sí.
+  const carriedFields = {};
+  for (const key of ["referredByName", "referralDiscount", "source"]) {
+    if (oldAppt[key] !== undefined) carriedFields[key] = oldAppt[key];
+  }
+  if (oldAppt.serviceId === newAppt.serviceId) {
+    if (oldAppt.price !== undefined) carriedFields.price = oldAppt.price;
+    if (oldAppt.discount !== undefined) carriedFields.discount = oldAppt.discount;
+  } else if (oldAppt.referralDiscount) {
+    carriedFields.discount = oldAppt.referralDiscount;
+  }
   const newSlotRef = doc(db, "availability", newAppt.fromAvailabilityId);
   const newApptRef = doc(collection(db, "appointments"));
   const newApptId = newApptRef.id;
@@ -422,6 +435,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
     t.update(oldApptRef, { status: "cancelado", cancelProof: oldCancelProof });
     t.update(newSlotRef, { booked: true });
     t.set(newApptRef, {
+      ...carriedFields,
       ...newAppt,
       cancelToken: newCancelToken,
       cancelProof: null,
@@ -793,6 +807,15 @@ export async function updateClient(id, data) {
       console.error("[updateClient] No se pudo migrar clientDiscounts:", err);
     }
     try {
+      const oldCreditSnap = await getDoc(doc(db, "referralCredits", oldPhoneDigits));
+      if (oldCreditSnap.exists()) {
+        await setDoc(doc(db, "referralCredits", newPhoneDigits), oldCreditSnap.data());
+        await deleteDoc(doc(db, "referralCredits", oldPhoneDigits));
+      }
+    } catch (err) {
+      console.error("[updateClient] No se pudo migrar referralCredits:", err);
+    }
+    try {
       await setDoc(doc(db, "phoneIndex", newPhoneDigits), { clientId: id });
       await deleteDoc(doc(db, "phoneIndex", oldPhoneDigits));
     } catch (err) {
@@ -842,6 +865,46 @@ export async function getClientDiscountPublic(phone) {
     return null;
   }
 }
+// Para el link de referidos: el descuento de bienvenida es solo para teléfonos que no son clientes.
+export async function isExistingClientPublic(phone) {
+  const variants = phoneVariants(phone);
+  if (!variants.length) return false;
+  try {
+    const snaps = await Promise.all(variants.map(v => getDoc(doc(db, "phoneIndex", v))));
+    return snaps.some(s => s.exists());
+  } catch {
+    return false;
+  }
+}
+
+export async function getReferralCreditPublic(phone) {
+  const variants = phoneVariants(phone);
+  if (!variants.length) return 0;
+  try {
+    const snaps = await Promise.all(variants.map(v => getDoc(doc(db, "referralCredits", v))));
+    const found = snaps.find(s => s.exists());
+    return found ? (found.data().amount || 0) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// La fuente de verdad es clients/{id}.referralCredit; referralCredits/{phone} es la copia
+// pública que lee reservas-app (mismo patrón que discounts / clientDiscounts).
+export async function setReferralCredit(clientId, amount) {
+  const snap = await getDoc(doc(db, "clients", clientId));
+  if (!snap.exists()) return;
+  const safeAmount = Math.max(0, amount || 0);
+  await updateDoc(doc(db, "clients", clientId), { referralCredit: safeAmount });
+  const phoneDigits = snap.data().phoneDigits || normalizePhone(snap.data().phone);
+  if (!phoneDigits) return;
+  if (safeAmount > 0) {
+    await setDoc(doc(db, "referralCredits", phoneDigits), { amount: safeAmount });
+  } else {
+    await deleteDoc(doc(db, "referralCredits", phoneDigits)).catch(() => {});
+  }
+}
+
 export async function deleteClient(id) {
   try {
     const snap = await getDoc(doc(db, "clients", id));

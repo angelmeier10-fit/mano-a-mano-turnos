@@ -575,6 +575,13 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
           </div>
         )}
 
+        {!editingClient && selected.referralCredit > 0 && (
+          <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#8A8275", textTransform: "uppercase" }}>Crédito por recomendar</span>
+            <span style={{ fontSize: 13, color: "#2A2622" }}>{formatPrice(selected.referralCredit)} · se descuenta al completar su próximo turno</span>
+          </div>
+        )}
+
         <div style={styles.clientStatsGrid}>
           <div style={styles.clientStatBox}>
             <div style={styles.clientStatValue}>{stats.completed}</div>

@@ -152,6 +152,14 @@ function getComboCodeFromURL() {
   }
 }
 
+function getReferralFromURL() {
+  try {
+    return new URLSearchParams(window.location.search).has("ref");
+  } catch {
+    return false;
+  }
+}
+
 function getInitialViewFromURL() {
   try {
     const view = new URLSearchParams(window.location.search).get("view");
@@ -178,6 +186,7 @@ export default function App() {
   // Si la URL tiene ?giftcard=CODE o ?combo=CODE, mostramos la vista de canje directamente
   const giftCardCode = getGiftCardCodeFromURL();
   const comboCode = getComboCodeFromURL();
+  const referralMode = getReferralFromURL();
 
   useEffect(() => {
     const unsubServices = listenServices(setServices);
@@ -328,6 +337,7 @@ export default function App() {
             onGoGiftCard={() => setCurrentView("giftcard")}
             onGoCombo={() => { setCurrentView("combo"); setComboSubview("menu"); }}
             initialServiceId={quizPreselectedServiceId}
+            referralMode={referralMode}
           />
         )}
         {currentView === "quiz" && (

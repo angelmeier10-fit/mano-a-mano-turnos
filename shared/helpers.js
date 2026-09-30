@@ -46,6 +46,7 @@ export function getAppointmentPrice(appt, service) {
   const basePrice = appt?.price ?? service?.price ?? 0;
   return Math.max(0, basePrice - (appt?.discount || 0));
 }
+export const REFERRAL_AMOUNT = 5000;
 export function applyClientDiscount(price, discounts, serviceId) {
   const base = price || 0;
   const discount = discounts?.[serviceId];
