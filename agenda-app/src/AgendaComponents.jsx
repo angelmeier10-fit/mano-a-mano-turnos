@@ -115,6 +115,33 @@ export function AgendaView({
     setEditingAppt(null);
     setShowApptForm(true);
   }
+  const [copyingWeek, setCopyingWeek] = useState(false);
+  // Copia el patrón de cupos de la semana visible (libres y reservados) a la semana siguiente.
+  async function copyWeekToNext() {
+    const weekKeys = new Set(days.map(dateKey));
+    const source = availability.filter(s => weekKeys.has(s.dateKey));
+    if (source.length === 0) {
+      window.alert("Esta semana no tiene cupos para copiar.");
+      return;
+    }
+    if (!window.confirm(`¿Copiar los ${source.length} cupos de esta semana a la semana siguiente? Los que se superpongan con cupos o turnos ya cargados se saltan.`)) return;
+    setCopyingWeek(true);
+    try {
+      const slots = source.map(s => ({
+        dateKey: dateKey(addDays(parseDateKeyAsLocal(s.dateKey), 7)),
+        start: s.start,
+        end: s.end,
+      }));
+      const created = await onAddSlotsBatch(slots);
+      setWeekStart(addDays(weekStart, 7));
+      window.alert(`Se crearon ${created} cupos en la semana siguiente.`);
+    } catch (err) {
+      console.error(err);
+      window.alert("No se pudieron copiar los cupos. Probá de nuevo.");
+    } finally {
+      setCopyingWeek(false);
+    }
+  }
   function openEditAppt(appt) {
     setEditingAppt(appt);
     setPrefillSlot(null);
@@ -416,6 +443,9 @@ export function AgendaView({
               <ChevronRight size={18} />
             </button>
           </div>
+          <button style={{ ...styles.recurringBtn, marginBottom: 14 }} onClick={copyWeekToNext} disabled={copyingWeek}>
+            <Copy size={15} /> {copyingWeek ? "Copiando…" : "Copiar cupos de esta semana a la siguiente"}
+          </button>
 
           <div style={styles.weekGrid}>
             {days.map((d, i) => {
@@ -540,6 +570,7 @@ export function AgendaView({
         <AvailabilityFormModal
           dateKey={showAvailForm}
           existing={availabilityByDate[showAvailForm] || []}
+          dayAppts={appointments.filter(a => a.dateKey === showAvailForm && a.status !== "cancelado")}
           bookedSlotIds={new Set(
             appointments
               .filter(a => a.dateKey === showAvailForm && a.status !== "cancelado")
@@ -571,60 +602,103 @@ export function AgendaView({
   );
 }
 
-function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose, onAdd, onRemove, onCloseDay }) {
-  const [start, setStart] = useState("10:00");
-  const [end, setEnd] = useState("11:00");
-  const [statusMsg, setStatusMsg] = useState(null);
+// Horarios cada 30 min entre las 8 y las 22, que alcancen a terminar antes de las 22.
+function halfHourTimes(slotLength) {
+  const times = [];
+  for (let t = 8 * 60; t + slotLength <= 22 * 60; t += 30) times.push(minutesToTime(t));
+  return times;
+}
 
-  function handleAdd(e) {
-    e.preventDefault();
-    const newStart = timeToMinutes(start);
-    const newEnd = timeToMinutes(end);
-    if (newEnd <= newStart) return;
+function DurationPicker({ value, onChange }) {
+  return (
+    <div style={{ ...styles.weekdayPicker, alignItems: "center" }}>
+      {[30, 45, 60, 90, 120].map(len => (
+        <button
+          type="button"
+          key={len}
+          onClick={() => onChange(len)}
+          style={{ ...styles.weekdayChip, width: 52, ...(value === len ? styles.weekdayChipActive : {}) }}
+        >
+          {len}
+        </button>
+      ))}
+      <input
+        type="number" min={10} step={5}
+        style={{ ...styles.input, width: 70, margin: 0, height: 38 }}
+        value={value}
+        onChange={e => { const n = Number(e.target.value); if (n >= 10) onChange(n); }}
+      />
+      <span style={{ fontSize: 12.5, color: "#8A8275" }}>min</span>
+    </div>
+  );
+}
 
-    const slots = [];
-    let t = newStart;
-    while (t + 60 <= newEnd) {
-      slots.push({ start: minutesToTime(t), end: minutesToTime(t + 60) });
-      t += 60;
-    }
-    if (slots.length === 0) return;
+function CustomTimeInput({ onAdd }) {
+  const [time, setTime] = useState("");
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
+      <span style={{ fontSize: 12.5, color: "#8A8275" }}>Otro horario:</span>
+      <input type="time" style={{ ...styles.input, flex: 1, margin: 0, height: 38 }} value={time} onChange={e => setTime(e.target.value)} />
+      <button
+        type="button"
+        disabled={!time}
+        onClick={() => { onAdd(time); setTime(""); }}
+        style={{ ...styles.weekdayChip, width: 42, opacity: time ? 1 : 0.5 }}
+      >
+        <Plus size={14} />
+      </button>
+    </div>
+  );
+}
 
-    const toAdd = [];
-    let skipped = 0;
-    for (const slot of slots) {
-      const sStart = timeToMinutes(slot.start);
-      const sEnd = timeToMinutes(slot.end);
-      const overlap = existing.find(ex => sStart < timeToMinutes(ex.end) && timeToMinutes(ex.start) < sEnd);
-      if (overlap) {
-        skipped++;
-      } else {
-        toAdd.push(slot);
-      }
-    }
+function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotIds, onClose, onAdd, onRemove, onCloseDay }) {
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [pending, setPending] = useState(new Set());
+  const [slotLength, setSlotLength] = useState(60);
 
-    if (toAdd.length === 0) {
-      setStatusMsg({ type: "error", text: "Todos los cupos ya existen, no se agregó ninguno." });
-      return;
-    }
+  const overlaps = (s, e, other) => s < timeToMinutes(other.end) && timeToMinutes(other.start) < e;
 
-    toAdd.forEach(slot => onAdd(slot));
+  const chipTimes = [...new Set([
+    ...halfHourTimes(slotLength),
+    ...existing.map(s => s.start),
+  ])].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
 
-    if (skipped > 0) {
-      setStatusMsg({
-        type: "info",
-        text: `Se agregaron ${toAdd.length} cupo${toAdd.length !== 1 ? "s" : ""}. Se saltaron ${skipped} que ya existían.`,
-      });
-    } else {
-      setStatusMsg(null);
-    }
+  function chipFor(time) {
+    const slot = existing.find(s => s.start === time);
+    if (slot) return { time, slot, state: bookedSlotIds?.has(slot.id) ? "booked" : "open" };
+    const s = timeToMinutes(time);
+    const e = s + slotLength;
+    const blocked = existing.some(ex => overlaps(s, e, ex)) || dayAppts.some(a => overlaps(s, e, a));
+    return { time, state: blocked ? "blocked" : "free" };
+  }
+  const chips = chipTimes.map(chipFor);
 
-    setStart(end);
-    const next = minutesToTime(Math.min(newEnd + 60, 23*60+45));
-    setEnd(next);
+  function addCustomTime(time) {
+    const chip = chipFor(time);
+    if (chip.state === "free") toggleChip(chip);
+    else setErrorMsg(`Las ${time} se superponen con otro cupo o turno.`);
   }
 
-  const slotCount = Math.floor((timeToMinutes(end) - timeToMinutes(start)) / 60);
+  async function toggleChip(chip) {
+    if (pending.has(chip.time)) return;
+    setErrorMsg(null);
+    setPending(prev => new Set(prev).add(chip.time));
+    try {
+      if (chip.state === "open") await onRemove(chip.slot.id);
+      else if (chip.state === "free") await onAdd({ start: chip.time, end: minutesToTime(timeToMinutes(chip.time) + slotLength) });
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setPending(prev => { const next = new Set(prev); next.delete(chip.time); return next; });
+    }
+  }
+
+  const chipStyle = {
+    open:    { background: "#6E7F5C", borderColor: "#6E7F5C", color: "#fff" },
+    booked:  { background: "#F5EBD6", borderColor: "#B08A3E", color: "#B08A3E", cursor: "default" },
+    blocked: { background: "#F0EDE8", borderColor: "#E2DCD0", color: "#B8AFA0", cursor: "default" },
+    free:    {},
+  };
 
   const sorted = existing.slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
   const removableIds = sorted.filter(s => !bookedSlotIds?.has(s.id)).map(s => s.id);
@@ -648,28 +722,35 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
           <h3 style={styles.modalTitle}>Cupos · {formatDateLong(dKey)}</h3>
           <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
-        <p style={styles.helperText}>Estos horarios van a aparecer disponibles para que tus clientes reserven.</p>
+        <p style={styles.helperText}>Elegí la duración y tocá un horario para abrir un cupo. Tocalo de nuevo para quitarlo.</p>
 
-        {sorted.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "12px 0" }}>
-            {sorted.map(s => {
-              const isBooked = bookedSlotIds?.has(s.id);
-              return (
-                <div key={s.id} style={styles.availExistingRow}>
-                  <Clock size={13} color={isBooked ? "#B08A3E" : "#6E7F5C"} />
-                  <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>
-                    {s.start} – {s.end}
-                    {isBooked && <span style={{ fontSize: 11, fontWeight: 600, color: "#B08A3E", marginLeft: 6 }}>· reservado</span>}
-                  </span>
-                  {!isBooked && (
-                    <button type="button" style={styles.iconBtnGhost} onClick={() => onRemove(s.id)}>
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        <label style={{ ...styles.fieldLabel, marginTop: 10 }}>Duración del cupo</label>
+        <DurationPicker value={slotLength} onChange={setSlotLength} />
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, margin: "12px 0 0" }}>
+          {chips.map(chip => (
+            <button
+              type="button"
+              key={chip.time}
+              disabled={chip.state === "booked" || chip.state === "blocked"}
+              onClick={() => toggleChip(chip)}
+              title={chip.state === "booked" ? "Reservado" : chip.state === "blocked" ? "Se superpone con otro cupo o turno" : undefined}
+              style={{
+                ...styles.weekdayChip, width: "100%", ...chipStyle[chip.state],
+                opacity: pending.has(chip.time) ? 0.5 : 1,
+              }}
+            >
+              {chip.time}
+            </button>
+          ))}
+        </div>
+        <CustomTimeInput onAdd={addCustomTime} />
+        <p style={{ fontSize: 11.5, color: "#8A8275", margin: "10px 0" }}>
+          <span style={{ color: "#6E7F5C", fontWeight: 700 }}>Verde</span>: cupo abierto ·{" "}
+          <span style={{ color: "#B08A3E", fontWeight: 700 }}>dorado</span>: reservado
+        </p>
+        {errorMsg && (
+          <p style={{ fontSize: 12, color: "#A6483A", margin: "0 0 10px", fontWeight: 600 }}>{errorMsg}</p>
         )}
 
         {removableIds.length > 0 && (
@@ -678,28 +759,12 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
           </button>
         )}
 
-        <form onSubmit={handleAdd}>
-          <div style={styles.fieldRow}>
-            <div style={{ flex: 1 }}>
-              <label style={styles.fieldLabel}>Desde</label>
-              <input type="time" style={styles.input} value={start} onChange={e => { setStart(e.target.value); setStatusMsg(null); }} required />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={styles.fieldLabel}>Hasta</label>
-              <input type="time" style={styles.input} value={end} onChange={e => { setEnd(e.target.value); setStatusMsg(null); }} required />
-            </div>
-          </div>
-          {statusMsg && (
-            <p style={{ fontSize: 12, color: statusMsg.type === "error" ? "#A6483A" : "#6E7F5C", margin: "6px 0 0", fontWeight: 600 }}>{statusMsg.text}</p>
-          )}
-          <div style={styles.modalActions}>
-            <div style={{ flex: 1 }} />
-            <button type="button" style={styles.cancelBtn} onClick={onClose}>Listo</button>
-            <button type="submit" style={styles.saveBtn}>
-              <Plus size={16} /> {slotCount > 1 ? `Agregar ${slotCount} cupos` : "Agregar cupo"}
-            </button>
-          </div>
-        </form>
+        <div style={styles.modalActions}>
+          <div style={{ flex: 1 }} />
+          <button type="button" style={styles.saveBtn} onClick={onClose}>
+            <Check size={16} /> Listo
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -707,14 +772,13 @@ function AvailabilityFormModal({ dateKey: dKey, existing, bookedSlotIds, onClose
 
 function RecurringAvailabilityModal({ onClose, onConfirm }) {
   const todayStr = dateKey(new Date());
-  const inFourWeeks = dateKey(addDays(new Date(), 28));
   const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
-  const [start, setStart] = useState("10:00");
-  const [end, setEnd] = useState("14:00");
   const [slotLength, setSlotLength] = useState(60);
-  const [fromDate, setFromDate] = useState(todayStr);
-  const [toDate, setToDate] = useState(inFourWeeks);
+  const [selectedTimes, setSelectedTimes] = useState(["10:00", "11:00", "12:00", "13:00"]);
+  const [weeks, setWeeks] = useState(4);
   const [saving, setSaving] = useState(false);
+  const [fromDate, setFromDate] = useState(todayStr);
+  const toDate = fromDate ? dateKey(addDays(parseDateKeyAsLocal(fromDate), weeks * 7 - 1)) : "";
 
   const weekdayOptions = [
     { value: 1, label: "Lun" }, { value: 2, label: "Mar" }, { value: 3, label: "Mié" },
@@ -725,19 +789,30 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
     setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort());
   }
 
-  function buildDaySlots() {
-    const slots = [];
-    let t = timeToMinutes(start);
-    const endMin = timeToMinutes(end);
-    while (t + slotLength <= endMin) {
-      slots.push({ start: minutesToTime(t), end: minutesToTime(t + slotLength) });
-      t += slotLength;
-    }
-    return slots;
+  const byTime = (a, b) => timeToMinutes(a) - timeToMinutes(b);
+  const timeOptions = [...new Set([...halfHourTimes(slotLength), ...selectedTimes])].sort(byTime);
+  const clashes = (a, b, len) => Math.abs(timeToMinutes(a) - timeToMinutes(b)) < len;
+  const isBlocked = (time) => !selectedTimes.includes(time) && selectedTimes.some(t => clashes(t, time, slotLength));
+
+  // Al alargar la duración, se descartan los horarios elegidos que pasarían a superponerse.
+  function changeSlotLength(len) {
+    setSlotLength(len);
+    setSelectedTimes(prev => prev.slice().sort(byTime).reduce((kept, t) => {
+      if (kept.length === 0 || !clashes(kept[kept.length - 1], t, len)) kept.push(t);
+      return kept;
+    }, []));
   }
 
-  const daySlots = buildDaySlots();
-  const dateKeys = selectedDays.length > 0 && fromDate && toDate && fromDate <= toDate
+  function toggleTime(time) {
+    if (selectedTimes.includes(time)) setSelectedTimes(prev => prev.filter(t => t !== time));
+    else if (!isBlocked(time)) setSelectedTimes(prev => [...prev, time]);
+  }
+
+  const daySlots = selectedTimes
+    .slice()
+    .sort((a, b) => timeToMinutes(a) - timeToMinutes(b))
+    .map(t => ({ start: t, end: minutesToTime(timeToMinutes(t) + slotLength) }));
+  const dateKeys = selectedDays.length > 0 && fromDate
     ? getRecurringDateKeysByRange(selectedDays, fromDate, toDate)
     : [];
   const totalSlots = dateKeys.length * daySlots.length;
@@ -750,7 +825,10 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
       daySlots.forEach(s => allSlots.push({ dateKey: dKey, start: s.start, end: s.end }));
     });
     try {
-      await onConfirm(allSlots);
+      const created = await onConfirm(allSlots);
+      if (created < allSlots.length) {
+        window.alert(`Se crearon ${created} cupos. Se saltaron ${allSlots.length - created} que se superponían con cupos o turnos ya cargados.`);
+      }
       onClose();
     } catch (err) {
       console.error(err);
@@ -768,8 +846,7 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
           <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <p style={styles.helperText}>
-          Elegí los días y el rango horario. Se va a dividir en turnos de la duración que indiques
-          y se va a repetir durante varias semanas, sin que tengas que cargar día por día.
+          Elegí los días, tocá los horarios que querés abrir y por cuántas semanas repetirlo.
         </p>
 
         <label style={styles.fieldLabel}>Días</label>
@@ -786,39 +863,50 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
           ))}
         </div>
 
-        <div style={styles.fieldRow}>
-          <div style={{ flex: 1 }}>
-            <label style={styles.fieldLabel}>Desde</label>
-            <input type="time" style={styles.input} value={start} onChange={e => setStart(e.target.value)} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={styles.fieldLabel}>Hasta</label>
-            <input type="time" style={styles.input} value={end} onChange={e => setEnd(e.target.value)} />
-          </div>
-        </div>
+        <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Duración de cada turno</label>
+        <DurationPicker value={slotLength} onChange={changeSlotLength} />
 
-        <div style={styles.fieldRow}>
-          <div style={{ flex: 1 }}>
-            <label style={styles.fieldLabel}>Duración de cada turno (min)</label>
-            <input type="number" style={styles.input} value={slotLength} onChange={e => setSlotLength(Number(e.target.value) || 30)} min={10} step={5} />
-          </div>
+        <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Horarios</label>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+          {timeOptions.map(time => (
+            <button
+              type="button"
+              key={time}
+              disabled={isBlocked(time)}
+              onClick={() => toggleTime(time)}
+              style={{
+                ...styles.weekdayChip, width: "100%",
+                ...(selectedTimes.includes(time) ? styles.weekdayChipActive : {}),
+                ...(isBlocked(time) ? { color: "#C9BFA8", borderColor: "#E8E2D8", cursor: "default" } : {}),
+              }}
+            >
+              {time}
+            </button>
+          ))}
         </div>
+        <CustomTimeInput onAdd={toggleTime} />
 
-        <div style={styles.fieldRow}>
-          <div style={{ flex: 1 }}>
-            <label style={styles.fieldLabel}>Fecha inicio</label>
-            <input type="date" style={styles.input} value={fromDate} onChange={e => setFromDate(e.target.value)} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={styles.fieldLabel}>Fecha fin</label>
-            <input type="date" style={styles.input} value={toDate} onChange={e => setToDate(e.target.value)} min={fromDate} />
-          </div>
+        <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Empieza el</label>
+        <input type="date" style={styles.input} value={fromDate} min={todayStr} onChange={e => setFromDate(e.target.value)} />
+
+        <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Repetir por</label>
+        <div style={styles.weekdayPicker}>
+          {[1, 2, 4, 8].map(w => (
+            <button
+              type="button"
+              key={w}
+              onClick={() => setWeeks(w)}
+              style={{ ...styles.weekdayChip, width: 84, ...(weeks === w ? styles.weekdayChipActive : {}) }}
+            >
+              {w} semana{w !== 1 ? "s" : ""}
+            </button>
+          ))}
         </div>
 
         <p style={styles.recurringPreview}>
           {totalSlots > 0
-            ? `Se van a crear ${totalSlots} cupos (${daySlots.length} por día, ${dateKeys.length} días).`
-            : "Elegí al menos un día, un rango horario válido y fechas para ver la vista previa."}
+            ? `Se van a crear ${totalSlots} cupos (${daySlots.length} por día, ${dateKeys.length} días, del ${formatDateShort(fromDate)} al ${formatDateShort(toDate)}).`
+            : "Elegí al menos un día, un horario y la fecha de inicio para ver la vista previa."}
         </p>
 
         <div style={styles.modalActions}>

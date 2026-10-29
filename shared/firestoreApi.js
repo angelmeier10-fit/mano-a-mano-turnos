@@ -144,8 +144,9 @@ export async function updateBookingRef(clientPhone, apptId, { dateKey, start, en
 // Crea muchos cupos de una sola vez (ej: "todos los lunes de 10 a 14, por 8 semanas")
 // Firestore permite hasta 500 escrituras por batch; si hay más, las dividimos.
 // Descarta duplicados: no inserta cupos que ya existan con el mismo dateKey+start+end.
+// Devuelve la cantidad de cupos efectivamente creados.
 export async function addAvailabilitySlotsBatch(slots) {
-  if (slots.length === 0) return;
+  if (slots.length === 0) return 0;
 
   // Obtener todas las dateKeys únicas involucradas
   const dateKeys = [...new Set(slots.map(s => s.dateKey))];
@@ -174,7 +175,7 @@ export async function addAvailabilitySlotsBatch(slots) {
     accepted.push(s);
     return true;
   });
-  if (newSlots.length === 0) return;
+  if (newSlots.length === 0) return 0;
 
   const chunks = [];
   for (let i = 0; i < newSlots.length; i += 450) chunks.push(newSlots.slice(i, i + 450));
@@ -186,6 +187,7 @@ export async function addAvailabilitySlotsBatch(slots) {
     });
     await batch.commit();
   }
+  return newSlots.length;
 }
 // Borra todos los cupos (sin reservar) de un día puntual
 export async function removeAvailabilitySlotsByIds(ids) {
