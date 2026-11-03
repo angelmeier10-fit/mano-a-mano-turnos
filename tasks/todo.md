@@ -77,7 +77,7 @@ usuario externo: una colega que atiende en 2–3 lugares. Cuenta creada a mano, 
 - [x] BORRAR bloque legacy de las reglas y deployarlas (test 10/10, deploy OK 2026-11-03)
 - [x] Script de alta `scripts/create-business.mjs` (usuario Auth + businesses/{slug}; el resto lo carga ella). Test 11/11
 - [x] Título de la pestaña de reservas con el nombre del negocio (antes fijo "Meier Angel · Turnos")
-- [ ] Correr el alta de la colega (faltan email, slug, nombre)
+- [x] Alta de la colega: businesses/momento-relax, usuario 3zvq2I8zn0Nh9xrmuK7sj2yP9KE3 (2026-11-03)
 - [ ] Probar su link de reservas de punta a punta y pasárselo
 
 ## Datos que necesito de la colega (para la Fase 3)
