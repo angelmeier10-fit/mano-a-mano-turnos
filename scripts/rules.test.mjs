@@ -89,6 +89,15 @@ test("el cliente no cancela con una prueba falsa", async () => {
   await assertFails(updateDoc(doc(anon(), "businesses/a/appointments/t1"), { status: "cancelado", cancelProof: "0000" }));
 });
 
+test("las colecciones viejas de la raíz quedan cerradas para cualquier usuario", async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "clients/c1"), { name: "Ana" });
+  });
+  await assertFails(getDoc(doc(ownerB(), "clients/c1")));
+  await assertFails(setDoc(doc(ownerB(), "services/s1"), { name: "X" }));
+  await assertFails(getDoc(doc(anon(), "clients/c1")));
+});
+
 test("la migración copia todo con los mismos IDs, subcolecciones y docs fantasma, y es idempotente", async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();

@@ -71,9 +71,10 @@ usuario externo: una colega que atiende en 2–3 lugares. Cuenta creada a mano, 
 
 ### Fase 3 — Puesta en producción
 - [ ] Confirmar con vos antes de cada paso que toca la base real
-- [ ] `firebase deploy --only firestore:rules` (nuevo + legacy) → migración → push (deploy de las apps)
-      → migración otra vez (solo crea lo que falta, lista lo distinto) → BORRAR bloque legacy de las reglas y deployarlas
-- [ ] Verificar en producción: tu agenda, tus reservas, un link viejo sin `?b`
+- [x] `firebase deploy --only firestore:rules` (nuevo + legacy) → migración (2047 docs, 423 refs completadas)
+      → push (deploy de las apps OK) → migración otra vez (0 nuevos, 2047 iguales)
+- [x] Verificar en producción: tu agenda, tus reservas, un link viejo sin `?b` (todo igual)
+- [x] BORRAR bloque legacy de las reglas y deployarlas (test 10/10, deploy OK 2026-11-03)
 - [ ] Crear usuario de la colega en Firebase Auth + script de alta de su negocio (lugares, servicios)
 - [ ] Probar su link de reservas de punta a punta y pasárselo
 
