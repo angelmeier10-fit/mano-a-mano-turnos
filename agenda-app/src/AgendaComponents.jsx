@@ -9,7 +9,7 @@ import {
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
 import { ANAMNESIS_FIELDS, ClientQuickViewModal } from "./ClientesServiciosViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession, setAvailabilitySlotLastMinute, setReferralCredit, updateAppointment } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession, restoreGiftCard, setAvailabilitySlotLastMinute, setReferralCredit, updateAppointment } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo, locations = [], combos = [], giftCards = [],
@@ -160,6 +160,9 @@ export function AgendaView({
     if (appt?.paidByCombo && appt.comboId) {
       restoreComboSession(appt.comboId, id).catch((e) => console.error("[deleteAppt] restoreComboSession falló:", e));
     }
+    if (appt?.paidByGiftCard && appt.giftCardCode && appt.status !== "cancelado") {
+      restoreGiftCard(appt.giftCardCode).catch((e) => console.error("[deleteAppt] restoreGiftCard falló:", e));
+    }
     onDeleteAppt(id);
     deleteBookingRef(clientPhone, id).catch((e) => console.error("[deleteAppt] deleteBookingRef falló:", e));
   }
@@ -192,6 +195,9 @@ export function AgendaView({
       }
       if (appt?.paidByCombo && appt.comboId) {
         restoreComboSession(appt.comboId, id).catch((e) => console.error("[setApptStatus] restoreComboSession falló:", e));
+      }
+      if (appt?.paidByGiftCard && appt.giftCardCode && appt.status !== "cancelado") {
+        restoreGiftCard(appt.giftCardCode).catch((e) => console.error("[setApptStatus] restoreGiftCard falló:", e));
       }
       markBookingRefCancelled(clientPhone, id).catch(() => {});
       if (appt) {

@@ -3,6 +3,7 @@ import { Gift, ChevronLeft, Copy } from "lucide-react";
 import { formatPrice, formatDateLong, dateKey, addDays, generateCode } from "../../shared/helpers";
 import { createGiftCard, reservasUrl } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
+import TransferInfo from "./TransferInfo";
 
 
 export default function GiftCardView({ services, businessInfo, onBack }) {
@@ -114,14 +115,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
           </div>
         </div>
 
-        <div style={{ background: "#F0F7EC", border: "1.5px solid #6E7F5C", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, fontSize: 13.5, color: "#3D5430", marginBottom: 8 }}>Datos para transferir</div>
-          <div style={{ fontSize: 13.5, color: "#2A2622", lineHeight: 1.9 }}>
-            <div><strong>Angel Anibal Meier</strong></div>
-            <div>CVU: <strong>angel.meier</strong></div>
-            <div style={{ marginTop: 4, fontWeight: 700, fontSize: 15, color: "#3D5430" }}>{formatPrice(done.data.servicePrice)}</div>
-          </div>
-        </div>
+        <TransferInfo businessInfo={businessInfo} amount={done.data.servicePrice} />
 
         <div style={{ background: "#FFF8EC", border: "1.5px solid #C9973A", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13.5, color: "#7A5C20", marginBottom: 4 }}>Esperando confirmación de pago</div>

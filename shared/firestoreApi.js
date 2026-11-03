@@ -1126,9 +1126,11 @@ export async function createCombo(data) {
 }
 
 export async function activateCombo(comboId) {
+  const now = Date.now();
   return updateDoc(bdoc("combos", comboId), {
     status: "active",
-    activatedAt: Date.now(),
+    activatedAt: now,
+    expiresAt: now + COMBO_VALID_DAYS * 24 * 60 * 60 * 1000,
   });
 }
 

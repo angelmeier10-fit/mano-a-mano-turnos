@@ -269,6 +269,8 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   const [hoursLabel, setHoursLabel] = useState(businessInfo?.hoursLabel || "");
   const [whatsapp, setWhatsapp] = useState(businessInfo?.whatsapp || "");
   const [referralAmount, setReferralAmount] = useState(String(getReferralAmount(businessInfo)));
+  const [transferHolder, setTransferHolder] = useState(businessInfo?.transferHolder || "");
+  const [transferAlias, setTransferAlias] = useState(businessInfo?.transferAlias || "");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -278,11 +280,13 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     setHoursLabel(businessInfo?.hoursLabel || "");
     setWhatsapp(businessInfo?.whatsapp || "");
     setReferralAmount(String(getReferralAmount(businessInfo)));
+    setTransferHolder(businessInfo?.transferHolder || "");
+    setTransferAlias(businessInfo?.transferAlias || "");
   }, [businessInfo]);
 
   function handleSubmit(e) {
     e.preventDefault();
-    onSave({ name, address, addressDetail, hoursLabel, whatsapp, referralAmount: Math.max(0, Number(referralAmount) || 0) });
+    onSave({ name, address, addressDetail, hoursLabel, whatsapp, referralAmount: Math.max(0, Number(referralAmount) || 0), transferHolder: transferHolder.trim(), transferAlias: transferAlias.trim() });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -358,6 +362,13 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
         <label style={styles.fieldLabel}>Tu WhatsApp (para que te escriban tus clientes)</label>
         <input style={styles.input} value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="Ej: 1112345678 (sin 0 ni 15)" />
         <p style={styles.helperText}>Se va a mostrar como botón de contacto en la app de reservas.</p>
+
+        <label style={styles.fieldLabel}>Titular de la cuenta (para transferencias)</label>
+        <input style={styles.input} value={transferHolder} onChange={e => setTransferHolder(e.target.value)} placeholder="Nombre y apellido" />
+
+        <label style={styles.fieldLabel}>Alias o CVU</label>
+        <input style={styles.input} value={transferAlias} onChange={e => setTransferAlias(e.target.value)} placeholder="Ej: maria.masajes" />
+        <p style={styles.helperText}>Se muestran a quien compra una gift card o un combo. Si lo dejás vacío, se le pide coordinar el pago por WhatsApp.</p>
 
         <label style={styles.fieldLabel}>Descuento por referidos ($)</label>
         <input style={styles.input} type="number" min="0" step="500" value={referralAmount} onChange={e => setReferralAmount(e.target.value)} />

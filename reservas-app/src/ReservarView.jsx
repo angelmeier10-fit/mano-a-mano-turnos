@@ -188,9 +188,9 @@ export default function ReservarView({ services: allServices, availability: allA
       <div style={styles.viewWrap}>
         <div style={styles.confirmCard}>
           <div style={styles.confirmCheck}><Check size={28} color="#EFE9DF" /></div>
-          <h2 style={styles.confirmTitle}>{giftCardCode ? "Turno confirmado" : "Turno pendiente de confirmación"}</h2>
+          <h2 style={styles.confirmTitle}>Turno pendiente de confirmación</h2>
           {giftCardCode
-            ? <p style={{ ...styles.confirmDetail, color: "#4A5A40", fontWeight: 600, marginBottom: 4 }}>🎁 Pago con gift card</p>
+            ? <p style={{ ...styles.confirmDetail, color: "#4A5A40", fontWeight: 600, marginBottom: 4 }}>🎁 Pago con gift card · te confirmamos el turno pronto por WhatsApp.</p>
             : confirmed.comboId
             ? <p style={{ ...styles.confirmDetail, color: "#4A5A40", fontWeight: 600, marginBottom: 4 }}>📦 Pagado con tu combo</p>
             : <p style={{ ...styles.confirmDetail, color: "#8A8275", marginBottom: 4 }}>Te confirmamos el turno pronto por WhatsApp.</p>
