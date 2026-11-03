@@ -3,7 +3,7 @@ import { Calendar, Clock, Check, MessageCircle, CalendarDays, List } from "lucid
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
-  applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS, REFERRAL_AMOUNT,
+  applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS, getReferralAmount,
   slotLocationId, serviceAtLocation, servicePrice, locationSnapshot,
 } from "../../shared/helpers";
 import { getClientDiscountPublic, getCombosByPhone, isExistingClientPublic, getReferralCreditPublic } from "../../shared/firestoreApi";
@@ -93,10 +93,11 @@ export default function ReservarView({ services: allServices, availability: allA
     if (selectedDate && !availableDatesSet.has(selectedDate)) { setSelectedDate(availableDates[0] || null); setSelectedSlot(null); }
   }, [availableDatesSet]);
 
-  const referralApplies = referralMode && !isExistingClient && !!referredByName.trim();
+  const referralAmount = getReferralAmount(businessInfo);
+  const referralApplies = referralMode && referralAmount > 0 && !isExistingClient && !!referredByName.trim();
   function priceWithDiscounts(price, sId) {
     const { finalPrice, discountAmount } = applyClientDiscount(price, clientDiscount, sId);
-    const referralDiscount = referralApplies ? Math.min(REFERRAL_AMOUNT, finalPrice) : 0;
+    const referralDiscount = referralApplies ? Math.min(referralAmount, finalPrice) : 0;
     return { finalPrice: finalPrice - referralDiscount, discountAmount: discountAmount + referralDiscount, referralDiscount };
   }
 
@@ -263,9 +264,9 @@ export default function ReservarView({ services: allServices, availability: allA
           <div style={styles.comboBannerArrow}>›</div>
         </div>
       )}
-      {referralMode && (
+      {referralMode && referralAmount > 0 && (
         <div style={{ background: "#F7EDE6", border: "1.5px solid #B5654A", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 13.5, color: "#2A2622" }}>
-          <strong>Venís recomendado 🙌</strong> Tenés {formatPrice(REFERRAL_AMOUNT)} de descuento en tu primera sesión. Completá quién te recomendó más abajo.
+          <strong>Venís recomendado 🙌</strong> Tenés {formatPrice(referralAmount)} de descuento en tu primera sesión. Completá quién te recomendó más abajo.
         </div>
       )}
       <h2 style={styles.sectionTitle}>Reservá tu sesión</h2>
@@ -346,11 +347,11 @@ export default function ReservarView({ services: allServices, availability: allA
 
       {referralCredit > 0 && (
         <div style={{ background: "#EBF3E6", border: "1.5px solid #6E7F5C", borderRadius: 10, padding: "10px 14px", margin: "10px 0 4px", fontSize: 13, color: "#3D5430" }}>
-          <strong>Tenés {formatPrice(referralCredit)} de crédito por recomendar.</strong> Se descuentan {formatPrice(Math.min(REFERRAL_AMOUNT, referralCredit))} de tu próximo turno al momento de pagar.
+          <strong>Tenés {formatPrice(referralCredit)} de crédito por recomendar.</strong> Se descuentan {formatPrice(referralAmount > 0 ? Math.min(referralAmount, referralCredit) : referralCredit)} de tu próximo turno al momento de pagar.
         </div>
       )}
 
-      {referralMode && (
+      {referralMode && referralAmount > 0 && (
         <>
           <label style={styles.fieldLabel}>¿Quién te recomendó?</label>
           <input

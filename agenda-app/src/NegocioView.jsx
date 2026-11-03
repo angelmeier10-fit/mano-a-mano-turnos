@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Check, Download, Copy, Share2, Pencil, Trash2, Plus, MapPin } from "lucide-react";
 import styles from "../../shared/styles";
-import { STATUS, formatPrice, getAppointmentPrice, dateKey, REFERRAL_AMOUNT } from "../../shared/helpers";
+import { STATUS, formatPrice, getAppointmentPrice, dateKey, getReferralAmount } from "../../shared/helpers";
 import { reservasUrl } from "../../shared/firestoreApi";
 
 function ShareLinkCard({ label, url, shareTitle }) {
@@ -268,6 +268,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   const [addressDetail, setAddressDetail] = useState(businessInfo?.addressDetail || "");
   const [hoursLabel, setHoursLabel] = useState(businessInfo?.hoursLabel || "");
   const [whatsapp, setWhatsapp] = useState(businessInfo?.whatsapp || "");
+  const [referralAmount, setReferralAmount] = useState(String(getReferralAmount(businessInfo)));
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -276,11 +277,12 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     setAddressDetail(businessInfo?.addressDetail || "");
     setHoursLabel(businessInfo?.hoursLabel || "");
     setWhatsapp(businessInfo?.whatsapp || "");
+    setReferralAmount(String(getReferralAmount(businessInfo)));
   }, [businessInfo]);
 
   function handleSubmit(e) {
     e.preventDefault();
-    onSave({ name, address, addressDetail, hoursLabel, whatsapp });
+    onSave({ name, address, addressDetail, hoursLabel, whatsapp, referralAmount: Math.max(0, Number(referralAmount) || 0) });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -325,11 +327,13 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
       <h2 style={styles.sectionTitle}>Mi negocio</h2>
 
       <ShareLinkCard label="Link de reservas para tus clientes" url={reservasUrl()} shareTitle="Reservá tu sesión" />
-      <ShareLinkCard
-        label={`Link de referidos: ${formatPrice(REFERRAL_AMOUNT)} de descuento en la primera sesión`}
-        url={reservasUrl({ ref: "amigo" })}
-        shareTitle="Te recomiendo este lugar de masajes"
-      />
+      {getReferralAmount(businessInfo) > 0 && (
+        <ShareLinkCard
+          label={`Link de referidos: ${formatPrice(getReferralAmount(businessInfo))} de descuento en la primera sesión`}
+          url={reservasUrl({ ref: "amigo" })}
+          shareTitle="Te recomiendo este lugar de masajes"
+        />
+      )}
 
       <h2 style={{ ...styles.sectionTitle, marginTop: 4 }}>Ingresos</h2>
       <IncomesPanel appointments={appointments} services={services} />
@@ -354,6 +358,10 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
         <label style={styles.fieldLabel}>Tu WhatsApp (para que te escriban tus clientes)</label>
         <input style={styles.input} value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="Ej: 1112345678 (sin 0 ni 15)" />
         <p style={styles.helperText}>Se va a mostrar como botón de contacto en la app de reservas.</p>
+
+        <label style={styles.fieldLabel}>Descuento por referidos ($)</label>
+        <input style={styles.input} type="number" min="0" step="500" value={referralAmount} onChange={e => setReferralAmount(e.target.value)} />
+        <p style={styles.helperText}>Lo que descuenta la primera sesión de quien llega recomendado, y el crédito que recibe quien recomendó. Poné 0 si no querés usar referidos.</p>
 
         <div style={styles.modalActions}>
           <div style={{ flex: 1 }} />

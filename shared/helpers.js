@@ -83,6 +83,11 @@ export function publicApptFields(appt) {
   return Object.fromEntries(PUBLIC_APPT_FIELDS.filter(k => appt[k] != null).map(k => [k, appt[k]]));
 }
 export const REFERRAL_AMOUNT = 5000;
+// Descuento por referidos de cada negocio (si no lo configuró, el de siempre). 0 = sin referidos.
+export function getReferralAmount(businessInfo) {
+  const v = businessInfo?.referralAmount;
+  return typeof v === "number" && v >= 0 ? v : REFERRAL_AMOUNT;
+}
 export function applyClientDiscount(price, discounts, serviceId) {
   const base = price || 0;
   const discount = discounts?.[serviceId];

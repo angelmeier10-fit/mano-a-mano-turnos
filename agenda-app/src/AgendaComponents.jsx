@@ -3,7 +3,7 @@ import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, Mes
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
-  formatPhoneForWhatsapp, parseDateKeyAsLocal, REFERRAL_AMOUNT,
+  formatPhoneForWhatsapp, parseDateKeyAsLocal, getReferralAmount,
   slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, appointmentAddress,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
@@ -170,7 +170,9 @@ export function AgendaView({
     if (status === "completado" && !wasCompleted && client && !appt.referralCreditApplied
         && !appt.paidByCombo && !appt.paidByGiftCard) {
       const svc = services.find(s => s.id === appt.serviceId);
-      const applied = Math.min(REFERRAL_AMOUNT, client.referralCredit || 0, getAppointmentPrice(appt, svc));
+      // Con referidos apagados (monto 0) se usa el crédito que haya quedado, sin tope por turno.
+      const cap = getReferralAmount(businessInfo) || Infinity;
+      const applied = Math.min(cap, client.referralCredit || 0, getAppointmentPrice(appt, svc));
       if (applied > 0) {
         updates.discount = (appt.discount || 0) + applied;
         updates.referralCreditApplied = applied;
@@ -1004,7 +1006,7 @@ function TurnoAnamnesisSection({ client }) {
 
 // Turno que llegó por el link de referidos: una vez completado, se elige a qué cliente
 // corresponde el nombre que escribió y se le acredita el descuento para su próximo turno.
-function ReferralSection({ appt, clients }) {
+function ReferralSection({ appt, clients, amount }) {
   const [referrerId, setReferrerId] = useState("");
   const [creditedId, setCreditedId] = useState(appt.referrerClientId || null);
   const [saving, setSaving] = useState(false);
@@ -1021,7 +1023,7 @@ function ReferralSection({ appt, clients }) {
     if (!referrer || saving) return;
     setSaving(true);
     try {
-      await setReferralCredit(referrer.id, (referrer.referralCredit || 0) + REFERRAL_AMOUNT);
+      await setReferralCredit(referrer.id, (referrer.referralCredit || 0) + amount);
       await updateAppointment(appt.id, { referrerClientId: referrer.id });
       setCreditedId(referrer.id);
     } catch (e) {
@@ -1034,9 +1036,9 @@ function ReferralSection({ appt, clients }) {
     <div style={{ background: "#F7EDE6", border: "1.5px solid #D9B5A3", borderRadius: 10, padding: "10px 12px", margin: "6px 0 14px", fontSize: 13 }}>
       <div style={{ fontWeight: 700, color: "#2A2622" }}>Recomendado por: {appt.referredByName}</div>
       {credited ? (
-        <div style={{ color: "#3D5430", marginTop: 4 }}>Crédito de {formatPrice(REFERRAL_AMOUNT)} acreditado a {credited.name}.</div>
+        <div style={{ color: "#3D5430", marginTop: 4 }}>Crédito de {formatPrice(amount)} acreditado a {credited.name}.</div>
       ) : appt.status !== "completado" ? (
-        <div style={{ color: "#8A8275", marginTop: 4 }}>Cuando el turno esté completado vas a poder acreditarle {formatPrice(REFERRAL_AMOUNT)} a quien lo recomendó.</div>
+        <div style={{ color: "#8A8275", marginTop: 4 }}>Cuando el turno esté completado vas a poder acreditarle {formatPrice(amount)} a quien lo recomendó.</div>
       ) : (
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <select style={{ ...styles.input, flex: 1, margin: 0 }} value={referrerId} onChange={e => setReferrerId(e.target.value)}>
@@ -1045,7 +1047,7 @@ function ReferralSection({ appt, clients }) {
           </select>
           <button type="button" disabled={!referrerId || saving} onClick={credit}
             style={{ ...styles.saveBtn, width: "auto", padding: "0 14px", margin: 0, opacity: !referrerId || saving ? 0.5 : 1 }}>
-            Acreditar {formatPrice(REFERRAL_AMOUNT)}
+            Acreditar {formatPrice(amount)}
           </button>
         </div>
       )}
@@ -1320,7 +1322,7 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
           </div>
         )}
 
-        {initial?.referredByName && <ReferralSection appt={initial} clients={clients} />}
+        {initial?.referredByName && getReferralAmount(businessInfo) > 0 && <ReferralSection appt={initial} clients={clients} amount={getReferralAmount(businessInfo)} />}
 
         {!initial && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
