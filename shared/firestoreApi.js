@@ -128,8 +128,10 @@ export async function deleteLocation(id) {
 }
 
 // ---------- Disponibilidad (cupos abiertos por el profesional) ----------
-export function listenAvailability(callback) {
-  return onSnapshot(bcol("availability"), (snap) => {
+// fromDateKey (opcional): solo cupos desde esa fecha, para no leer los pasados.
+export function listenAvailability(callback, fromDateKey) {
+  const ref = fromDateKey ? query(bcol("availability"), where("dateKey", ">=", fromDateKey)) : bcol("availability");
+  return onSnapshot(ref, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }, (err) => console.error("[listenAvailability] snapshot error:", err));
 }
@@ -591,8 +593,9 @@ export function listenAppointments(callback) {
 }
 
 // Llama a onNew solo para turnos creados después de sessionStart (evita falsos positivos por cache/reconexión).
+// Solo trae lo creado después de sessionStart, así no vuelve a leer toda la colección.
 export function listenIncomingPendingAppointments(sessionStart, onNew) {
-  return onSnapshot(bcol("appointments"), (snap) => {
+  return onSnapshot(query(bcol("appointments"), where("createdAt", ">", sessionStart)), (snap) => {
     snap.docChanges().forEach(change => {
       if (change.type === "added") {
         const a = { id: change.doc.id, ...change.doc.data() };
@@ -602,7 +605,7 @@ export function listenIncomingPendingAppointments(sessionStart, onNew) {
   }, (err) => console.error("[listenIncomingPendingAppointments] snapshot error:", err));
 }
 export function listenIncomingPendingGiftCards(sessionStart, onNew) {
-  return onSnapshot(bcol("giftCards"), (snap) => {
+  return onSnapshot(query(bcol("giftCards"), where("createdAt", ">", sessionStart)), (snap) => {
     snap.docChanges().forEach(change => {
       if (change.type === "added") {
         const gc = { id: change.doc.id, ...change.doc.data() };
@@ -612,7 +615,7 @@ export function listenIncomingPendingGiftCards(sessionStart, onNew) {
   }, (err) => console.error("[listenIncomingPendingGiftCards] snapshot error:", err));
 }
 export function listenIncomingPendingCombos(sessionStart, onNew) {
-  return onSnapshot(bcol("combos"), (snap) => {
+  return onSnapshot(query(bcol("combos"), where("createdAt", ">", sessionStart)), (snap) => {
     snap.docChanges().forEach(change => {
       if (change.type === "added") {
         const c = { id: change.doc.id, ...change.doc.data() };

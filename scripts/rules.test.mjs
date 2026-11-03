@@ -5,7 +5,7 @@ import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection, query, where } from "firebase/firestore";
 import { initializeApp as initAdmin } from "firebase-admin/app";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { migrateToBusiness } from "./migrate-to-businesses.mjs";
@@ -175,4 +175,18 @@ test("alta de negocio: crea el doc con el dueño, sin quiz, y no pisa uno existe
   const colega = env.authenticatedContext("uidC").firestore();
   await assertSucceeds(setDoc(doc(colega, "businesses/colega/services/s1"), { name: "Descontracturante" }));
   await assertFails(setDoc(doc(colega, "businesses/a/services/s9"), { name: "X" }));
+});
+
+test("consultas livianas: el público lee solo cupos futuros y el dueño solo turnos nuevos", async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "businesses/a/availability/viejo"), { dateKey: "2020-01-01", start: "10:00", end: "11:00" });
+    await setDoc(doc(db, "businesses/a/availability/nuevo"), { dateKey: "2099-01-01", start: "10:00", end: "11:00" });
+    await setDoc(doc(db, "businesses/a/appointments/nuevo"), { clientName: "Bea", status: "pendiente", createdAt: 2000 });
+  });
+  const anon = env.unauthenticatedContext().firestore();
+  const slots = await assertSucceeds(getDocs(query(collection(anon, "businesses/a/availability"), where("dateKey", ">=", "2026-11-03"))));
+  assert.deepEqual(slots.docs.map(d => d.id), ["nuevo"]);
+  const appts = await assertSucceeds(getDocs(query(collection(ownerA(), "businesses/a/appointments"), where("createdAt", ">", 1000))));
+  assert.deepEqual(appts.docs.map(d => d.id), ["nuevo"]);
 });

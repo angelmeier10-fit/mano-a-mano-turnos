@@ -21,7 +21,7 @@ import {
   setBusinessId,
   DEFAULT_BUSINESS_ID,
 } from "../../shared/firestoreApi";
-import { GoogleFontsHref, sortLocations } from "../../shared/helpers";
+import { GoogleFontsHref, sortLocations, dateKey } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
 function isInAppBrowser() {
@@ -205,7 +205,7 @@ export default function App() {
 
   useEffect(() => {
     const unsubServices = listenServices(setServices);
-    const unsubAvail = listenAvailability((data) => { setAvailability(data); setLoaded(true); });
+    const unsubAvail = listenAvailability((data) => { setAvailability(data); setLoaded(true); }, dateKey(new Date()));
     const unsubBiz = listenBusinessInfo(setBusinessInfo);
     const unsubLocations = listenLocations(locs => setLocations(sortLocations(locs)));
     return () => { unsubServices(); unsubAvail(); unsubBiz(); unsubLocations(); };
