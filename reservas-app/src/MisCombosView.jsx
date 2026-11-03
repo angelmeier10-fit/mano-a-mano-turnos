@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { Search, ChevronLeft } from "lucide-react";
-import { getCombosByPhone } from "../../shared/firestoreApi";
+import { getCombosByPhone, reservasUrl } from "../../shared/firestoreApi";
 import { formatDateLong, formatPrice } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
-const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
-export default function MisCombosView({ onBack, onSelectCombo }) {
+export default function MisCombosView({ businessInfo, onBack, onSelectCombo }) {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
@@ -101,8 +100,8 @@ export default function MisCombosView({ onBack, onSelectCombo }) {
                 <button
                   style={{ ...styles.saveBtn, background: "#25D366", width: "100%", justifyContent: "center", marginTop: 10 }}
                   onClick={() => {
-                    const link = `${BASE_URL}?combo=${c.id}`;
-                    const msg = `Hola ${c.clientName}! Te comparto tu combo de sesiones de Angel Meier Masoterapia 📦\nServicio: ${c.serviceName} · x${c.totalSessions}\nDe parte de: ${c.fromName}${c.message ? `\n"${c.message}"` : ""}\n\nLink para verlo y usarlo:\n${link}`;
+                    const link = reservasUrl({ combo: c.id });
+                    const msg = `Hola ${c.clientName}! Te comparto tu combo de sesiones de ${businessInfo.name} 📦\nServicio: ${c.serviceName} · x${c.totalSessions}\nDe parte de: ${c.fromName}${c.message ? `\n"${c.message}"` : ""}\n\nLink para verlo y usarlo:\n${link}`;
                     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
                   }}
                 >

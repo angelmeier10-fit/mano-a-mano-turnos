@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Download, Check, Gift } from "lucide-react";
-import { getGiftCard } from "../../shared/firestoreApi";
+import { getGiftCard, reservasUrl } from "../../shared/firestoreApi";
 import { formatPrice, formatDateLong, dateKey } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import ReservarView from "./ReservarView";
 
-const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
-function GiftCardVisual({ gc, canvasRef }) {
+function GiftCardVisual({ gc, canvasRef, businessInfo }) {
   return (
     <div ref={canvasRef} style={{ ...styles.giftCardVisual, display: "flex", flexDirection: "column", padding: 0 }}>
       <div style={{ position: "relative", height: 110, overflow: "hidden", flexShrink: 0 }}>
@@ -28,18 +27,18 @@ function GiftCardVisual({ gc, canvasRef }) {
       </div>
       <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #D4AF37 50%, #C9A84C 80%, transparent)", flexShrink: 0 }} />
       <div style={{ padding: "18px 22px 20px", flex: 1 }}>
-        <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
+        <div style={styles.giftCardVisualLogo}>{businessInfo.name}</div>
         <div style={styles.giftCardVisualService}>{gc.serviceName}</div>
         <div style={styles.giftCardVisualTo}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
         {gc.message && <div style={styles.giftCardVisualMessage}>"{gc.message}"</div>}
         <div style={styles.giftCardVisualCode}>Código: {gc.code}</div>
-        <div style={styles.giftCardVisualLink}>{`${BASE_URL}?giftcard=${gc.code}`}</div>
+        <div style={styles.giftCardVisualLink}>{reservasUrl({ giftcard: gc.code })}</div>
       </div>
     </div>
   );
 }
 
-export default function GiftCardRedeemView({ code, services, availability, businessInfo, onBookSlot, onUpsertClient }) {
+export default function GiftCardRedeemView({ code, services, availability, locations = [], businessInfo, onBookSlot, onUpsertClient }) {
   const [gc, setGc] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -106,10 +105,10 @@ export default function GiftCardRedeemView({ code, services, availability, busin
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <Gift size={28} color="#B5654A" />
         <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, margin: "8px 0 4px" }}>Gift Card</h2>
-        <p style={{ fontSize: 13, color: "#8A8275", margin: 0 }}>Angel Meier · Masoterapia</p>
+        <p style={{ fontSize: 13, color: "#8A8275", margin: 0 }}>{businessInfo.name}</p>
       </div>
 
-      <GiftCardVisual gc={gc} canvasRef={cardRef} />
+      <GiftCardVisual gc={gc} canvasRef={cardRef} businessInfo={businessInfo} />
 
       <button
         onClick={handleDownload}
@@ -165,6 +164,7 @@ function BookingForGiftCard({ gc, services, availability, businessInfo, onBookSl
     <ReservarView
       services={services}
       availability={availability}
+      locations={locations}
       businessInfo={businessInfo}
       onBookSlot={onBookSlot}
       onUpsertClient={onUpsertClient}

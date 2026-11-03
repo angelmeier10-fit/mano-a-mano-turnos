@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { Check, Gift, Search } from "lucide-react";
 
-const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
-import { activateGiftCard, deactivateGiftCard, deleteGiftCard, getGiftCard } from "../../shared/firestoreApi";
+import { activateGiftCard, deactivateGiftCard, deleteGiftCard, getGiftCard, reservasUrl } from "../../shared/firestoreApi";
 import { formatPrice, formatDateLong } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
@@ -12,7 +11,7 @@ const STATUS_LABEL = {
   used: "Utilizada",
 };
 
-export default function GiftCardsView({ giftCards }) {
+export default function GiftCardsView({ giftCards, businessInfo }) {
   const [confirming, setConfirming] = useState(null);
   const [codeInput, setCodeInput] = useState("");
   const [codeSearch, setCodeSearch] = useState(null); // { loading, result, error }
@@ -154,8 +153,8 @@ export default function GiftCardsView({ giftCards }) {
         <button
           style={{ ...styles.giftCardConfirmBtn, background: "#25D366", color: "#fff", borderColor: "#25D366", marginTop: 8, width: "100%", justifyContent: "center" }}
           onClick={() => {
-            const link = `${BASE_URL}?giftcard=${gc.code}`;
-            const msg = `Hola ${gc.toName}! Te comparto tu gift card de Angel Meier Masoterapia 🎁\nServicio: ${gc.serviceName}\nDe parte de: ${gc.fromName}${gc.message ? `\n"${gc.message}"` : ""}\n\nLink para usarla:\n${link}`;
+            const link = reservasUrl({ giftcard: gc.code });
+            const msg = `Hola ${gc.toName}! Te comparto tu gift card de ${businessInfo.name} 🎁\nServicio: ${gc.serviceName}\nDe parte de: ${gc.fromName}${gc.message ? `\n"${gc.message}"` : ""}\n\nLink para usarla:\n${link}`;
             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
           }}
         >

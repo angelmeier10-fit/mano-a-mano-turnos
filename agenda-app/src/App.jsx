@@ -7,15 +7,17 @@ import { ClientesView, ServiciosView, CombosView } from "./ClientesServiciosView
 import NegocioView from "./NegocioView";
 import GiftCardsView from "./GiftCardsView";
 import {
-  listenServices, addService, setServiceWithId, updateService, deleteService,
+  setBusinessId, getBusinessForOwner,
+  listenServices, addService, updateService, deleteService,
   listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
   listenAppointments, listenIncomingPendingAppointments, createAppointment, updateAppointment, deleteAppointment,
   listenClients, upsertClientByName, updateClient, deleteClient,
   listenBusinessInfo, setBusinessInfo, freeAvailabilitySlot,
   listenGiftCards, listenCombos,
   listenIncomingPendingGiftCards, listenIncomingPendingCombos,
+  listenLocations, addLocation, updateLocation, deleteLocation,
 } from "../../shared/firestoreApi";
-import { DEFAULT_SERVICES, DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
+import { DEFAULT_BUSINESS_INFO, GoogleFontsHref, sortLocations } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
 function GoogleFontsLoader() {
@@ -32,6 +34,8 @@ function GoogleFontsLoader() {
 export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState(null);
+  // undefined = buscando, null = la cuenta no tiene negocio, string = id del negocio
+  const [bizId, setBizId] = useState(undefined);
 
   const [view, setView] = useState("agenda");
   const [services, setServices] = useState([]);
@@ -39,11 +43,9 @@ export default function App() {
   const [clients, setClients] = useState([]);
   const [availability, setAvailability] = useState([]);
   const [businessInfo, setBusinessInfoState] = useState(DEFAULT_BUSINESS_INFO);
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [servicesLoaded, setServicesLoaded] = useState(false);
-  const seededServicesRef = React.useRef(false);
   const [giftCards, setGiftCards] = useState([]);
   const [combos, setCombos] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [apptNotifs, setApptNotifs] = useState([]); // [{ id, clientName, dateKey, start }]
   const [purchaseNotifs, setPurchaseNotifs] = useState([]); // [{ id, kind: "giftcard"|"combo", label }]
   const [openApptId, setOpenApptId] = useState(null);
@@ -55,6 +57,28 @@ export default function App() {
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!user) { setBizId(undefined); return; }
+    let cancelled = false;
+    getBusinessForOwner(user.uid)
+      .then(id => {
+        if (cancelled) return;
+        if (id) setBusinessId(id);
+        setBizId(id);
+      })
+      .catch(err => {
+        console.error("[agenda] No se pudo buscar el negocio de la cuenta:", err);
+        if (!cancelled) setBizId(null);
+      });
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Recargar al salir evita que otra cuenta en el mismo dispositivo vea datos en memoria.
+  async function handleLogout() {
+    await logout();
+    window.location.reload();
+  }
 
   // El permiso de notificaciones solo se puede pedir con un gesto del usuario
   // (los navegadores ignoran/bloquean el pedido si se dispara solo al cargar la página).
@@ -69,8 +93,8 @@ export default function App() {
 
   // Suscripciones en tiempo real a Firestore, solo cuando hay sesión iniciada
   useEffect(() => {
-    if (!user) return;
-    const unsubServices = listenServices(list => { setServices(list); setServicesLoaded(true); });
+    if (!user || !bizId) return;
+    const unsubServices = listenServices(setServices);
     const unsubAppts = listenAppointments(setAppointments);
     const sessionStart = Date.now();
     const unsubIncoming = listenIncomingPendingAppointments(sessionStart, (a) => {
@@ -86,10 +110,10 @@ export default function App() {
     const unsubAvail = listenAvailability(setAvailability);
     const unsubBiz = listenBusinessInfo((data) => {
       if (data) setBusinessInfoState(data);
-      setDataLoaded(true);
     });
     const unsubGiftCards = listenGiftCards(setGiftCards);
     const unsubCombos = listenCombos(setCombos);
+    const unsubLocations = listenLocations(locs => setLocations(sortLocations(locs)));
     const unsubIncomingGiftCards = listenIncomingPendingGiftCards(sessionStart, (gc) => {
       setPurchaseNotifs(prev => [...prev, { id: gc.id, kind: "giftcard", label: `Gift card: ${gc.toName} · ${gc.serviceName}` }]);
       if ("Notification" in window && Notification.permission === "granted") {
@@ -109,10 +133,10 @@ export default function App() {
       }
     });
     return () => {
-      unsubServices(); unsubAppts(); unsubIncoming(); unsubClients(); unsubAvail(); unsubBiz(); unsubGiftCards(); unsubCombos();
+      unsubServices(); unsubAppts(); unsubIncoming(); unsubClients(); unsubAvail(); unsubBiz(); unsubGiftCards(); unsubCombos(); unsubLocations();
       unsubIncomingGiftCards(); unsubIncomingCombos();
     };
-  }, [user]);
+  }, [user, bizId]);
 
   // Una vez que la gift card o el combo dejan de estar pendientes (se activaron o se
   // eliminaron), la notificación correspondiente se borra sola.
@@ -130,26 +154,7 @@ export default function App() {
     }));
   }, [giftCards, combos]);
 
-  // Primera vez: si no hay servicios cargados en Firestore, precargamos los por defecto.
-  // Espera a que el propio listener de servicios haya emitido su primer snapshot
-  // (servicesLoaded), no solo a dataLoaded (que depende del listener de businessInfo y
-  // puede resolver antes, haciendo creer que la lista está vacía cuando en realidad
-  // todavía no llegó el primer snapshot real).
-  useEffect(() => {
-    if (!user || !dataLoaded || !servicesLoaded || seededServicesRef.current) return;
-    seededServicesRef.current = true;
-    // Se escribe con el id fijo de DEFAULT_SERVICES (en vez de un id autogenerado)
-    // para que sembrar sea idempotente: si dos pestañas/dispositivos disparan esto
-    // a la vez, ambos terminan escribiendo el mismo documento en vez de duplicarlo.
-    const existingNames = new Set(services.map(s => s.name));
-    DEFAULT_SERVICES.forEach(s => {
-      if (existingNames.has(s.name)) return;
-      const { id, ...rest } = s;
-      setServiceWithId(id, rest);
-    });
-  }, [user, dataLoaded, servicesLoaded, services.length]);
-
-  if (!authChecked) {
+  if (!authChecked || (user && bizId === undefined)) {
     return (
       <div style={styles.loadingScreen}>
         <div style={styles.loadingMark} />
@@ -166,11 +171,23 @@ export default function App() {
     );
   }
 
+  if (!bizId) {
+    return (
+      <div style={{ ...styles.loadingScreen, flexDirection: "column", gap: 16, padding: 24, textAlign: "center" }}>
+        <GoogleFontsLoader />
+        <p style={{ fontSize: 15, color: "#2A2622", margin: 0 }}>Esta cuenta todavía no tiene un negocio configurado.</p>
+        <button onClick={handleLogout} style={{ background: "#2A2622", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 14, cursor: "pointer" }}>
+          Cerrar sesión
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.app}>
       <GoogleFontsLoader />
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-        <Header view={view} setView={setView} onLogout={logout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "pending" || (c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000)).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
+        <Header view={view} setView={setView} onLogout={handleLogout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "pending" || (c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000)).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
         {notifPermission === "default" && (
           <div
             onClick={handleEnableNotifications}
@@ -216,6 +233,7 @@ export default function App() {
             availability={availability}
             clients={clients}
             businessInfo={businessInfo}
+            locations={locations}
             combos={combos}
             giftCards={giftCards}
             onCreateAppt={createAppointment}
@@ -254,6 +272,7 @@ export default function App() {
             onAddService={addService}
             onUpdateService={updateService}
             onDeleteService={deleteService}
+            locations={locations}
             businessInfo={businessInfo}
             onSaveBusinessInfo={setBusinessInfo}
           />
@@ -265,10 +284,14 @@ export default function App() {
             appointments={appointments}
             clients={clients}
             services={services}
+            locations={locations}
+            onAddLocation={addLocation}
+            onUpdateLocation={updateLocation}
+            onDeleteLocation={deleteLocation}
           />
         )}
         {view === "giftcards" && (
-          <GiftCardsView giftCards={giftCards} />
+          <GiftCardsView giftCards={giftCards} businessInfo={businessInfo} />
         )}
       </main>
     </div>

@@ -4,6 +4,7 @@ import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
   formatPhoneForWhatsapp, parseDateKeyAsLocal, REFERRAL_AMOUNT,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, appointmentAddress,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
@@ -11,7 +12,7 @@ import { ANAMNESIS_FIELDS, ClientQuickViewModal } from "./ClientesServiciosViews
 import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession, setAvailabilitySlotLastMinute, setReferralCredit, updateAppointment } from "../../shared/firestoreApi";
 
 export function AgendaView({
-  services, appointments, availability, clients, businessInfo, combos = [], giftCards = [],
+  services, appointments, availability, clients, businessInfo, locations = [], combos = [], giftCards = [],
   onCreateAppt, onUpdateAppt, onDeleteAppt,
   onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch, onFreeSlot,
   upsertClientByName, pendingGiftCards = 0, onGoGiftCards,
@@ -29,6 +30,8 @@ export function AgendaView({
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const todayKey = dateKey(new Date());
+  const multiLoc = locations.length > 1;
+  const locationName = (id) => locations.find(l => l.id === id)?.name || "";
 
   const STATUS_BG = {
     pendiente:  { bg: "#FFF8EC", border: "#C9973A" },
@@ -61,7 +64,7 @@ export function AgendaView({
       .replace("{servicio}", svc?.name || "masaje")
       .replace("{cuando}", when)
       .replace("{hora}", appt.start)
-      .replace("{direccion}", businessInfo?.address || "");
+      .replace("{direccion}", appointmentAddress(appt, businessInfo));
     return `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
   }
 
@@ -111,7 +114,11 @@ export function AgendaView({
   }, [openApptId]);
 
   function openNewAppt(slotDate, slotTime, fromSlotId) {
-    setPrefillSlot({ dateKey: dateKey(slotDate), start: slotTime || "10:00", fromAvailabilityId: fromSlotId || null });
+    const slot = fromSlotId ? availability.find(s => s.id === fromSlotId) : null;
+    setPrefillSlot({
+      dateKey: dateKey(slotDate), start: slotTime || "10:00", fromAvailabilityId: fromSlotId || null,
+      ...(slot ? { locationId: slotLocationId(slot, locations) } : {}),
+    });
     setEditingAppt(null);
     setShowApptForm(true);
   }
@@ -131,6 +138,7 @@ export function AgendaView({
         dateKey: dateKey(addDays(parseDateKeyAsLocal(s.dateKey), 7)),
         start: s.start,
         end: s.end,
+        ...(s.locationId ? { locationId: s.locationId } : {}),
       }));
       const created = await onAddSlotsBatch(slots);
       setWeekStart(addDays(weekStart, 7));
@@ -215,6 +223,7 @@ export function AgendaView({
       clientName: appt.clientName,
       clientPhone: appt.clientPhone || "",
       notes: appt.notes || "",
+      ...(appt.locationId ? { locationId: appt.locationId } : {}),
     });
     setEditingAppt(null);
   }
@@ -254,6 +263,7 @@ export function AgendaView({
           start: data.start,
           end: data.end,
           serviceName: svc?.name || "",
+          ...(data.locationId ? { locationId: data.locationId, locationName: data.locationName, locationAddress: data.locationAddress } : {}),
         }).catch((e) => console.error("[saveAppt] updateBookingRef falló:", e));
       }
       if (editingAppt.dateKey !== data.dateKey || editingAppt.start !== data.start) {
@@ -500,6 +510,7 @@ export function AgendaView({
                                 </span>
                               </div>
                               <div style={styles.apptClient}>{a.clientName}</div>
+                              {multiLoc && a.locationName && <div style={{ fontSize: 10.5, color: "#8A8275" }}>{a.locationName}</div>}
                               <div style={styles.apptService}>
                                 {svc.name}
                                 {a.paidByGiftCard && <span style={{ marginLeft: 5, fontSize: 10, background: "#EBF3E6", color: "#4A5A40", borderRadius: 6, padding: "1px 6px", fontWeight: 700 }}>🎁 Gift Card</span>}
@@ -514,7 +525,7 @@ export function AgendaView({
                             <div style={styles.openSlotInfo}>
                               <Clock size={12} color="#6E7F5C" />
                               <span>{slot.start}–{slot.end}</span>
-                              <span style={styles.openSlotTag}>Cupo libre</span>
+                              <span style={styles.openSlotTag}>{(multiLoc && locationName(slotLocationId(slot, locations))) || "Cupo libre"}</span>
                             </div>
                             <div style={{ display: "flex", gap: 4 }}>
                               <button
@@ -556,6 +567,7 @@ export function AgendaView({
           appointments={appointments}
           combos={combos}
           businessInfo={businessInfo}
+          locations={locations}
           initial={editingAppt}
           prefill={prefillSlot}
           onClose={() => setShowApptForm(false)}
@@ -577,6 +589,7 @@ export function AgendaView({
               .map(a => a.fromAvailabilityId)
               .filter(Boolean)
           )}
+          locations={locations}
           onClose={() => setShowAvailForm(null)}
           onAdd={(slot) => onAddSlot({ dateKey: showAvailForm, ...slot })}
           onRemove={(slotId) => onRemoveSlot(slotId)}
@@ -586,6 +599,7 @@ export function AgendaView({
 
       {showRecurringForm && (
         <RecurringAvailabilityModal
+          locations={locations}
           onClose={() => setShowRecurringForm(false)}
           onConfirm={onAddSlotsBatch}
         />
@@ -595,10 +609,32 @@ export function AgendaView({
           availability={availability}
           appointments={appointments}
           businessInfo={businessInfo}
+          locations={locations}
           onClose={() => setShowExportModal(false)}
         />
       )}
     </div>
+  );
+}
+
+function LocationPicker({ locations, value, onChange, label = "Lugar" }) {
+  if (locations.length < 2) return null;
+  return (
+    <>
+      <label style={{ ...styles.fieldLabel, marginTop: 10 }}>{label}</label>
+      <div style={{ ...styles.weekdayPicker, flexWrap: "wrap" }}>
+        {locations.map(loc => (
+          <button
+            type="button"
+            key={loc.id}
+            onClick={() => onChange(loc.id)}
+            style={{ ...styles.weekdayChip, width: "auto", padding: "0 12px", ...(value === loc.id ? styles.weekdayChipActive : {}) }}
+          >
+            {loc.name}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -651,8 +687,11 @@ function CustomTimeInput({ onAdd }) {
   );
 }
 
-function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotIds, onClose, onAdd, onRemove, onCloseDay }) {
+function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotIds, locations = [], onClose, onAdd, onRemove, onCloseDay }) {
   const [errorMsg, setErrorMsg] = useState(null);
+  const [locationId, setLocationId] = useState(
+    (existing[0] && slotLocationId(existing[0], locations)) || locations[0]?.id || null
+  );
   const [pending, setPending] = useState(new Set());
   const [slotLength, setSlotLength] = useState(60);
 
@@ -685,7 +724,10 @@ function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotId
     setPending(prev => new Set(prev).add(chip.time));
     try {
       if (chip.state === "open") await onRemove(chip.slot.id);
-      else if (chip.state === "free") await onAdd({ start: chip.time, end: minutesToTime(timeToMinutes(chip.time) + slotLength) });
+      else if (chip.state === "free") await onAdd({
+        start: chip.time, end: minutesToTime(timeToMinutes(chip.time) + slotLength),
+        ...(locations.length > 1 && locationId ? { locationId } : {}),
+      });
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -723,6 +765,7 @@ function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotId
           <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <p style={styles.helperText}>Elegí la duración y tocá un horario para abrir un cupo. Tocalo de nuevo para quitarlo.</p>
+        <LocationPicker locations={locations} value={locationId} onChange={setLocationId} label="Lugar de los cupos nuevos" />
 
         <label style={{ ...styles.fieldLabel, marginTop: 10 }}>Duración del cupo</label>
         <DurationPicker value={slotLength} onChange={setSlotLength} />
@@ -734,7 +777,7 @@ function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotId
               key={chip.time}
               disabled={chip.state === "booked" || chip.state === "blocked"}
               onClick={() => toggleChip(chip)}
-              title={chip.state === "booked" ? "Reservado" : chip.state === "blocked" ? "Se superpone con otro cupo o turno" : undefined}
+              title={chip.state === "booked" ? "Reservado" : chip.state === "blocked" ? "Se superpone con otro cupo o turno" : (chip.slot && locations.length > 1 ? locations.find(l => l.id === slotLocationId(chip.slot, locations))?.name : undefined)}
               style={{
                 ...styles.weekdayChip, width: "100%", ...chipStyle[chip.state],
                 opacity: pending.has(chip.time) ? 0.5 : 1,
@@ -770,8 +813,9 @@ function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotId
   );
 }
 
-function RecurringAvailabilityModal({ onClose, onConfirm }) {
+function RecurringAvailabilityModal({ locations = [], onClose, onConfirm }) {
   const todayStr = dateKey(new Date());
+  const [locationId, setLocationId] = useState(locations[0]?.id || null);
   const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
   const [slotLength, setSlotLength] = useState(60);
   const [selectedTimes, setSelectedTimes] = useState(["10:00", "11:00", "12:00", "13:00"]);
@@ -822,7 +866,10 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
     setSaving(true);
     const allSlots = [];
     dateKeys.forEach(dKey => {
-      daySlots.forEach(s => allSlots.push({ dateKey: dKey, start: s.start, end: s.end }));
+      daySlots.forEach(s => allSlots.push({
+        dateKey: dKey, start: s.start, end: s.end,
+        ...(locations.length > 1 && locationId ? { locationId } : {}),
+      }));
     });
     try {
       const created = await onConfirm(allSlots);
@@ -848,6 +895,7 @@ function RecurringAvailabilityModal({ onClose, onConfirm }) {
         <p style={styles.helperText}>
           Elegí los días, tocá los horarios que querés abrir y por cuántas semanas repetirlo.
         </p>
+        <LocationPicker locations={locations} value={locationId} onChange={setLocationId} />
 
         <label style={styles.fieldLabel}>Días</label>
         <div style={styles.weekdayPicker}>
@@ -1005,7 +1053,7 @@ function ReferralSection({ appt, clients }) {
   );
 }
 
-function ApptFormModal({ services, clients, appointments = [], combos = [], initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo }) {
+function ApptFormModal({ services, clients, appointments = [], combos = [], initial, prefill, onClose, onSave, onDelete, onStatusChange, onDuplicate, businessInfo, locations = [] }) {
   const base = initial || {
     dateKey: prefill?.dateKey || dateKey(new Date()),
     start: prefill?.start || "10:00",
@@ -1027,8 +1075,12 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
   const [showDateCalendar, setShowDateCalendar] = useState(false);
   const [repeatWeeks, setRepeatWeeks] = useState(1);
   const fromAvailabilityId = initial?.fromAvailabilityId || prefill?.fromAvailabilityId || null;
+  const [locationId, setLocationId] = useState(initial?.locationId || prefill?.locationId || locations[0]?.id || null);
+  const location = locations.find(l => l.id === locationId) || null;
+  const visibleServices = services.filter(s => s.id === serviceId || serviceAtLocation(s, locations.length > 1 ? locationId : null));
 
   const svc = services.find(s => s.id === serviceId);
+  const svcPrice = servicePrice(svc, locationId);
   const end = svc ? minutesToTime(timeToMinutes(start) + svc.duration) : start;
 
   const availableCombo = combos.find(c =>
@@ -1058,8 +1110,9 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
     const paidByCombo = !initial && useCombo && !!availableCombo;
     onSave({
       dateKey: dateVal, start, end, serviceId, clientName, clientPhone, notes,
-      price: paidByCombo ? 0 : (svc?.price || 0),
+      price: paidByCombo ? 0 : svcPrice,
       discount: paidByCombo ? 0 : (Number(discount) || 0),
+      ...(location ? locationSnapshot(location) : {}),
       ...(paidByCombo ? { paidByCombo: true, comboId: availableCombo.id } : {}),
       ...(fromAvailabilityId ? { fromAvailabilityId } : {}),
       ...(!initial && repeatWeeks > 1 ? { repeatWeeks } : {}),
@@ -1075,7 +1128,7 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
       .replace("{servicio}", svc?.name || "")
       .replace("{fecha}", formatDateLong(dateVal))
       .replace("{hora}", start)
-      .replace("{direccion}", businessInfo?.address || "");
+      .replace("{direccion}", location?.address || appointmentAddress(initial, businessInfo));
     return `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
   }
   const waLink = whatsappLink();
@@ -1190,9 +1243,11 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
           </div>
         )}
 
+        <LocationPicker locations={locations} value={locationId} onChange={setLocationId} />
+
         <label style={styles.fieldLabel}>Servicio</label>
         <div style={styles.serviceChips}>
-          {services.map(s => (
+          {visibleServices.map(s => (
             <button
               type="button"
               key={s.id}
@@ -1202,7 +1257,7 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
                 ...(serviceId === s.id ? { background: s.color, color: "#EFE9DF", borderColor: s.color } : {}),
               }}
             >
-              {s.name} <span style={{ opacity: 0.75 }}>· {s.duration}min{s.price ? ` · ${formatPrice(s.price)}` : ""}</span>
+              {s.name} <span style={{ opacity: 0.75 }}>· {s.duration}min{servicePrice(s, locationId) ? ` · ${formatPrice(servicePrice(s, locationId))}` : ""}</span>
             </button>
           ))}
         </div>
@@ -1252,9 +1307,9 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
         </div>
         {svc && (
           <div style={styles.endTimeNote}>
-            Precio: {formatPrice(svc.price)}
+            Precio: {formatPrice(svcPrice)}
             {Number(discount) !== 0
-              ? ` ${Number(discount) > 0 ? "−" : "+"} ${formatPrice(Math.abs(Number(discount)))} = ${formatPrice(getAppointmentPrice({ discount }, svc))}`
+              ? ` ${Number(discount) > 0 ? "−" : "+"} ${formatPrice(Math.abs(Number(discount)))} = ${formatPrice(getAppointmentPrice({ price: svcPrice, discount }, svc))}`
               : ""}
           </div>
         )}
@@ -1319,8 +1374,11 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
   );
 }
 
-function ExportDisponibilidadModal({ availability, appointments, businessInfo, onClose }) {
+function ExportDisponibilidadModal({ availability, appointments, businessInfo, locations = [], onClose }) {
   const [days, setDays] = useState(7);
+  const [locationId, setLocationId] = useState(locations[0]?.id || null);
+  const location = locations.find(l => l.id === locationId) || null;
+  const inLocation = (s) => locations.length < 2 || slotLocationId(s, locations) === locationId;
   const [generating, setGenerating] = useState(false);
 
   const today = new Date();
@@ -1332,7 +1390,7 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, o
     for (let i = 0; i < days; i++) {
       const d = addDays(today, i);
       const dKey = dateKey(d);
-      const dayAvail = availability.filter(s => s.dateKey === dKey);
+      const dayAvail = availability.filter(s => s.dateKey === dKey && inLocation(s));
       if (dayAvail.length === 0) continue;
       const dayAppts = appointments.filter(a => a.dateKey === dKey && a.status !== "cancelado");
       const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
@@ -1372,14 +1430,14 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, o
     ctx.fillRect(0, 0, W, HEADER_H);
     ctx.fillStyle = "#EFE9DF";
     ctx.font = "bold 26px Georgia, serif";
-    ctx.fillText(businessInfo?.name || "Angel Meier Turnos", PADDING, 42);
+    ctx.fillText(businessInfo?.name || "", PADDING, 42);
     ctx.font = "16px Arial, sans-serif";
     ctx.fillStyle = "#B5654A";
     ctx.fillText("Turnos disponibles", PADDING, 68);
     const rangeLabel = days === 1 ? "Hoy" : `Próximos ${days} días`;
     ctx.fillStyle = "rgba(239,233,223,0.55)";
     ctx.font = "13px Arial, sans-serif";
-    ctx.fillText(rangeLabel, PADDING, 88);
+    ctx.fillText(locations.length > 1 && location ? `${rangeLabel} · ${location.name}${location.address ? ` (${location.address})` : ""}` : rangeLabel, PADDING, 88);
 
     let y = HEADER_H + 16;
 
@@ -1423,7 +1481,7 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, o
     ctx.fillText("Reservas: " + (businessInfo?.whatsapp ? `WhatsApp ${businessInfo.whatsapp}` : businessInfo?.name || ""), PADDING, H - 24);
 
     const link = document.createElement("a");
-    link.download = `disponibilidad-${todayKey}.png`;
+    link.download = `disponibilidad-${todayKey}${locations.length > 1 && location ? "-" + location.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : ""}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
     setGenerating(false);
@@ -1453,6 +1511,8 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, o
           <h3 style={styles.modalTitle}>Exportar disponibilidad</h3>
           <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
+
+        <LocationPicker locations={locations} value={locationId} onChange={setLocationId} />
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "16px 0" }}>
           <label style={{ ...styles.fieldLabel, margin: 0, flex: 1 }}>Cantidad de días</label>

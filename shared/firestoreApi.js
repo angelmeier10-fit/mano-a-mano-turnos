@@ -3,9 +3,10 @@
 // Funciones compartidas para leer/escribir en Firestore.
 // Ambas apps (agenda-app y reservas-app) importan este archivo.
 
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import {
   getFirestore,
+  connectFirestoreEmulator,
   collection,
   doc,
   addDoc,
@@ -22,10 +23,66 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { firebaseConfig } from "./firebaseConfig";
-import { timeToMinutes } from "./helpers";
+import { timeToMinutes, publicApptFields } from "./helpers";
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+if (import.meta.env?.VITE_USE_EMULATOR) connectFirestoreEmulator(db, "127.0.0.1", 8080);
+
+// ---------- Negocio activo ----------
+// Todos los datos viven en businesses/{businessId}/... Cada app fija el negocio una
+// sola vez (agenda: el del dueño logueado; reservas: el del link ?b=) antes de leer.
+export const DEFAULT_BUSINESS_ID = "mano-a-mano";
+let businessId = null;
+
+export function setBusinessId(id) {
+  businessId = id;
+}
+function currentBusinessId() {
+  if (!businessId) throw new Error("No hay un negocio seleccionado.");
+  return businessId;
+}
+function bcol(...path) {
+  return collection(db, "businesses", currentBusinessId(), ...path);
+}
+function bdoc(...path) {
+  return doc(db, "businesses", currentBusinessId(), ...path);
+}
+
+// Link público de reservas del negocio activo. Mano a Mano no lleva ?b= para que
+// los links que ya circulan sigan siendo iguales.
+const RESERVAS_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
+export function reservasUrl(params = {}) {
+  const q = new URLSearchParams();
+  if (currentBusinessId() !== DEFAULT_BUSINESS_ID) q.set("b", currentBusinessId());
+  for (const [k, v] of Object.entries(params)) q.set(k, v);
+  const s = q.toString();
+  return s ? `${RESERVAS_URL}?${s}` : RESERVAS_URL;
+}
+
+export async function getBusinessForOwner(uid) {
+  const snap = await getDocs(query(collection(db, "businesses"), where("ownerUid", "==", uid)));
+  return snap.empty ? null : snap.docs[0].id;
+}
+export async function businessExists(id) {
+  const snap = await getDoc(doc(db, "businesses", id));
+  return snap.exists();
+}
+
+// Lugar del turno que se copia a phoneIndex/bookings para mostrarlo en "Mi turno".
+function bookingLocationFields(appt) {
+  if (!appt.locationId) return {};
+  return { locationId: appt.locationId, locationName: appt.locationName || "", locationAddress: appt.locationAddress || "" };
+}
+
+// El público no puede leer turnos: cancelar/reprogramar usa los datos copiados en phoneIndex/bookings.
+async function readApptForPublic(apptId, phone, phoneVariant) {
+  for (const v of [...new Set([phoneVariant, ...phoneVariants(phone)].filter(Boolean))]) {
+    const snap = await getDoc(bdoc("phoneIndex", v, "bookings", apptId));
+    if (snap.exists()) return snap.data();
+  }
+  return {};
+}
 
 // Dos rangos horarios se superponen si empiezan antes de que termine el otro.
 function rangesOverlap(aStart, aEnd, bStart, bEnd) {
@@ -34,35 +91,51 @@ function rangesOverlap(aStart, aEnd, bStart, bEnd) {
 
 // ---------- Servicios ----------
 export function listenServices(callback) {
-  return onSnapshot(collection(db, "services"), (snap) => {
+  return onSnapshot(bcol("services"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }, (err) => console.error("[listenServices] snapshot error:", err));
 }
 export async function addService(service) {
-  return addDoc(collection(db, "services"), service);
+  return addDoc(bcol("services"), service);
 }
 // Usa un id fijo (en vez de uno autogenerado) para que sembrar los servicios
 // por defecto sea idempotente: si dos pestañas/dispositivos lo disparan a la
 // vez, ambos escriben el mismo documento en lugar de crear duplicados.
 export async function setServiceWithId(id, service) {
-  return setDoc(doc(db, "services", id), service, { merge: true });
+  return setDoc(bdoc("services", id), service, { merge: true });
 }
 export async function updateService(id, data) {
-  return updateDoc(doc(db, "services", id), data);
+  return updateDoc(bdoc("services", id), data);
 }
 export async function deleteService(id) {
-  return deleteDoc(doc(db, "services", id));
+  return deleteDoc(bdoc("services", id));
+}
+
+// ---------- Lugares de atención ----------
+export function listenLocations(callback) {
+  return onSnapshot(bcol("locations"), (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, (err) => console.error("[listenLocations] snapshot error:", err));
+}
+export async function addLocation(location) {
+  return addDoc(bcol("locations"), { ...location, createdAt: Date.now() });
+}
+export async function updateLocation(id, data) {
+  return updateDoc(bdoc("locations", id), data);
+}
+export async function deleteLocation(id) {
+  return deleteDoc(bdoc("locations", id));
 }
 
 // ---------- Disponibilidad (cupos abiertos por el profesional) ----------
 export function listenAvailability(callback) {
-  return onSnapshot(collection(db, "availability"), (snap) => {
+  return onSnapshot(bcol("availability"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }, (err) => console.error("[listenAvailability] snapshot error:", err));
 }
 export async function addAvailabilitySlot(slot) {
   // slot: { dateKey, start, end }
-  const apptSnap = await getDocs(query(collection(db, "appointments"), where("dateKey", "==", slot.dateKey)));
+  const apptSnap = await getDocs(query(bcol("appointments"), where("dateKey", "==", slot.dateKey)));
   const overlapsAppt = apptSnap.docs.some(d => {
     const data = d.data();
     return data.status !== "cancelado" && rangesOverlap(slot.start, slot.end, data.start, data.end);
@@ -70,22 +143,22 @@ export async function addAvailabilitySlot(slot) {
   if (overlapsAppt) {
     throw new Error(`Ese horario se superpone con un turno ya tomado el ${slot.dateKey}.`);
   }
-  const slotSnap = await getDocs(query(collection(db, "availability"), where("dateKey", "==", slot.dateKey)));
+  const slotSnap = await getDocs(query(bcol("availability"), where("dateKey", "==", slot.dateKey)));
   const overlapsSlot = slotSnap.docs.some(d => rangesOverlap(slot.start, slot.end, d.data().start, d.data().end));
   if (overlapsSlot) {
     throw new Error(`Ya existe un cupo que se superpone con ese horario el ${slot.dateKey}.`);
   }
-  return addDoc(collection(db, "availability"), slot);
+  return addDoc(bcol("availability"), slot);
 }
 export async function removeAvailabilitySlot(id) {
-  return deleteDoc(doc(db, "availability", id));
+  return deleteDoc(bdoc("availability", id));
 }
 export async function freeAvailabilitySlot(id) {
-  return updateDoc(doc(db, "availability", id), { booked: false });
+  return updateDoc(bdoc("availability", id), { booked: false });
 }
 // Permite que el cupo se vea en reservas aunque falte menos de 1 hora.
 export async function setAvailabilitySlotLastMinute(id, allowLastMinute) {
-  return updateDoc(doc(db, "availability", id), { allowLastMinute });
+  return updateDoc(bdoc("availability", id), { allowLastMinute });
 }
 // Marca como cancelado el registro en phoneIndex/bookings del cliente (best-effort).
 // Se usa cuando el profesional cancela un turno desde la Agenda.
@@ -93,7 +166,7 @@ export async function markBookingRefCancelled(clientPhone, apptId) {
   const phoneDigits = normalizePhone(clientPhone);
   if (!phoneDigits || !apptId) return;
   try {
-    await updateDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "cancelado" });
+    await updateDoc(bdoc("phoneIndex", phoneDigits, "bookings", apptId), { status: "cancelado" });
   } catch {
     // Si el cliente no tiene registro en phoneIndex/bookings, se ignora silenciosamente.
   }
@@ -106,7 +179,7 @@ export async function deleteBookingRef(clientPhone, apptId) {
     return;
   }
   try {
-    await deleteDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId));
+    await deleteDoc(bdoc("phoneIndex", phoneDigits, "bookings", apptId));
   } catch (e) {
     console.error("[phoneIndex/bookings] No se pudo borrar la referencia:", e, { phoneDigits, apptId });
   }
@@ -121,20 +194,20 @@ export async function markBookingRefConfirmed(clientPhone, apptId) {
     return;
   }
   try {
-    await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), { status: "confirmado" }, { merge: true });
+    await setDoc(bdoc("phoneIndex", phoneDigits, "bookings", apptId), { status: "confirmado" }, { merge: true });
   } catch (e) {
     console.error("[phoneIndex/bookings] No se pudo marcar como confirmado:", e, { phoneDigits, apptId });
   }
 }
 // Actualiza dateKey, start, end y serviceName en phoneIndex/bookings cuando el profesional
 // edita un turno desde la Agenda. Usa setDoc merge:true para cubrir el caso de que no exista.
-export async function updateBookingRef(clientPhone, apptId, { dateKey, start, end, serviceName }) {
+export async function updateBookingRef(clientPhone, apptId, { dateKey, start, end, serviceName, ...rest }) {
   const phoneDigits = normalizePhone(clientPhone);
   if (!phoneDigits || !apptId) return;
   try {
     await setDoc(
-      doc(db, "phoneIndex", phoneDigits, "bookings", apptId),
-      { dateKey, start, end, serviceName: serviceName || "" },
+      bdoc("phoneIndex", phoneDigits, "bookings", apptId),
+      { dateKey, start, end, serviceName: serviceName || "", ...bookingLocationFields(rest) },
       { merge: true }
     );
   } catch (e) {
@@ -156,9 +229,9 @@ export async function addAvailabilitySlotsBatch(slots) {
   const existingAppts = [];
   for (let i = 0; i < dateKeys.length; i += 30) {
     const chunk = dateKeys.slice(i, i + 30);
-    const snap = await getDocs(query(collection(db, "availability"), where("dateKey", "in", chunk)));
+    const snap = await getDocs(query(bcol("availability"), where("dateKey", "in", chunk)));
     snap.forEach(d => existingSlots.push(d.data()));
-    const apptSnap = await getDocs(query(collection(db, "appointments"), where("dateKey", "in", chunk)));
+    const apptSnap = await getDocs(query(bcol("appointments"), where("dateKey", "in", chunk)));
     apptSnap.forEach(d => {
       const data = d.data();
       if (data.status !== "cancelado") existingAppts.push(data);
@@ -182,7 +255,7 @@ export async function addAvailabilitySlotsBatch(slots) {
   for (const chunk of chunks) {
     const batch = writeBatch(db);
     chunk.forEach(slot => {
-      const ref = doc(collection(db, "availability"));
+      const ref = doc(bcol("availability"));
       batch.set(ref, slot);
     });
     await batch.commit();
@@ -196,7 +269,7 @@ export async function removeAvailabilitySlotsByIds(ids) {
   for (let i = 0; i < ids.length; i += 450) chunks.push(ids.slice(i, i + 450));
   for (const chunk of chunks) {
     const batch = writeBatch(db);
-    chunk.forEach(id => batch.delete(doc(db, "availability", id)));
+    chunk.forEach(id => batch.delete(bdoc("availability", id)));
     await batch.commit();
   }
 }
@@ -232,7 +305,7 @@ export async function bookSlotAtomic(appt) {
   };
 
   if (!slotId) {
-    const apptSnap = await getDocs(query(collection(db, "appointments"), where("dateKey", "==", appt.dateKey)));
+    const apptSnap = await getDocs(query(bcol("appointments"), where("dateKey", "==", appt.dateKey)));
     const overlapping = apptSnap.docs.some(d => {
       const data = d.data();
       return data.status !== "cancelado" && rangesOverlap(appt.start, appt.end, data.start, data.end);
@@ -240,13 +313,13 @@ export async function bookSlotAtomic(appt) {
     if (overlapping) {
       throw new Error("Este horario ya fue reservado. Por favor elegí otro.");
     }
-    const ref = await addDoc(collection(db, "appointments"), apptData);
+    const ref = await addDoc(bcol("appointments"), apptData);
     if (giftCardCode) await redeemGiftCard(giftCardCode, ref.id);
     if (comboId) await redeemComboSession(comboId, ref.id);
     return { apptId: ref.id, cancelToken };
   }
 
-  const slotRef = doc(db, "availability", slotId);
+  const slotRef = bdoc("availability", slotId);
   let apptId;
   await runTransaction(db, async (transaction) => {
     const slotSnap = await transaction.get(slotRef);
@@ -254,7 +327,7 @@ export async function bookSlotAtomic(appt) {
       throw new Error("Este horario ya fue reservado. Por favor elegí otro.");
     }
     transaction.update(slotRef, { booked: true });
-    const apptRef = doc(collection(db, "appointments"));
+    const apptRef = doc(bcol("appointments"));
     apptId = apptRef.id;
     transaction.set(apptRef, apptData);
   });
@@ -266,7 +339,7 @@ export async function bookSlotAtomic(appt) {
   const phoneDigits = normalizePhone(appt.clientPhone);
   if (phoneDigits && apptId) {
     try {
-      await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptId), {
+      await setDoc(bdoc("phoneIndex", phoneDigits, "bookings", apptId), {
         dateKey: appt.dateKey,
         start: appt.start,
         end: appt.end,
@@ -277,6 +350,8 @@ export async function bookSlotAtomic(appt) {
         status: apptData.status || "confirmado",
         requiresCancelToken: true,
         cancelToken,
+        ...bookingLocationFields(appt),
+        ...publicApptFields(apptData),
       });
     } catch (e) {
       console.error("[phoneIndex/bookings] No se pudo guardar la referencia:", e);
@@ -295,7 +370,7 @@ export async function getMyBookingRefs(phone) {
   try {
     const variants = phoneVariants(phone);
     const snaps = await Promise.all(
-      variants.map(v => getDocs(collection(db, "phoneIndex", v, "bookings")))
+      variants.map(v => getDocs(bcol("phoneIndex", v, "bookings")))
     );
     const seen = new Set();
     const results = [];
@@ -314,7 +389,7 @@ export async function getMyBookingRefs(phone) {
 // Escribe un evento en appointmentHistory (best-effort, nunca bloquea la operación principal).
 export async function addAppointmentHistory(event) {
   try {
-    await addDoc(collection(db, "appointmentHistory"), event);
+    await addDoc(bcol("appointmentHistory"), event);
   } catch (e) {
     console.error("[appointmentHistory] No se pudo guardar el evento:", e);
   }
@@ -325,7 +400,7 @@ export async function getAppointmentHistory(clientId) {
   if (!clientId) return [];
   try {
     const snap = await getDocs(
-      query(collection(db, "appointmentHistory"), where("clientId", "==", clientId))
+      query(bcol("appointmentHistory"), where("clientId", "==", clientId))
     );
     return snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
@@ -341,22 +416,22 @@ export async function getAppointmentHistory(clientId) {
 // historyData es opcional: { clientId, clientPhone, clientName, originalDateKey,
 //   originalStart, originalEnd, serviceId, serviceName }
 export async function cancelAppointmentPublic(apptId, cancelToken, availabilitySlotId, phone, historyData, phoneVariant) {
-  const apptSnap = await getDoc(doc(db, "appointments", apptId));
-  const giftCardCode = apptSnap.exists() ? apptSnap.data().giftCardCode : null;
-  const comboId = apptSnap.exists() ? apptSnap.data().comboId : null;
+  const appt = await readApptForPublic(apptId, phone, phoneVariant);
+  const giftCardCode = appt.giftCardCode || null;
+  const comboId = appt.comboId || null;
 
   // Priorizamos el teléfono con el que el cliente encontró el turno como prueba
   // (Firestore valida que phoneIndex/{proof}/bookings/{apptId} exista): es más
   // confiable que el cancelToken, que puede desincronizarse entre colecciones.
   const cancelProof = phoneVariant || normalizePhone(phone) || cancelToken || null;
 
-  await updateDoc(doc(db, "appointments", apptId), {
+  await updateDoc(bdoc("appointments", apptId), {
     status: "cancelado",
     cancelProof,
   });
   if (availabilitySlotId) {
     try {
-      await updateDoc(doc(db, "availability", availabilitySlotId), { booked: false });
+      await updateDoc(bdoc("availability", availabilitySlotId), { booked: false });
     } catch (e) {
       console.error("[availability] No se pudo liberar el cupo:", e);
     }
@@ -365,7 +440,7 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
     try {
       await Promise.allSettled(
         phoneVariants(phone).map(v =>
-          updateDoc(doc(db, "phoneIndex", v, "bookings", apptId), { status: "cancelado" })
+          updateDoc(bdoc("phoneIndex", v, "bookings", apptId), { status: "cancelado" })
         )
       );
     } catch {}
@@ -401,19 +476,18 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
 //   originalStart, originalEnd, serviceId, serviceName }
 export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, oldSlotId, newAppt, phone, historyData, oldPhoneVariant }) {
   const newCancelToken = generateCancelToken();
-  const oldApptRef = doc(db, "appointments", oldApptId);
+  const oldApptRef = bdoc("appointments", oldApptId);
   // Igual que en cancelAppointmentPublic: priorizamos el teléfono como prueba,
   // más confiable que el cancelToken.
   const oldCancelProof = oldPhoneVariant || normalizePhone(phone) || oldCancelToken || null;
 
-  const oldApptSnap = await getDoc(oldApptRef);
-  const oldAppt = oldApptSnap.exists() ? oldApptSnap.data() : {};
+  const oldAppt = await readApptForPublic(oldApptId, phone, oldPhoneVariant);
   const giftCardCode = oldAppt.giftCardCode || null;
   const comboId = oldAppt.comboId || null;
   // El turno nuevo mantiene precio y descuentos del original. Si cambió el servicio,
   // el precio y el descuento VIP (que es por servicio) no aplican, pero el de referido sí.
   const carriedFields = {};
-  for (const key of ["referredByName", "referralDiscount", "source"]) {
+  for (const key of ["referredByName", "referralDiscount", "source", "giftCardCode", "paidByGiftCard", "comboId", "paidByCombo"]) {
     if (oldAppt[key] !== undefined) carriedFields[key] = oldAppt[key];
   }
   if (oldAppt.serviceId === newAppt.serviceId) {
@@ -422,8 +496,16 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
   } else if (oldAppt.referralDiscount) {
     carriedFields.discount = oldAppt.referralDiscount;
   }
-  const newSlotRef = doc(db, "availability", newAppt.fromAvailabilityId);
-  const newApptRef = doc(collection(db, "appointments"));
+  const newApptData = {
+    ...carriedFields,
+    ...newAppt,
+    cancelToken: newCancelToken,
+    cancelProof: null,
+    status: "confirmado",
+    createdAt: Date.now(),
+  };
+  const newSlotRef = bdoc("availability", newAppt.fromAvailabilityId);
+  const newApptRef = doc(bcol("appointments"));
   const newApptId = newApptRef.id;
 
   await runTransaction(db, async (t) => {
@@ -436,14 +518,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
     // Se libera best-effort después de que lo crítico ya se confirmó.
     t.update(oldApptRef, { status: "cancelado", cancelProof: oldCancelProof });
     t.update(newSlotRef, { booked: true });
-    t.set(newApptRef, {
-      ...carriedFields,
-      ...newAppt,
-      cancelToken: newCancelToken,
-      cancelProof: null,
-      status: "confirmado",
-      createdAt: Date.now(),
-    });
+    t.set(newApptRef, newApptData);
   });
 
   if (giftCardCode) {
@@ -464,7 +539,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
   // Liberar cupo viejo fuera de la transacción (best-effort)
   if (oldSlotId) {
     try {
-      await updateDoc(doc(db, "availability", oldSlotId), { booked: false });
+      await updateDoc(bdoc("availability", oldSlotId), { booked: false });
     } catch (e) {
       console.error("[reschedule] No se pudo liberar el cupo anterior:", e);
     }
@@ -474,9 +549,9 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
   if (phoneDigits) {
     try {
       await Promise.allSettled(
-        phoneVariants(phone).map(v => deleteDoc(doc(db, "phoneIndex", v, "bookings", oldApptId)))
+        phoneVariants(phone).map(v => deleteDoc(bdoc("phoneIndex", v, "bookings", oldApptId)))
       );
-      await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", newApptId), {
+      await setDoc(bdoc("phoneIndex", phoneDigits, "bookings", newApptId), {
         dateKey: newAppt.dateKey,
         start: newAppt.start,
         end: newAppt.end,
@@ -487,6 +562,8 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
         status: "confirmado",
         requiresCancelToken: true,
         cancelToken: newCancelToken,
+        ...bookingLocationFields(newAppt),
+        ...publicApptFields(newApptData),
       });
     } catch {}
   }
@@ -508,14 +585,14 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
 }
 
 export function listenAppointments(callback) {
-  return onSnapshot(collection(db, "appointments"), (snap) => {
+  return onSnapshot(bcol("appointments"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }, (err) => console.error("[listenAppointments] snapshot error:", err));
 }
 
 // Llama a onNew solo para turnos creados después de sessionStart (evita falsos positivos por cache/reconexión).
 export function listenIncomingPendingAppointments(sessionStart, onNew) {
-  return onSnapshot(collection(db, "appointments"), (snap) => {
+  return onSnapshot(bcol("appointments"), (snap) => {
     snap.docChanges().forEach(change => {
       if (change.type === "added") {
         const a = { id: change.doc.id, ...change.doc.data() };
@@ -525,7 +602,7 @@ export function listenIncomingPendingAppointments(sessionStart, onNew) {
   }, (err) => console.error("[listenIncomingPendingAppointments] snapshot error:", err));
 }
 export function listenIncomingPendingGiftCards(sessionStart, onNew) {
-  return onSnapshot(collection(db, "giftCards"), (snap) => {
+  return onSnapshot(bcol("giftCards"), (snap) => {
     snap.docChanges().forEach(change => {
       if (change.type === "added") {
         const gc = { id: change.doc.id, ...change.doc.data() };
@@ -535,7 +612,7 @@ export function listenIncomingPendingGiftCards(sessionStart, onNew) {
   }, (err) => console.error("[listenIncomingPendingGiftCards] snapshot error:", err));
 }
 export function listenIncomingPendingCombos(sessionStart, onNew) {
-  return onSnapshot(collection(db, "combos"), (snap) => {
+  return onSnapshot(bcol("combos"), (snap) => {
     snap.docChanges().forEach(change => {
       if (change.type === "added") {
         const c = { id: change.doc.id, ...change.doc.data() };
@@ -547,7 +624,7 @@ export function listenIncomingPendingCombos(sessionStart, onNew) {
 export async function createAppointment(appt) {
   // appt: { dateKey, start, end, serviceId, clientName, clientPhone, notes, status, fromAvailabilityId? }
   const dupCheck = await getDocs(query(
-    collection(db, "appointments"),
+    bcol("appointments"),
     where("dateKey", "==", appt.dateKey),
   ));
   const overlapping = dupCheck.docs.some(d => {
@@ -564,8 +641,8 @@ export async function createAppointment(appt) {
   if (slotId) {
     // Si viene de un cupo existente, marcar booked:true y crear el turno atómicamente
     // para evitar que un cliente reserve el mismo horario simultáneamente.
-    apptRef = doc(collection(db, "appointments"));
-    const slotRef = doc(db, "availability", slotId);
+    apptRef = doc(bcol("appointments"));
+    const slotRef = bdoc("availability", slotId);
     await runTransaction(db, async (t) => {
       const slotSnap = await t.get(slotRef);
       if (!slotSnap.exists() || slotSnap.data().booked) {
@@ -577,7 +654,7 @@ export async function createAppointment(appt) {
   } else {
     // Sin fromAvailabilityId: buscar si existe un cupo con el mismo día y hora de inicio
     const slotQuery = query(
-      collection(db, "availability"),
+      bcol("availability"),
       where("dateKey", "==", appt.dateKey),
       where("start", "==", appt.start),
     );
@@ -587,22 +664,22 @@ export async function createAppointment(appt) {
     }
     if (slotSnap.size >= 1) {
       const matchedSlot = slotSnap.docs[0];
-      apptRef = doc(collection(db, "appointments"));
-      const matchedSlotRef = doc(db, "availability", matchedSlot.id);
+      apptRef = doc(bcol("appointments"));
+      const matchedSlotRef = bdoc("availability", matchedSlot.id);
       slotId = matchedSlot.id;
       await runTransaction(db, async (t) => {
         t.update(matchedSlotRef, { booked: true });
         t.set(apptRef, { ...appt, fromAvailabilityId: slotId, createdAt: Date.now() });
       });
     } else {
-      apptRef = await addDoc(collection(db, "appointments"), { ...appt, createdAt: Date.now() });
+      apptRef = await addDoc(bcol("appointments"), { ...appt, createdAt: Date.now() });
     }
   }
 
   const phoneDigits = normalizePhone(appt.clientPhone);
   if (phoneDigits) {
     try {
-      await setDoc(doc(db, "phoneIndex", phoneDigits, "bookings", apptRef.id), {
+      await setDoc(bdoc("phoneIndex", phoneDigits, "bookings", apptRef.id), {
         dateKey: appt.dateKey,
         start: appt.start,
         end: appt.end,
@@ -612,6 +689,8 @@ export async function createAppointment(appt) {
         clientId: appt.clientId || null,
         status: appt.status || "confirmado",
         requiresCancelToken: false,
+        ...bookingLocationFields(appt),
+        ...publicApptFields(appt),
       });
     } catch (e) {
       console.error("[phoneIndex/bookings] No se pudo crear la referencia desde Agenda:", e);
@@ -620,14 +699,14 @@ export async function createAppointment(appt) {
   return apptRef;
 }
 export async function updateAppointment(id, data) {
-  return updateDoc(doc(db, "appointments", id), data);
+  return updateDoc(bdoc("appointments", id), data);
 }
 // Al editar un turno desde la Agenda: libera el cupo anterior (si había uno distinto al nuevo),
 // busca un cupo coincidente con el nuevo dateKey+start y lo ocupa, y actualiza el turno — todo atómicamente.
 export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityId, newData) {
   // La query no puede ir dentro de la transacción (limitación del SDK web de Firestore)
   const dupCheck = await getDocs(query(
-    collection(db, "appointments"),
+    bcol("appointments"),
     where("dateKey", "==", newData.dateKey),
   ));
   const activeDup = dupCheck.docs.find(d => {
@@ -640,7 +719,7 @@ export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityI
   }
 
   const slotQuery = query(
-    collection(db, "availability"),
+    bcol("availability"),
     where("dateKey", "==", newData.dateKey),
     where("start", "==", newData.start),
   );
@@ -648,9 +727,9 @@ export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityI
   const newSlotId = slotSnap.empty ? null : slotSnap.docs[0].id;
 
   const sameSlot = newSlotId !== null && newSlotId === oldFromAvailabilityId;
-  const apptRef = doc(db, "appointments", apptId);
-  const oldSlotRef = (oldFromAvailabilityId && !sameSlot) ? doc(db, "availability", oldFromAvailabilityId) : null;
-  const newSlotRef = (newSlotId && !sameSlot) ? doc(db, "availability", newSlotId) : null;
+  const apptRef = bdoc("appointments", apptId);
+  const oldSlotRef = (oldFromAvailabilityId && !sameSlot) ? bdoc("availability", oldFromAvailabilityId) : null;
+  const newSlotRef = (newSlotId && !sameSlot) ? bdoc("availability", newSlotId) : null;
 
   await runTransaction(db, async (t) => {
     // Firestore exige todos los reads antes de cualquier write en la transacción
@@ -665,12 +744,12 @@ export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityI
   return newSlotId;
 }
 export async function deleteAppointment(id) {
-  return deleteDoc(doc(db, "appointments", id));
+  return deleteDoc(bdoc("appointments", id));
 }
 
 // ---------- Clientes ----------
 export function listenClients(callback) {
-  return onSnapshot(collection(db, "clients"), (snap) => {
+  return onSnapshot(bcol("clients"), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }, (err) => console.error("[listenClients] snapshot error:", err));
 }
@@ -701,30 +780,30 @@ export async function upsertClientByName(name, phone) {
   if (phoneDigits) {
     const variants = phoneVariants(phone);
     const snaps = await Promise.all(
-      variants.map(v => getDocs(query(collection(db, "clients"), where("phoneDigits", "==", v))))
+      variants.map(v => getDocs(query(bcol("clients"), where("phoneDigits", "==", v))))
     );
     const existing = snaps.flatMap(s => s.docs)[0];
     if (existing) {
-      await updateDoc(doc(db, "clients", existing.id), { phone: phone || existing.data().phone });
+      await updateDoc(bdoc("clients", existing.id), { phone: phone || existing.data().phone });
       return existing.id;
     }
   }
 
-  const qName = query(collection(db, "clients"), where("name", "==", trimmedName));
+  const qName = query(bcol("clients"), where("name", "==", trimmedName));
   const snapName = await getDocs(qName);
   if (!snapName.empty) {
     const existing = snapName.docs[0];
     const updates = {};
     if (phone) updates.phone = phone;
     if (phoneDigits) updates.phoneDigits = phoneDigits;
-    if (Object.keys(updates).length) await updateDoc(doc(db, "clients", existing.id), updates);
+    if (Object.keys(updates).length) await updateDoc(bdoc("clients", existing.id), updates);
     if (phoneDigits) {
-      await setDoc(doc(db, "phoneIndex", phoneDigits), { clientId: existing.id });
+      await setDoc(bdoc("phoneIndex", phoneDigits), { clientId: existing.id });
     }
     return existing.id;
   }
 
-  const ref = await addDoc(collection(db, "clients"), {
+  const ref = await addDoc(bcol("clients"), {
     name: trimmedName,
     phone: phone || "",
     phoneDigits,
@@ -732,7 +811,7 @@ export async function upsertClientByName(name, phone) {
     createdAt: Date.now(),
   });
   if (phoneDigits) {
-    await setDoc(doc(db, "phoneIndex", phoneDigits), { clientId: ref.id });
+    await setDoc(bdoc("phoneIndex", phoneDigits), { clientId: ref.id });
   }
   return ref.id;
 }
@@ -745,7 +824,7 @@ export async function createClientPublic(name, phone) {
 
   if (phoneDigits) {
     try {
-      const indexSnap = await getDoc(doc(db, "phoneIndex", phoneDigits));
+      const indexSnap = await getDoc(bdoc("phoneIndex", phoneDigits));
       if (indexSnap.exists()) return indexSnap.data().clientId;
     } catch (getErr) {
       console.error("[phoneIndex] No se pudo leer la entrada para", phoneDigits, getErr);
@@ -753,7 +832,7 @@ export async function createClientPublic(name, phone) {
   }
 
   try {
-    const ref = await addDoc(collection(db, "clients"), {
+    const ref = await addDoc(bcol("clients"), {
       name: name.trim(),
       phone: phone || "",
       phoneDigits,
@@ -762,7 +841,7 @@ export async function createClientPublic(name, phone) {
     });
     if (phoneDigits) {
       try {
-        await setDoc(doc(db, "phoneIndex", phoneDigits), { clientId: ref.id });
+        await setDoc(bdoc("phoneIndex", phoneDigits), { clientId: ref.id });
       } catch (indexErr) {
         console.error("[phoneIndex] No se pudo crear la entrada para", phoneDigits, indexErr);
       }
@@ -776,7 +855,7 @@ export async function createClientPublic(name, phone) {
 // Al editar nombre/teléfono de un cliente, propaga el cambio a todo lo que lo referencia
 // (turnos y combos desnormalizados, descuento VIP y phoneIndex indexados por teléfono).
 export async function updateClient(id, data) {
-  const snap = await getDoc(doc(db, "clients", id));
+  const snap = await getDoc(bdoc("clients", id));
   const current = snap.data() || {};
   const oldPhoneDigits = current.phoneDigits || "";
 
@@ -789,49 +868,49 @@ export async function updateClient(id, data) {
     const phoneDigits = updates.phoneDigits ?? oldPhoneDigits;
     if (phoneDigits) {
       if (data.discounts && Object.keys(data.discounts).length) {
-        await setDoc(doc(db, "clientDiscounts", phoneDigits), data.discounts);
+        await setDoc(bdoc("clientDiscounts", phoneDigits), data.discounts);
       } else {
-        await deleteDoc(doc(db, "clientDiscounts", phoneDigits)).catch(() => {});
+        await deleteDoc(bdoc("clientDiscounts", phoneDigits)).catch(() => {});
       }
     }
   }
 
   if (phoneChanged && oldPhoneDigits && newPhoneDigits) {
     try {
-      const oldDiscountSnap = await getDoc(doc(db, "clientDiscounts", oldPhoneDigits));
+      const oldDiscountSnap = await getDoc(bdoc("clientDiscounts", oldPhoneDigits));
       if (oldDiscountSnap.exists() && !("discounts" in data)) {
-        await setDoc(doc(db, "clientDiscounts", newPhoneDigits), oldDiscountSnap.data());
+        await setDoc(bdoc("clientDiscounts", newPhoneDigits), oldDiscountSnap.data());
       }
       if (oldDiscountSnap.exists()) {
-        await deleteDoc(doc(db, "clientDiscounts", oldPhoneDigits));
+        await deleteDoc(bdoc("clientDiscounts", oldPhoneDigits));
       }
     } catch (err) {
       console.error("[updateClient] No se pudo migrar clientDiscounts:", err);
     }
     try {
-      const oldCreditSnap = await getDoc(doc(db, "referralCredits", oldPhoneDigits));
+      const oldCreditSnap = await getDoc(bdoc("referralCredits", oldPhoneDigits));
       if (oldCreditSnap.exists()) {
-        await setDoc(doc(db, "referralCredits", newPhoneDigits), oldCreditSnap.data());
-        await deleteDoc(doc(db, "referralCredits", oldPhoneDigits));
+        await setDoc(bdoc("referralCredits", newPhoneDigits), oldCreditSnap.data());
+        await deleteDoc(bdoc("referralCredits", oldPhoneDigits));
       }
     } catch (err) {
       console.error("[updateClient] No se pudo migrar referralCredits:", err);
     }
     try {
-      await setDoc(doc(db, "phoneIndex", newPhoneDigits), { clientId: id });
-      await deleteDoc(doc(db, "phoneIndex", oldPhoneDigits));
+      await setDoc(bdoc("phoneIndex", newPhoneDigits), { clientId: id });
+      await deleteDoc(bdoc("phoneIndex", oldPhoneDigits));
     } catch (err) {
       console.error("[updateClient] No se pudo migrar phoneIndex:", err);
     }
   } else if (phoneChanged && newPhoneDigits) {
     try {
-      await setDoc(doc(db, "phoneIndex", newPhoneDigits), { clientId: id });
+      await setDoc(bdoc("phoneIndex", newPhoneDigits), { clientId: id });
     } catch (err) {
       console.error("[updateClient] No se pudo crear phoneIndex:", err);
     }
   }
 
-  await updateDoc(doc(db, "clients", id), updates);
+  await updateDoc(bdoc("clients", id), updates);
 
   const nameChanged = "name" in data && data.name !== current.name;
   if (nameChanged || phoneChanged) {
@@ -861,7 +940,7 @@ export async function getClientDiscountPublic(phone) {
   const phoneDigits = normalizePhone(phone);
   if (!phoneDigits) return null;
   try {
-    const snap = await getDoc(doc(db, "clientDiscounts", phoneDigits));
+    const snap = await getDoc(bdoc("clientDiscounts", phoneDigits));
     return snap.exists() ? snap.data() : null;
   } catch {
     return null;
@@ -872,7 +951,7 @@ export async function isExistingClientPublic(phone) {
   const variants = phoneVariants(phone);
   if (!variants.length) return false;
   try {
-    const snaps = await Promise.all(variants.map(v => getDoc(doc(db, "phoneIndex", v))));
+    const snaps = await Promise.all(variants.map(v => getDoc(bdoc("phoneIndex", v))));
     return snaps.some(s => s.exists());
   } catch {
     return false;
@@ -883,7 +962,7 @@ export async function getReferralCreditPublic(phone) {
   const variants = phoneVariants(phone);
   if (!variants.length) return 0;
   try {
-    const snaps = await Promise.all(variants.map(v => getDoc(doc(db, "referralCredits", v))));
+    const snaps = await Promise.all(variants.map(v => getDoc(bdoc("referralCredits", v))));
     const found = snaps.find(s => s.exists());
     return found ? (found.data().amount || 0) : 0;
   } catch {
@@ -894,34 +973,34 @@ export async function getReferralCreditPublic(phone) {
 // La fuente de verdad es clients/{id}.referralCredit; referralCredits/{phone} es la copia
 // pública que lee reservas-app (mismo patrón que discounts / clientDiscounts).
 export async function setReferralCredit(clientId, amount) {
-  const snap = await getDoc(doc(db, "clients", clientId));
+  const snap = await getDoc(bdoc("clients", clientId));
   if (!snap.exists()) return;
   const safeAmount = Math.max(0, amount || 0);
-  await updateDoc(doc(db, "clients", clientId), { referralCredit: safeAmount });
+  await updateDoc(bdoc("clients", clientId), { referralCredit: safeAmount });
   const phoneDigits = snap.data().phoneDigits || normalizePhone(snap.data().phone);
   if (!phoneDigits) return;
   if (safeAmount > 0) {
-    await setDoc(doc(db, "referralCredits", phoneDigits), { amount: safeAmount });
+    await setDoc(bdoc("referralCredits", phoneDigits), { amount: safeAmount });
   } else {
-    await deleteDoc(doc(db, "referralCredits", phoneDigits)).catch(() => {});
+    await deleteDoc(bdoc("referralCredits", phoneDigits)).catch(() => {});
   }
 }
 
 export async function deleteClient(id) {
   try {
-    const snap = await getDoc(doc(db, "clients", id));
+    const snap = await getDoc(bdoc("clients", id));
     if (snap.exists() && snap.data().phoneDigits) {
-      await deleteDoc(doc(db, "phoneIndex", snap.data().phoneDigits));
+      await deleteDoc(bdoc("phoneIndex", snap.data().phoneDigits));
     }
   } catch {
     // Best-effort: si falla la limpieza del índice, igual borra el cliente
   }
-  return deleteDoc(doc(db, "clients", id));
+  return deleteDoc(bdoc("clients", id));
 }
 
 export function subscribeClientSessions(clientId, callback) {
   const q = query(
-    collection(db, "clients", clientId, "sessions"),
+    bcol("clients", clientId, "sessions"),
     orderBy("date", "desc")
   );
   return onSnapshot(q, snap => {
@@ -930,7 +1009,7 @@ export function subscribeClientSessions(clientId, callback) {
 }
 
 export async function addClientSession(clientId, data) {
-  const ref = await addDoc(collection(db, "clients", clientId, "sessions"), {
+  const ref = await addDoc(bcol("clients", clientId, "sessions"), {
     ...data,
     createdAt: Date.now(),
   });
@@ -938,46 +1017,50 @@ export async function addClientSession(clientId, data) {
 }
 
 export async function updateClientSession(clientId, sessionId, data) {
-  return updateDoc(doc(db, "clients", clientId, "sessions", sessionId), data);
+  return updateDoc(bdoc("clients", clientId, "sessions", sessionId), data);
 }
 
 export async function deleteClientSession(clientId, sessionId) {
-  return deleteDoc(doc(db, "clients", clientId, "sessions", sessionId));
+  return deleteDoc(bdoc("clients", clientId, "sessions", sessionId));
 }
 
 // ---------- Info del negocio ----------
+// La info vive en el propio doc businesses/{id}, junto con ownerUid (que las reglas no dejan cambiar).
 export function listenBusinessInfo(callback) {
-  return onSnapshot(doc(db, "businessInfo", "main"), (snap) => {
-    callback(snap.exists() ? snap.data() : null);
+  return onSnapshot(doc(db, "businesses", currentBusinessId()), (snap) => {
+    if (!snap.exists()) return callback(null);
+    const { ownerUid, ...info } = snap.data();
+    callback(info);
   }, (err) => console.error("[listenBusinessInfo] snapshot error:", err));
 }
 export async function setBusinessInfo(data) {
-  return setDoc(doc(db, "businessInfo", "main"), data, { merge: true });
+  const { ownerUid, ...info } = data;
+  return setDoc(doc(db, "businesses", currentBusinessId()), info, { merge: true });
 }
 
 // ---------- Gift Cards ----------
 export async function createGiftCard(data) {
   // data.code es el ID del documento
-  return setDoc(doc(db, "giftCards", data.code), data);
+  return setDoc(bdoc("giftCards", data.code), data);
 }
 
 export function listenGiftCards(callback) {
   return onSnapshot(
-    query(collection(db, "giftCards"), orderBy("createdAt", "desc")),
+    query(bcol("giftCards"), orderBy("createdAt", "desc")),
     (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
     (err) => console.error("[listenGiftCards] snapshot error:", err)
   );
 }
 
 export async function getGiftCard(code) {
-  const snap = await getDoc(doc(db, "giftCards", code));
+  const snap = await getDoc(bdoc("giftCards", code));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 export async function getGiftCardsByPhone(phone) {
   const variants = phoneVariants(phone);
   const snaps = await Promise.all(
-    variants.map(v => getDocs(query(collection(db, "giftCards"), where("buyerPhone", "==", v))))
+    variants.map(v => getDocs(query(bcol("giftCards"), where("buyerPhone", "==", v))))
   );
   const seen = new Set();
   const results = [];
@@ -990,25 +1073,25 @@ export async function getGiftCardsByPhone(phone) {
 }
 
 export async function activateGiftCard(code) {
-  return updateDoc(doc(db, "giftCards", code), {
+  return updateDoc(bdoc("giftCards", code), {
     status: "active",
     activatedAt: Date.now(),
   });
 }
 
 export async function deactivateGiftCard(code) {
-  return updateDoc(doc(db, "giftCards", code), {
+  return updateDoc(bdoc("giftCards", code), {
     status: "pending",
     activatedAt: null,
   });
 }
 
 export async function deleteGiftCard(code) {
-  return deleteDoc(doc(db, "giftCards", code));
+  return deleteDoc(bdoc("giftCards", code));
 }
 
 export async function redeemGiftCard(code, apptId) {
-  return updateDoc(doc(db, "giftCards", code), {
+  return updateDoc(bdoc("giftCards", code), {
     status: "used",
     apptId,
     usedAt: Date.now(),
@@ -1016,7 +1099,7 @@ export async function redeemGiftCard(code, apptId) {
 }
 
 export async function restoreGiftCard(code) {
-  return updateDoc(doc(db, "giftCards", code), {
+  return updateDoc(bdoc("giftCards", code), {
     status: "active",
     apptId: null,
     usedAt: null,
@@ -1024,7 +1107,7 @@ export async function restoreGiftCard(code) {
 }
 
 export async function updateGiftCardApptId(code, newApptId) {
-  return updateDoc(doc(db, "giftCards", code), { apptId: newApptId });
+  return updateDoc(bdoc("giftCards", code), { apptId: newApptId });
 }
 
 // ---------- Combos de sesiones prepagas ----------
@@ -1032,7 +1115,7 @@ const COMBO_VALID_DAYS = 60;
 
 export async function createCombo(data) {
   const now = Date.now();
-  return addDoc(collection(db, "combos"), {
+  return addDoc(bcol("combos"), {
     ...data,
     sessionsRemaining: data.totalSessions,
     usedApptIds: [],
@@ -1043,33 +1126,33 @@ export async function createCombo(data) {
 }
 
 export async function activateCombo(comboId) {
-  return updateDoc(doc(db, "combos", comboId), {
+  return updateDoc(bdoc("combos", comboId), {
     status: "active",
     activatedAt: Date.now(),
   });
 }
 
 export async function updateCombo(comboId, data) {
-  return updateDoc(doc(db, "combos", comboId), data);
+  return updateDoc(bdoc("combos", comboId), data);
 }
 
 export function listenCombos(callback) {
   return onSnapshot(
-    query(collection(db, "combos"), orderBy("createdAt", "desc")),
+    query(bcol("combos"), orderBy("createdAt", "desc")),
     (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
     (err) => console.error("[listenCombos] snapshot error:", err)
   );
 }
 
 export async function getCombo(comboId) {
-  const snap = await getDoc(doc(db, "combos", comboId));
+  const snap = await getDoc(bdoc("combos", comboId));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 export async function getCombosByPhone(phone) {
   const variants = phoneVariants(phone);
   const snaps = await Promise.all(
-    variants.map(v => getDocs(query(collection(db, "combos"), where("clientPhone", "==", v))))
+    variants.map(v => getDocs(query(bcol("combos"), where("clientPhone", "==", v))))
   );
   const seen = new Set();
   const results = [];
@@ -1082,7 +1165,7 @@ export async function getCombosByPhone(phone) {
 }
 
 export async function updateComboApptId(comboId, oldApptId, newApptId) {
-  const comboRef = doc(db, "combos", comboId);
+  const comboRef = bdoc("combos", comboId);
   return runTransaction(db, async (transaction) => {
     const snap = await transaction.get(comboRef);
     if (!snap.exists()) return;
@@ -1094,7 +1177,7 @@ export async function updateComboApptId(comboId, oldApptId, newApptId) {
 }
 
 export async function redeemComboSession(comboId, apptId) {
-  const comboRef = doc(db, "combos", comboId);
+  const comboRef = bdoc("combos", comboId);
   return runTransaction(db, async (transaction) => {
     const snap = await transaction.get(comboRef);
     if (!snap.exists()) throw new Error("El combo ya no existe.");
@@ -1110,7 +1193,7 @@ export async function redeemComboSession(comboId, apptId) {
 }
 
 export async function restoreComboSession(comboId, apptId) {
-  const comboRef = doc(db, "combos", comboId);
+  const comboRef = bdoc("combos", comboId);
   return runTransaction(db, async (transaction) => {
     const snap = await transaction.get(comboRef);
     if (!snap.exists()) return;
@@ -1124,5 +1207,5 @@ export async function restoreComboSession(comboId, apptId) {
 }
 
 export async function deleteCombo(comboId) {
-  return deleteDoc(doc(db, "combos", comboId));
+  return deleteDoc(bdoc("combos", comboId));
 }

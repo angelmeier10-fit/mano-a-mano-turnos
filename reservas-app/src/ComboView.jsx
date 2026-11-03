@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { Package, ChevronLeft } from "lucide-react";
 import { formatPrice } from "../../shared/helpers";
-import { createCombo } from "../../shared/firestoreApi";
+import { createCombo, reservasUrl } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
-const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
-export default function ComboView({ services, onBack, onGoReservar, startAsGift = false }) {
+export default function ComboView({ services, businessInfo, onBack, onGoReservar, startAsGift = false }) {
   const comboServices = services.filter(s => s.price2 > 0 || s.price3 > 0);
   const [serviceId, setServiceId] = useState(comboServices[0]?.id || "");
   const [sessions, setSessions] = useState(2);
@@ -39,7 +38,7 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
         ...(isGift ? { fromName: buyerName.trim(), buyerPhone: buyerPhone.replace(/\D/g, ""), message: message.trim() } : {}),
       };
       const ref = await createCombo(data);
-      setDone({ ...data, id: ref.id, link: isGift ? `${BASE_URL}?combo=${ref.id}` : null });
+      setDone({ ...data, id: ref.id, link: isGift ? reservasUrl({ combo: ref.id }) : null });
     } catch (e) {
       console.error(e);
       window.alert("Hubo un problema al generar el pedido. Intentá de nuevo.");
@@ -49,7 +48,7 @@ export default function ComboView({ services, onBack, onGoReservar, startAsGift 
   }
 
   function shareWhatsApp() {
-    const msg = `Hola ${done.clientName}! Te comparto tu combo de sesiones de Angel Meier Masoterapia 📦\nServicio: ${done.serviceName} · x${done.totalSessions}\nDe parte de: ${done.fromName}${done.message ? `\n"${done.message}"` : ""}\n\nLink para verlo y usarlo:\n${done.link}`;
+    const msg = `Hola ${done.clientName}! Te comparto tu combo de sesiones de ${businessInfo.name} 📦\nServicio: ${done.serviceName} · x${done.totalSessions}\nDe parte de: ${done.fromName}${done.message ? `\n"${done.message}"` : ""}\n\nLink para verlo y usarlo:\n${done.link}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 

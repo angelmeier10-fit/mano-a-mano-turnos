@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Gift, ChevronLeft, Copy } from "lucide-react";
 import { formatPrice, formatDateLong, dateKey, addDays, generateCode } from "../../shared/helpers";
-import { createGiftCard } from "../../shared/firestoreApi";
+import { createGiftCard, reservasUrl } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 
-const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
 export default function GiftCardView({ services, businessInfo, onBack }) {
   const todayStr = dateKey(new Date());
@@ -45,7 +44,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
         activatedAt: null,
       };
       await createGiftCard(data);
-      setDone({ code, link: `${BASE_URL}?giftcard=${code}`, data });
+      setDone({ code, link: reservasUrl({ giftcard: code }), data });
     } catch (e) {
       console.error(e);
       window.alert("Hubo un problema al generar la gift card. Intentá de nuevo.");
@@ -77,7 +76,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
   }
 
   function shareWhatsApp() {
-    const msg = `Hola ${done.data.toName}! Te comparto tu gift card de Angel Meier Masoterapia 🎁\nServicio: ${done.data.serviceName}\nDe parte de: ${done.data.fromName}${done.data.message ? `\n"${done.data.message}"` : ""}\n\nLink para usarla:\n${done.link}`;
+    const msg = `Hola ${done.data.toName}! Te comparto tu gift card de ${businessInfo.name} 🎁\nServicio: ${done.data.serviceName}\nDe parte de: ${done.data.fromName}${done.data.message ? `\n"${done.data.message}"` : ""}\n\nLink para usarla:\n${done.link}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
@@ -106,7 +105,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
           <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #D4AF37 50%, #C9A84C 80%, transparent)", flexShrink: 0 }} />
           {/* zona de texto inferior */}
           <div style={{ padding: "18px 22px 20px", flex: 1 }}>
-            <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
+            <div style={styles.giftCardVisualLogo}>{businessInfo.name}</div>
             <div style={styles.giftCardVisualService}>{done.data.serviceName}</div>
             <div style={styles.giftCardVisualTo}>Para {done.data.toName} · de parte de {done.data.fromName}</div>
             {done.data.message && <div style={styles.giftCardVisualMessage}>"{done.data.message}"</div>}

@@ -4,6 +4,7 @@ import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
   applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS, REFERRAL_AMOUNT,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot,
 } from "../../shared/helpers";
 import { getClientDiscountPublic, getCombosByPhone, isExistingClientPublic, getReferralCreditPublic } from "../../shared/firestoreApi";
 import { MiniCalendar } from "../../shared/MiniCalendar";
@@ -20,7 +21,28 @@ function saveBookingToLocalStorage(apptId, cancelToken, appt, serviceName) {
   } catch {}
 }
 
-export default function ReservarView({ services, availability, businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard, onGoCombo, referralMode = false }) {
+export default function ReservarView({ services: allServices, availability: allAvailability, locations = [], businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard, onGoCombo, referralMode = false }) {
+  // Con 0 o 1 lugar no hay que elegir. Con varios, se filtran servicios y cupos por el lugar elegido.
+  const multiLoc = locations.length > 1;
+  const [locationId, setLocationId] = useState(multiLoc ? null : (locations[0]?.id || null));
+  useEffect(() => {
+    if (!multiLoc && locations[0] && !locationId) setLocationId(locations[0].id);
+  }, [locations, multiLoc, locationId]);
+  const location = locations.find(l => l.id === locationId) || null;
+  // Gift card / combo: solo los lugares donde se ofrece ese servicio.
+  const preselectedSvc = allServices.find(s => s.id === preselectedServiceId);
+  const pickableLocations = preselectedSvc ? locations.filter(l => serviceAtLocation(preselectedSvc, l.id)) : locations;
+  const services = useMemo(
+    () => allServices.filter(s => serviceAtLocation(s, multiLoc ? locationId : null)),
+    [allServices, multiLoc, locationId]
+  );
+  const availability = useMemo(
+    () => multiLoc ? allAvailability.filter(s => slotLocationId(s, locations) === locationId) : allAvailability,
+    [allAvailability, multiLoc, locations, locationId]
+  );
+  const address = location?.address || businessInfo?.address;
+  const addressDetail = location ? location.addressDetail : businessInfo?.addressDetail;
+
   const availabilityByDate = useMemo(() => {
     const map = {};
     availability.forEach(slot => {
@@ -61,9 +83,15 @@ export default function ReservarView({ services, availability, businessInfo, onB
     if (!selectedDate && availableDates.length > 0) setSelectedDate(availableDates[0]);
   }, [availableDates, selectedDate]);
 
+  // Si el servicio elegido no se ofrece en el lugar, se pasa al primero que sí.
   useEffect(() => {
-    if (!serviceId && services.length > 0) setServiceId(services[0].id);
+    if (services.length > 0 && !services.some(s => s.id === serviceId)) setServiceId(services[0].id);
   }, [services, serviceId]);
+
+  // Al cambiar de lugar, la fecha elegida puede no tener cupos ahí.
+  useEffect(() => {
+    if (selectedDate && !availableDatesSet.has(selectedDate)) { setSelectedDate(availableDates[0] || null); setSelectedSlot(null); }
+  }, [availableDatesSet]);
 
   const referralApplies = referralMode && !isExistingClient && !!referredByName.trim();
   function priceWithDiscounts(price, sId) {
@@ -73,7 +101,8 @@ export default function ReservarView({ services, availability, businessInfo, onB
   }
 
   const svc = services.find(s => s.id === serviceId);
-  const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount, referralDiscount: svcReferralDiscount } = priceWithDiscounts(svc?.price, serviceId);
+  const svcPrice = svc ? servicePrice(svc, locationId) : 0;
+  const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount, referralDiscount: svcReferralDiscount } = priceWithDiscounts(svcPrice, serviceId);
   const matchingCombo = myCombos.find(c => c.status === "active" && c.sessionsRemaining > 0 && c.serviceId === serviceId);
 
   const slotsForSelectedDate = useMemo(() => {
@@ -122,8 +151,9 @@ export default function ReservarView({ services, availability, businessInfo, onB
       notes: "",
       status: "pendiente",
       fromAvailabilityId: slot.id,
-      price: usingCombo ? 0 : (svc?.price || 0),
+      price: usingCombo ? 0 : svcPrice,
       discount: usingCombo ? 0 : svcDiscountAmount,
+      ...locationSnapshot(location),
       ...(clientId ? { clientId } : {}),
       ...(giftCardCode ? { giftCardCode } : {}),
       ...(usingCombo ? { comboId: matchingCombo.id } : {}),
@@ -143,7 +173,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
     saveBookingToLocalStorage(result.apptId, result.cancelToken, appt, svc?.name || "");
     if (typeof window.fbq === "function") window.fbq("track", "Schedule");
     if (businessInfo?.whatsapp) {
-      const msg = `Hola! Reservé un turno de ${svc.name} para el ${formatDateLong(selectedDate)} a las ${slot.start}. Mi nombre es ${clientName.trim()}.`;
+      const msg = `Hola! Reservé un turno de ${svc.name} para el ${formatDateLong(selectedDate)} a las ${slot.start}${multiLoc && location ? ` en ${location.name}` : ""}. Mi nombre es ${clientName.trim()}.`;
       window.open(`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}?text=${encodeURIComponent(msg)}`, "_blank");
     }
     setSelectedSlot(null);
@@ -165,15 +195,16 @@ export default function ReservarView({ services, availability, businessInfo, onB
             : <p style={{ ...styles.confirmDetail, color: "#8A8275", marginBottom: 4 }}>Te confirmamos el turno pronto por WhatsApp.</p>
           }
           <p style={styles.confirmDetail}>{cSvc?.name} · {confirmed.start} a {confirmed.end}</p>
-          {cSvc?.price && !preselectedServiceId && !confirmed.comboId && (
+          {confirmed.price > 0 && !preselectedServiceId && !confirmed.comboId && (
             <p style={styles.confirmPrice}>
               {confirmed.discount > 0
-                ? <><span style={{ textDecoration: "line-through", opacity: 0.6, marginRight: 6, fontSize: "0.8em" }}>{formatPrice(cSvc.price)}</span>{formatPrice(Math.max(0, cSvc.price - confirmed.discount))}</>
-                : formatPrice(cSvc.price)}
+                ? <><span style={{ textDecoration: "line-through", opacity: 0.6, marginRight: 6, fontSize: "0.8em" }}>{formatPrice(confirmed.price)}</span>{formatPrice(Math.max(0, confirmed.price - confirmed.discount))}</>
+                : formatPrice(confirmed.price)}
             </p>
           )}
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
-          <p style={{ ...styles.confirmDetail, marginTop: 10 }}>{businessInfo?.address}</p>
+          {multiLoc && confirmed.locationName && <p style={{ ...styles.confirmDetail, marginTop: 10, fontWeight: 700 }}>{confirmed.locationName}</p>}
+          <p style={{ ...styles.confirmDetail, marginTop: multiLoc ? 2 : 10 }}>{confirmed.locationAddress || businessInfo?.address}</p>
           {businessInfo?.whatsapp && (
             <a
               href={`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}`}
@@ -243,10 +274,12 @@ export default function ReservarView({ services, availability, businessInfo, onB
           <Clock size={14} color="#8A8275" />
           <span>{businessInfo?.hoursLabel}</span>
         </div>
-        <div style={styles.businessInfoRow}>
-          <Calendar size={14} color="#8A8275" />
-          <span>{businessInfo?.address} <span style={{ color: "#8A8275" }}>· {businessInfo?.addressDetail}</span></span>
-        </div>
+        {(!multiLoc || location) && (
+          <div style={styles.businessInfoRow}>
+            <Calendar size={14} color="#8A8275" />
+            <span>{address}{addressDetail ? <span style={{ color: "#8A8275" }}> · {addressDetail}</span> : null}</span>
+          </div>
+        )}
         {businessInfo?.whatsapp && (
           <a
             href={`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}`}
@@ -259,6 +292,34 @@ export default function ReservarView({ services, availability, businessInfo, onB
         )}
       </div>
 
+      {multiLoc && (
+        <>
+          <label style={styles.fieldLabel}>¿Dónde querés atenderte?</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+            {pickableLocations.map(loc => {
+              const active = loc.id === locationId;
+              return (
+                <button
+                  key={loc.id}
+                  type="button"
+                  onClick={() => { setLocationId(loc.id); setSelectedSlot(null); }}
+                  style={{
+                    ...styles.serviceChip, width: "100%", textAlign: "left",
+                    ...(active ? { background: "#2A2622", color: "#EFE9DF", borderColor: "#2A2622" } : {}),
+                  }}
+                >
+                  <span style={{ display: "block", fontWeight: 700 }}>{loc.name}</span>
+                  <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
+                    {[loc.address, loc.addressDetail].filter(Boolean).join(" · ")}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {(!multiLoc || location) && <>
       <label style={styles.fieldLabel}>Tu nombre</label>
       <input id="client-name-input" style={styles.input} value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre y apellido" />
       <label style={styles.fieldLabel}>Teléfono (WhatsApp)</label>
@@ -346,7 +407,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
             >
               <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
               <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
-                {s.duration} min{s.price ? ` · ${formatPrice(priceWithDiscounts(s.price, s.id).finalPrice)}` : ""}
+                {s.duration} min{servicePrice(s, locationId) ? ` · ${formatPrice(priceWithDiscounts(servicePrice(s, locationId), s.id).finalPrice)}` : ""}
               </span>
             </button>
           ))}
@@ -461,14 +522,15 @@ export default function ReservarView({ services, availability, businessInfo, onB
           {selectedSlot && slotsForSelectedDate.some(s => s.id === selectedSlot.id) && (
             <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "14px 16px", marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ fontWeight: 700, fontSize: 15, color: "#2A2622" }}>{svc?.name}</div>
+              {multiLoc && location && <div style={{ fontSize: 13, color: "#5A5046" }}>{location.name}{location.address ? ` · ${location.address}` : ""}</div>}
               <div style={{ fontSize: 13, color: "#5A5046" }}>
                 {formatDateLong(selectedDate)} · {selectedSlot.start} a {minutesToTime(timeToMinutes(selectedSlot.start) + (svc?.duration || 0))}
               </div>
-              {svc?.price && !preselectedServiceId && (
+              {svcPrice > 0 && !preselectedServiceId && (
                 <div style={{ fontSize: 13, color: "#5A5046" }}>
                   {svcDiscountAmount > 0
-                    ? <><span style={{ textDecoration: "line-through", opacity: 0.6, marginRight: 6 }}>{formatPrice(svc.price)}</span>{formatPrice(svcFinalPrice)}</>
-                    : formatPrice(svc.price)}
+                    ? <><span style={{ textDecoration: "line-through", opacity: 0.6, marginRight: 6 }}>{formatPrice(svcPrice)}</span>{formatPrice(svcFinalPrice)}</>
+                    : formatPrice(svcPrice)}
                 </div>
               )}
               <button
@@ -483,6 +545,7 @@ export default function ReservarView({ services, availability, businessInfo, onB
 
         </>
       )}
+      </>}
     </div>
   );
 }

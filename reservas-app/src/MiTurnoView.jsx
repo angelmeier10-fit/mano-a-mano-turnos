@@ -3,6 +3,7 @@ import { Clock, Check, MessageCircle, X, ChevronLeft, Search } from "lucide-reac
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
@@ -39,7 +40,7 @@ function isMoreThan24hAway(dKey, startTime) {
 }
 
 export default function MiTurnoView({
-  services, availability, businessInfo,
+  services: allServices, availability: allAvailability, locations = [], businessInfo,
   onGetMyBookings, onCancelAppointment, onReschedule,
   initialPhone = "",
 }) {
@@ -61,6 +62,18 @@ export default function MiTurnoView({
   const [reschedDate, setReschedDate] = useState(null);
   const [reschedSlot, setReschedSlot] = useState(null);
 
+  // Reprogramar: solo dentro del mismo lugar del turno (los turnos sin lugar cuentan como del primero).
+  const multiLoc = locations.length > 1;
+  const reschedLocation = locations.find(l => l.id === (selected?.locationId || locations[0]?.id)) || null;
+  const services = useMemo(
+    () => multiLoc && reschedLocation ? allServices.filter(sv => serviceAtLocation(sv, reschedLocation.id)) : allServices,
+    [allServices, multiLoc, reschedLocation]
+  );
+  const availability = useMemo(
+    () => multiLoc && reschedLocation ? allAvailability.filter(sl => slotLocationId(sl, locations) === reschedLocation.id) : allAvailability,
+    [allAvailability, multiLoc, locations, reschedLocation]
+  );
+
   // ---- Availability index ----
   const availabilityByDate = useMemo(() => {
     const map = {};
@@ -78,7 +91,7 @@ export default function MiTurnoView({
       .sort()
   , [availabilityByDate, todayKey]);
 
-  const reschedSvc = services.find(s => s.id === reschedServiceId);
+  const reschedSvc = allServices.find(s => s.id === reschedServiceId);
   const reschedSlots = useMemo(() => {
     if (!reschedDate || !reschedSvc) return [];
     return (availabilityByDate[reschedDate] || [])
@@ -128,7 +141,7 @@ export default function MiTurnoView({
     setWorking(true);
     setWorkError(null);
     try {
-      const svc = services.find(s => s.id === selected.serviceId);
+      const svc = allServices.find(s => s.id === selected.serviceId);
       const historyData = {
         clientId: selected.clientId || null,
         clientPhone: phone,
@@ -173,7 +186,7 @@ export default function MiTurnoView({
     setWorkError(null);
     try {
       const newEnd = minutesToTime(timeToMinutes(reschedSlot.start) + reschedSvc.duration);
-      const oldSvc = services.find(s => s.id === selected.serviceId);
+      const oldSvc = allServices.find(s => s.id === selected.serviceId);
       const historyData = {
         clientId: selected.clientId || null,
         clientPhone: phone,
@@ -199,6 +212,8 @@ export default function MiTurnoView({
           clientId: selected.clientId || null,
           notes: "",
           fromAvailabilityId: reschedSlot.id,
+          ...locationSnapshot(reschedLocation),
+          ...(reschedSvc.id !== selected.serviceId ? { price: servicePrice(reschedSvc, reschedLocation?.id) } : {}),
         },
         phone,
         historyData,
@@ -250,7 +265,7 @@ export default function MiTurnoView({
   }
 
   if (step === "cancel") {
-    const svcName = services.find(s => s.id === selected?.serviceId)?.name || "";
+    const svcName = allServices.find(s => s.id === selected?.serviceId)?.name || "";
     return (
       <div style={styles.viewWrap}>
         <button style={styles.backBtn} onClick={() => setStep("list")}>
@@ -294,6 +309,9 @@ export default function MiTurnoView({
           <ChevronLeft size={16} /> Volver
         </button>
         <h2 style={styles.sectionTitle}>Cambiar horario</h2>
+        {multiLoc && reschedLocation && (
+          <p style={styles.helperText}>En {reschedLocation.name}. Para cambiar de lugar, cancelá este turno y reservá uno nuevo.</p>
+        )}
 
         {services.length > 1 && (
           <>
@@ -389,7 +407,7 @@ export default function MiTurnoView({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {bookings.map(b => {
-              const svc = services.find(s => s.id === b.serviceId);
+              const svc = allServices.find(s => s.id === b.serviceId);
               const hasLocalToken = !!(b.cancelToken || localTokens[b.id]?.cancelToken);
               const isManual = b.requiresCancelToken === false;
               const canModify = (hasLocalToken || isManual) && isMoreThan24hAway(b.dateKey, b.start);
@@ -413,6 +431,7 @@ export default function MiTurnoView({
                   </div>
                   <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6E6555" }}>
                     {b.start} hs · {svc?.name || "Masaje"}
+                    {multiLoc && b.locationName ? ` · ${b.locationName}` : ""}
                   </p>
 
                   {canModify && (

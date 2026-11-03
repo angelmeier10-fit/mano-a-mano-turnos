@@ -13,11 +13,13 @@ import {
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
+  connectAuthEmulator,
 } from "firebase/auth";
 import { firebaseConfig } from "../../shared/firebaseConfig";
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+if (import.meta.env.VITE_USE_EMULATOR) connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 
 setPersistence(auth, browserLocalPersistence);
 

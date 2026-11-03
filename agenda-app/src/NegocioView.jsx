@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Check, Download, Copy, Share2 } from "lucide-react";
+import { Check, Download, Copy, Share2, Pencil, Trash2, Plus, MapPin } from "lucide-react";
 import styles from "../../shared/styles";
 import { STATUS, formatPrice, getAppointmentPrice, dateKey, REFERRAL_AMOUNT } from "../../shared/helpers";
-
-const RESERVAS_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
-const REFERIDOS_URL = `${RESERVAS_URL}?ref=amigo`;
+import { reservasUrl } from "../../shared/firestoreApi";
 
 function ShareLinkCard({ label, url, shareTitle }) {
   const [copied, setCopied] = useState(false);
@@ -34,6 +32,86 @@ function ShareLinkCard({ label, url, shareTitle }) {
         )}
       </div>
     </div>
+  );
+}
+
+function LocationForm({ initial, onSubmit, onCancel }) {
+  const [name, setName] = useState(initial?.name || "");
+  const [address, setAddress] = useState(initial?.address || "");
+  const [addressDetail, setAddressDetail] = useState(initial?.addressDetail || "");
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onSubmit({ name: name.trim(), address: address.trim(), addressDetail: addressDetail.trim() });
+  }
+
+  return (
+    <form style={{ ...styles.newServiceForm, marginTop: 4 }} onSubmit={handleSubmit}>
+      <label style={styles.fieldLabel}>Nombre del lugar</label>
+      <input style={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Consultorio Centro" autoFocus />
+      <label style={styles.fieldLabel}>Dirección</label>
+      <input style={styles.input} value={address} onChange={e => setAddress(e.target.value)} placeholder="Calle y número, localidad" />
+      <label style={styles.fieldLabel}>Referencia</label>
+      <input style={styles.input} value={addressDetail} onChange={e => setAddressDetail(e.target.value)} placeholder="Entre calles, piso, timbre, etc." />
+      <div style={styles.modalActions}>
+        <button type="button" style={styles.cancelBtn} onClick={onCancel}>Cancelar</button>
+        <button type="submit" style={styles.saveBtn}><Check size={16} /> Guardar</button>
+      </div>
+    </form>
+  );
+}
+
+function LocationsSection({ locations, onAdd, onUpdate, onDelete }) {
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  async function run(action) {
+    try { await action(); } catch (err) { alert("No se pudo guardar el lugar: " + err.message); }
+  }
+
+  function handleDelete(loc) {
+    if (!window.confirm(`¿Borrar "${loc.name}"? Los turnos ya reservados conservan la dirección, pero los cupos libres de ese lugar dejan de mostrarse en reservas.`)) return;
+    run(() => onDelete(loc.id));
+  }
+
+  return (
+    <>
+      <h2 style={{ ...styles.sectionTitle, marginTop: 4 }}>Lugares de atención</h2>
+      <p style={styles.helperText}>
+        Si atendés en más de un lugar, cargalos acá: tus clientes eligen el lugar al reservar y cada cupo se abre en un lugar.
+        Con uno solo (o ninguno) todo funciona como siempre.
+      </p>
+      <div style={{ ...styles.serviceList, marginBottom: 12 }}>
+        {locations.map(loc => (
+          <div key={loc.id}>
+            <div style={styles.serviceRow}>
+              <MapPin size={15} color="#B5654A" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={styles.serviceRowName}>{loc.name}</div>
+                <div style={styles.serviceRowMeta}>{[loc.address, loc.addressDetail].filter(Boolean).join(" · ")}</div>
+              </div>
+              <button type="button" style={styles.iconBtnGhost} onClick={() => setEditingId(editingId === loc.id ? null : loc.id)}><Pencil size={15} /></button>
+              <button type="button" style={styles.iconBtnGhost} onClick={() => handleDelete(loc)}><Trash2 size={15} /></button>
+            </div>
+            {editingId === loc.id && (
+              <LocationForm
+                initial={loc}
+                onCancel={() => setEditingId(null)}
+                onSubmit={(data) => run(async () => { await onUpdate(loc.id, data); setEditingId(null); })}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      {adding ? (
+        <LocationForm onCancel={() => setAdding(false)} onSubmit={(data) => run(async () => { await onAdd(data); setAdding(false); })} />
+      ) : (
+        <button type="button" style={{ ...styles.addServiceBtn, marginBottom: 24 }} onClick={() => setAdding(true)}>
+          <Plus size={16} /> Agregar lugar
+        </button>
+      )}
+    </>
   );
 }
 
@@ -184,7 +262,7 @@ function IncomesPanel({ appointments, services }) {
   );
 }
 
-export default function NegocioView({ businessInfo, onSave, appointments = [], clients = [], services = [] }) {
+export default function NegocioView({ businessInfo, onSave, appointments = [], clients = [], services = [], locations = [], onAddLocation, onUpdateLocation, onDeleteLocation }) {
   const [name, setName] = useState(businessInfo?.name || "");
   const [address, setAddress] = useState(businessInfo?.address || "");
   const [addressDetail, setAddressDetail] = useState(businessInfo?.addressDetail || "");
@@ -246,15 +324,17 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     <div style={styles.viewWrap}>
       <h2 style={styles.sectionTitle}>Mi negocio</h2>
 
-      <ShareLinkCard label="Link de reservas para tus clientes" url={RESERVAS_URL} shareTitle="Reservá tu sesión" />
+      <ShareLinkCard label="Link de reservas para tus clientes" url={reservasUrl()} shareTitle="Reservá tu sesión" />
       <ShareLinkCard
         label={`Link de referidos: ${formatPrice(REFERRAL_AMOUNT)} de descuento en la primera sesión`}
-        url={REFERIDOS_URL}
+        url={reservasUrl({ ref: "amigo" })}
         shareTitle="Te recomiendo este lugar de masajes"
       />
 
       <h2 style={{ ...styles.sectionTitle, marginTop: 4 }}>Ingresos</h2>
       <IncomesPanel appointments={appointments} services={services} />
+
+      <LocationsSection locations={locations} onAdd={onAddLocation} onUpdate={onUpdateLocation} onDelete={onDeleteLocation} />
 
       <p style={styles.helperText}>Esta info aparece en la app de reservas para tus clientes.</p>
 
@@ -262,7 +342,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
         <label style={styles.fieldLabel}>Nombre</label>
         <input style={styles.input} value={name} onChange={e => setName(e.target.value)} />
 
-        <label style={styles.fieldLabel}>Dirección</label>
+        <label style={styles.fieldLabel}>Dirección{locations.length > 0 ? " (si no cargaste lugares)" : ""}</label>
         <input style={styles.input} value={address} onChange={e => setAddress(e.target.value)} placeholder="Calle y número, localidad" />
 
         <label style={styles.fieldLabel}>Referencia de dirección</label>

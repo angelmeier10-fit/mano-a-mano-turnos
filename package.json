@@ -9,6 +9,13 @@
     "build:reservas": "npm --prefix reservas-app run build",
     "build": "npm run build:agenda && npm run build:reservas",
     "install:all": "npm install --prefix agenda-app && npm install --prefix reservas-app",
-    "deploy": "npm run build && firebase deploy"
+    "deploy": "npm run build && firebase deploy",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-mano-a-mano \"node --test scripts/rules.test.mjs\"",
+    "migrate": "node scripts/migrate-to-businesses.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "firebase-admin": "^13.10.0"
   }
 }

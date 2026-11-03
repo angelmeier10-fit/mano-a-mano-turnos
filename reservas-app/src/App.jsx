@@ -11,14 +11,17 @@ import ComboRedeemView from "./ComboRedeemView";
 import {
   listenServices,
   listenAvailability,
+  listenLocations,
   bookSlotAtomic,
   createClientPublic,
   listenBusinessInfo,
   getMyBookingRefs,
   cancelAppointmentPublic,
   rescheduleAppointmentPublic,
+  setBusinessId,
+  DEFAULT_BUSINESS_ID,
 } from "../../shared/firestoreApi";
-import { DEFAULT_BUSINESS_INFO, GoogleFontsHref } from "../../shared/helpers";
+import { GoogleFontsHref, sortLocations } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
 function isInAppBrowser() {
@@ -160,6 +163,16 @@ function getReferralFromURL() {
   }
 }
 
+function getBusinessIdFromURL() {
+  try {
+    return new URLSearchParams(window.location.search).get("b") || DEFAULT_BUSINESS_ID;
+  } catch {
+    return DEFAULT_BUSINESS_ID;
+  }
+}
+
+setBusinessId(getBusinessIdFromURL());
+
 function getInitialViewFromURL() {
   try {
     const view = new URLSearchParams(window.location.search).get("view");
@@ -172,7 +185,9 @@ function getInitialViewFromURL() {
 export default function App() {
   const [services, setServices] = useState([]);
   const [availability, setAvailability] = useState([]);
-  const [businessInfo, setBusinessInfo] = useState(DEFAULT_BUSINESS_INFO);
+  const [locations, setLocations] = useState([]);
+  // undefined = cargando, null = el negocio del link no existe
+  const [businessInfo, setBusinessInfo] = useState(undefined);
   const [loaded, setLoaded] = useState(false);
   const [currentView, setCurrentView] = useState(getInitialViewFromURL);
   const [giftCardSubview, setGiftCardSubview] = useState("menu"); // "menu" | "buy" | "lookup" | "redeem"
@@ -191,14 +206,24 @@ export default function App() {
   useEffect(() => {
     const unsubServices = listenServices(setServices);
     const unsubAvail = listenAvailability((data) => { setAvailability(data); setLoaded(true); });
-    const unsubBiz = listenBusinessInfo((data) => { if (data) setBusinessInfo(data); });
-    return () => { unsubServices(); unsubAvail(); unsubBiz(); };
+    const unsubBiz = listenBusinessInfo(setBusinessInfo);
+    const unsubLocations = listenLocations(locs => setLocations(sortLocations(locs)));
+    return () => { unsubServices(); unsubAvail(); unsubBiz(); unsubLocations(); };
   }, []);
 
-  if (!loaded) {
+  if (!loaded || businessInfo === undefined) {
     return (
       <div style={styles.loadingScreen}>
         <div style={styles.loadingMark} />
+      </div>
+    );
+  }
+
+  if (businessInfo === null) {
+    return (
+      <div style={{ ...styles.loadingScreen, padding: 24, textAlign: "center" }}>
+        <GoogleFontsLoader />
+        <p style={{ fontSize: 15, color: "#2A2622", margin: 0 }}>No encontramos este negocio. Revisá que el link esté completo.</p>
       </div>
     );
   }
@@ -218,7 +243,7 @@ export default function App() {
                 <circle cx="14" cy="19" r="2.6" fill="#B5654A"/>
               </svg>
             </div>
-            <h1 style={styles.brandName}>{businessInfo?.name || "Angel Meier Turnos"}</h1>
+            <h1 style={styles.brandName}>{businessInfo.name}</h1>
           </div>
         </header>
         <main style={styles.main}>
@@ -226,6 +251,7 @@ export default function App() {
             code={giftCardCode}
             services={services}
             availability={availability}
+            locations={locations}
             businessInfo={businessInfo}
             onBookSlot={bookSlotAtomic}
             onUpsertClient={createClientPublic}
@@ -250,7 +276,7 @@ export default function App() {
                 <circle cx="14" cy="19" r="2.6" fill="#B5654A"/>
               </svg>
             </div>
-            <h1 style={styles.brandName}>{businessInfo?.name || "Angel Meier Turnos"}</h1>
+            <h1 style={styles.brandName}>{businessInfo.name}</h1>
           </div>
         </header>
         <main style={styles.main}>
@@ -258,6 +284,7 @@ export default function App() {
             comboId={comboCode}
             services={services}
             availability={availability}
+            locations={locations}
             businessInfo={businessInfo}
             onBookSlot={bookSlotAtomic}
             onUpsertClient={createClientPublic}
@@ -290,7 +317,7 @@ export default function App() {
               <circle cx="14" cy="19" r="2.6" fill="#B5654A"/>
             </svg>
           </div>
-          <h1 style={styles.brandName}>{businessInfo?.name || "Angel Meier Turnos"}</h1>
+          <h1 style={styles.brandName}>{businessInfo.name}</h1>
         </div>
         <nav style={styles.tabBar}>
           <button
@@ -299,12 +326,14 @@ export default function App() {
           >
             Reservar
           </button>
-          <button
-            style={{ ...styles.tabBtn, fontWeight: 700, ...(currentView === "quiz" ? styles.tabBtnActive : {}) }}
-            onClick={() => setCurrentView("quiz")}
-          >
-            🧭 ¿Qué masaje elijo?
-          </button>
+          {businessInfo.showQuiz && (
+            <button
+              style={{ ...styles.tabBtn, fontWeight: 700, ...(currentView === "quiz" ? styles.tabBtnActive : {}) }}
+              onClick={() => setCurrentView("quiz")}
+            >
+              🧭 ¿Qué masaje elijo?
+            </button>
+          )}
           <button
             style={{ ...styles.tabBtn, ...(currentView === "giftcard" ? styles.tabBtnActive : {}) }}
             onClick={() => { setCurrentView("giftcard"); setGiftCardSubview("menu"); }}
@@ -330,6 +359,7 @@ export default function App() {
           <ReservarView
             services={services}
             availability={availability}
+            locations={locations}
             businessInfo={businessInfo}
             onBookSlot={bookSlotAtomic}
             onUpsertClient={createClientPublic}
@@ -359,6 +389,7 @@ export default function App() {
         )}
         {currentView === "giftcard" && giftCardSubview === "lookup" && (
           <GiftCardLookupView
+            businessInfo={businessInfo}
             onSelectGiftCard={(code) => { setLookupSelectedCode(code); setGiftCardSubview("redeem"); }}
             onBack={() => setGiftCardSubview("menu")}
           />
@@ -368,6 +399,7 @@ export default function App() {
             code={lookupSelectedCode}
             services={services}
             availability={availability}
+            locations={locations}
             businessInfo={businessInfo}
             onBookSlot={bookSlotAtomic}
             onUpsertClient={createClientPublic}
@@ -382,6 +414,7 @@ export default function App() {
         {currentView === "combo" && comboSubview === "buy" && (
           <ComboView
             services={services}
+            businessInfo={businessInfo}
             startAsGift={comboStartAsGift}
             onBack={() => setComboSubview("menu")}
             onGoReservar={() => setCurrentView("reservar")}
@@ -389,6 +422,7 @@ export default function App() {
         )}
         {currentView === "combo" && comboSubview === "lookup" && (
           <MisCombosView
+            businessInfo={businessInfo}
             onBack={() => setComboSubview("menu")}
             onSelectCombo={(id) => { setLookupSelectedComboId(id); setComboSubview("redeem"); }}
           />
@@ -398,6 +432,7 @@ export default function App() {
             comboId={lookupSelectedComboId}
             services={services}
             availability={availability}
+            locations={locations}
             businessInfo={businessInfo}
             onBookSlot={bookSlotAtomic}
             onUpsertClient={createClientPublic}
@@ -407,6 +442,7 @@ export default function App() {
           <MiTurnoView
             services={services}
             availability={availability}
+            locations={locations}
             businessInfo={businessInfo}
             onGetMyBookings={getMyBookingRefs}
             onCancelAppointment={cancelAppointmentPublic}

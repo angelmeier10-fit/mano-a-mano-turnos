@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { listenServices, listenBusinessInfo } from "../../shared/firestoreApi";
+import { listenServices, listenBusinessInfo, setBusinessId, DEFAULT_BUSINESS_ID } from "../../shared/firestoreApi";
 import { DEFAULT_BUSINESS_INFO, formatPrice, formatPhoneForWhatsapp } from "../../shared/helpers";
 import "./landing.css";
+
+setBusinessId(DEFAULT_BUSINESS_ID);
 
 const RESERVAR_URL = "/mano-a-mano-turnos/mano-a-mano-reservas/";
 const INSTAGRAM_URL = "https://www.instagram.com/angelmasaje.fit/";

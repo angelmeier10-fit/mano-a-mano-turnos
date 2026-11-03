@@ -46,6 +46,42 @@ export function getAppointmentPrice(appt, service) {
   const basePrice = appt?.price ?? service?.price ?? 0;
   return Math.max(0, basePrice - (appt?.discount || 0));
 }
+
+// ---------- Lugares de atención ----------
+// Con 0 lugares se usa la dirección del negocio. Los cupos sin locationId (cargados antes
+// de tener lugares) cuentan como del primer lugar.
+export function sortLocations(locations) {
+  return locations.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+}
+export function slotLocationId(slot, locations) {
+  return slot.locationId || locations[0]?.id || null;
+}
+export function serviceAtLocation(service, locationId) {
+  return !locationId || !service.locationIds?.length || service.locationIds.includes(locationId);
+}
+export function servicePrice(service, locationId) {
+  const p = locationId ? service?.priceByLocation?.[locationId] : undefined;
+  return p > 0 ? p : (service?.price || 0);
+}
+// Datos de lugar que se guardan en el turno, para que queden aunque después se edite o borre el lugar.
+export function locationSnapshot(location) {
+  if (!location) return {};
+  return {
+    locationId: location.id,
+    locationName: location.name || "",
+    locationAddress: location.address || "",
+    locationAddressDetail: location.addressDetail || "",
+  };
+}
+export function appointmentAddress(appt, businessInfo) {
+  return appt?.locationAddress || businessInfo?.address || "";
+}
+// Datos del turno que se copian a phoneIndex/bookings: el público no puede leer turnos y los
+// necesita para cancelar/reprogramar. Lo usan firestoreApi y el script de migración.
+export const PUBLIC_APPT_FIELDS = ["giftCardCode", "comboId", "paidByGiftCard", "paidByCombo", "price", "discount", "referredByName", "referralDiscount", "source"];
+export function publicApptFields(appt) {
+  return Object.fromEntries(PUBLIC_APPT_FIELDS.filter(k => appt[k] != null).map(k => [k, appt[k]]));
+}
 export const REFERRAL_AMOUNT = 5000;
 export function applyClientDiscount(price, discounts, serviceId) {
   const base = price || 0;

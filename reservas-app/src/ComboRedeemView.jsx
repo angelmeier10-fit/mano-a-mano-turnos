@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Download, Check, Package } from "lucide-react";
-import { getCombo } from "../../shared/firestoreApi";
+import { getCombo, reservasUrl } from "../../shared/firestoreApi";
 import { formatDateLong, dateKey } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import ReservarView from "./ReservarView";
 
-const BASE_URL = "https://angelmeier10-fit.github.io/mano-a-mano-turnos/mano-a-mano-reservas/";
 
-function ComboVisual({ combo, canvasRef }) {
+function ComboVisual({ combo, canvasRef, businessInfo }) {
   return (
     <div ref={canvasRef} style={{ ...styles.giftCardVisual, display: "flex", flexDirection: "column", padding: 0 }}>
       <div style={{ position: "relative", height: 110, overflow: "hidden", flexShrink: 0 }}>
@@ -28,18 +27,18 @@ function ComboVisual({ combo, canvasRef }) {
       </div>
       <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #D4AF37 50%, #C9A84C 80%, transparent)", flexShrink: 0 }} />
       <div style={{ padding: "18px 22px 20px", flex: 1 }}>
-        <div style={styles.giftCardVisualLogo}>Angel Meier Masoterapia</div>
+        <div style={styles.giftCardVisualLogo}>{businessInfo.name}</div>
         <div style={styles.giftCardVisualService}>{combo.serviceName} · x{combo.totalSessions}</div>
         <div style={styles.giftCardVisualTo}>Para <strong>{combo.clientName}</strong>{combo.fromName ? ` · de parte de ${combo.fromName}` : ""}</div>
         {combo.message && <div style={styles.giftCardVisualMessage}>"{combo.message}"</div>}
         <div style={styles.giftCardVisualCode}>Código: {combo.id}</div>
-        <div style={styles.giftCardVisualLink}>{`${BASE_URL}?combo=${combo.id}`}</div>
+        <div style={styles.giftCardVisualLink}>{reservasUrl({ combo: combo.id })}</div>
       </div>
     </div>
   );
 }
 
-export default function ComboRedeemView({ comboId, services, availability, businessInfo, onBookSlot, onUpsertClient }) {
+export default function ComboRedeemView({ comboId, services, availability, locations = [], businessInfo, onBookSlot, onUpsertClient }) {
   const [combo, setCombo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -101,6 +100,7 @@ export default function ComboRedeemView({ comboId, services, availability, busin
       <ReservarView
         services={services}
         availability={availability}
+        locations={locations}
         businessInfo={businessInfo}
         onBookSlot={onBookSlot}
         onUpsertClient={onUpsertClient}
@@ -115,10 +115,10 @@ export default function ComboRedeemView({ comboId, services, availability, busin
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <Package size={28} color="#B5654A" />
         <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, margin: "8px 0 4px" }}>Combo de sesiones</h2>
-        <p style={{ fontSize: 13, color: "#8A8275", margin: 0 }}>Angel Meier · Masoterapia</p>
+        <p style={{ fontSize: 13, color: "#8A8275", margin: 0 }}>{businessInfo.name}</p>
       </div>
 
-      <ComboVisual combo={combo} canvasRef={cardRef} />
+      <ComboVisual combo={combo} canvasRef={cardRef} businessInfo={businessInfo} />
 
       <button
         onClick={handleDownload}
