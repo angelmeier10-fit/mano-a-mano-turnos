@@ -13,7 +13,7 @@ function addSeenId(id) {
   if (!seen.includes(id)) localStorage.setItem(SEEN_KEY, JSON.stringify([...seen, id]));
 }
 
-export default function Header({ view, setView, onLogout, pendingGiftCards = 0, pendingCombos = 0, pendingApptsList = [], onOpenAppt }) {
+export default function Header({ businessName = "", view, setView, onLogout, pendingGiftCards = 0, pendingCombos = 0, pendingApptsList = [], onOpenAppt }) {
   const [open, setOpen] = useState(false);
   const [seenIds, setSeenIds] = useState(getSeenIds);
   const bellRef = useRef(null);
@@ -57,7 +57,7 @@ export default function Header({ view, setView, onLogout, pendingGiftCards = 0, 
             <circle cx="14" cy="19" r="2.6" fill="#B5654A"/>
           </svg>
         </div>
-        <h1 style={styles.brandName}>Mano&nbsp;a&nbsp;Mano</h1>
+        <h1 style={styles.brandName}>{businessName}</h1>
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4 }}>
           {/* Bell de notificaciones */}

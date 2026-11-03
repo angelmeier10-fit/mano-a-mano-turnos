@@ -43,6 +43,8 @@ export default function App() {
   const [clients, setClients] = useState([]);
   const [availability, setAvailability] = useState([]);
   const [businessInfo, setBusinessInfoState] = useState(DEFAULT_BUSINESS_INFO);
+  // Aparte de businessInfo para no mostrar el nombre por defecto mientras carga el negocio real.
+  const [businessName, setBusinessName] = useState("");
   const [giftCards, setGiftCards] = useState([]);
   const [combos, setCombos] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -110,6 +112,8 @@ export default function App() {
     const unsubAvail = listenAvailability(setAvailability);
     const unsubBiz = listenBusinessInfo((data) => {
       if (data) setBusinessInfoState(data);
+      setBusinessName(data?.name || "");
+      document.title = data?.name ? `${data.name} · Agenda` : "Agenda";
     });
     const unsubGiftCards = listenGiftCards(setGiftCards);
     const unsubCombos = listenCombos(setCombos);
@@ -187,7 +191,7 @@ export default function App() {
     <div style={styles.app}>
       <GoogleFontsLoader />
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-        <Header view={view} setView={setView} onLogout={handleLogout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "pending" || (c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000)).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
+        <Header businessName={businessName} view={view} setView={setView} onLogout={handleLogout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "pending" || (c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000)).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
         {notifPermission === "default" && (
           <div
             onClick={handleEnableNotifications}
