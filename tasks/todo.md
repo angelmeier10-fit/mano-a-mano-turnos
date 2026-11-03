@@ -78,7 +78,13 @@ usuario externo: una colega que atiende en 2–3 lugares. Cuenta creada a mano, 
 - [x] Script de alta `scripts/create-business.mjs` (usuario Auth + businesses/{slug}; el resto lo carga ella). Test 11/11
 - [x] Título de la pestaña de reservas con el nombre del negocio (antes fijo "Meier Angel · Turnos")
 - [x] Alta de la colega: businesses/momento-relax, usuario 3zvq2I8zn0Nh9xrmuK7sj2yP9KE3 (2026-11-03)
-- [ ] Probar su link de reservas de punta a punta y pasárselo
+- [x] Agenda: encabezado y pestaña con el nombre de cada negocio (antes fijo "Mano a Mano")
+- [x] Meta Pixel solo en mano-a-mano
+- [x] Por negocio en Negocio: monto de referidos (0 = sin referidos) y datos de transferencia (antes fijos de Angel)
+- [x] Fixes: combo vence 60 días desde que se confirma el pago; gift card vuelve al cancelar/borrar desde la agenda;
+      aviso de reserva con gift card dice "pendiente" (coincide con el estado real). Probados en emulador
+- [x] Guía de uso con capturas (genérica): https://claude.ai/artifact/ME15WHxfTtquZ4MmytbCfm
+- [ ] Que la colega cargue sus datos; probar su link de reservas de punta a punta
 
 ## Datos que necesito de la colega (para la Fase 3)
 - Nombre del negocio, slug para el link, WhatsApp, email para la cuenta
