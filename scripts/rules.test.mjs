@@ -9,6 +9,7 @@ import { doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection } from "fir
 import { initializeApp as initAdmin } from "firebase-admin/app";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { migrateToBusiness } from "./migrate-to-businesses.mjs";
+import { createBusiness } from "./create-business.mjs";
 
 const PROJECT_ID = "demo-mano-a-mano";
 const [host, port] = (process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080").split(":");
@@ -156,4 +157,22 @@ test("la migración completa en phoneIndex/bookings los datos del turno que canc
   const second = await migrateToBusiness(admin, { ownerUid: "uidAngel" });
   assert.equal(second.backfilled, 0);
   assert.deepEqual(second.different, []);
+});
+
+test("alta de negocio: crea el doc con el dueño, sin quiz, y no pisa uno existente", async () => {
+  const admin = getAdminFirestore(initAdmin({ projectId: PROJECT_ID }, "create-business-test"));
+  await createBusiness(admin, { slug: "colega", name: "Colega Masajes", ownerUid: "uidC" });
+  const biz = (await admin.doc("businesses/colega").get()).data();
+  assert.equal(biz.name, "Colega Masajes");
+  assert.equal(biz.ownerUid, "uidC");
+  assert.equal(biz.showQuiz, false);
+
+  await assert.rejects(createBusiness(admin, { slug: "colega", name: "Otro", ownerUid: "uidX" }), /ya existe/);
+  await assert.rejects(createBusiness(admin, { slug: "Con Espacios", name: "X", ownerUid: "uidY" }), /slug/);
+  await assert.rejects(createBusiness(admin, { slug: "otra", name: "X", ownerUid: "uidC" }), /ya tiene/);
+  assert.equal((await admin.doc("businesses/colega").get()).data().name, "Colega Masajes");
+
+  const colega = env.authenticatedContext("uidC").firestore();
+  await assertSucceeds(setDoc(doc(colega, "businesses/colega/services/s1"), { name: "Descontracturante" }));
+  await assertFails(setDoc(doc(colega, "businesses/a/services/s9"), { name: "X" }));
 });

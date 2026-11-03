@@ -211,6 +211,10 @@ export default function App() {
     return () => { unsubServices(); unsubAvail(); unsubBiz(); unsubLocations(); };
   }, []);
 
+  useEffect(() => {
+    if (businessInfo?.name) document.title = `${businessInfo.name} · Turnos`;
+  }, [businessInfo?.name]);
+
   if (!loaded || businessInfo === undefined) {
     return (
       <div style={styles.loadingScreen}>

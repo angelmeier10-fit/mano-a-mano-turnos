@@ -75,7 +75,9 @@ usuario externo: una colega que atiende en 2–3 lugares. Cuenta creada a mano, 
       → push (deploy de las apps OK) → migración otra vez (0 nuevos, 2047 iguales)
 - [x] Verificar en producción: tu agenda, tus reservas, un link viejo sin `?b` (todo igual)
 - [x] BORRAR bloque legacy de las reglas y deployarlas (test 10/10, deploy OK 2026-11-03)
-- [ ] Crear usuario de la colega en Firebase Auth + script de alta de su negocio (lugares, servicios)
+- [x] Script de alta `scripts/create-business.mjs` (usuario Auth + businesses/{slug}; el resto lo carga ella). Test 11/11
+- [x] Título de la pestaña de reservas con el nombre del negocio (antes fijo "Meier Angel · Turnos")
+- [ ] Correr el alta de la colega (faltan email, slug, nombre)
 - [ ] Probar su link de reservas de punta a punta y pasárselo
 
 ## Datos que necesito de la colega (para la Fase 3)

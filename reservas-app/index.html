@@ -3,10 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Meier Angel · Turnos</title>
+    <title>Turnos</title>
 
     <!-- Meta Pixel: reemplazar TU_PIXEL_ID por el ID real (Meta Business Manager > Administrador de eventos) -->
     <script>
+      // El pixel es solo de Mano a Mano: no se carga en los links de otros negocios (?b=otro).
+      var bizParam = new URLSearchParams(location.search).get('b');
+      if (!bizParam || bizParam === 'mano-a-mano') {
       !function(f,b,e,v,n,t,s)
       {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
       n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -17,6 +20,7 @@
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '3543344812509665');
       fbq('track', 'PageView');
+      }
     </script>
   </head>
   <body>
