@@ -22,6 +22,27 @@ function saveBookingToLocalStorage(apptId, cancelToken, appt, serviceName) {
   } catch {}
 }
 
+// El celular puede recargar la página al volver de pagar: la confirmación se guarda para esta
+// pestaña, y por poco tiempo para no mostrar una vieja.
+const CONFIRMED_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+const confirmedKey = () => `confirmedBooking:${window.location.search}`;
+function readConfirmed() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(confirmedKey()));
+    return saved && Date.now() - saved.savedAt < CONFIRMED_MAX_AGE_MS ? saved.booking : null;
+  } catch {
+    return null;
+  }
+}
+function writeConfirmed(booking) {
+  try {
+    if (booking) sessionStorage.setItem(confirmedKey(), JSON.stringify({ booking, savedAt: Date.now() }));
+    else sessionStorage.removeItem(confirmedKey());
+  } catch {
+    // Sin almacenamiento, la confirmación funciona igual hasta que se recargue la página.
+  }
+}
+
 export default function ReservarView({ services: allServices, availability: allAvailability, locations = [], businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard, onGoCombo, referralMode = false }) {
   // Con 0 o 1 lugar no hay que elegir. Con varios, se filtran servicios y cupos por el lugar elegido.
   const multiLoc = locations.length > 1;
@@ -69,7 +90,7 @@ export default function ReservarView({ services: allServices, availability: allA
   const [clientDiscount, setClientDiscount] = useState(null);
   const [myCombos, setMyCombos] = useState([]);
   const [useCombo, setUseCombo] = useState(true);
-  const [confirmed, setConfirmed] = useState(null);
+  const [confirmed, setConfirmed] = useState(() => (preselectedServiceId ? null : readConfirmed()));
   const [booking, setBooking] = useState(false);
   const [dateViewMode, setDateViewMode] = useState("list");
   const [phoneError, setPhoneError] = useState("");
@@ -79,6 +100,14 @@ export default function ReservarView({ services: allServices, availability: allA
   const [referredByName, setReferredByName] = useState("");
   const [referralCredit, setReferralCredit] = useState(0);
   const trafficSource = useMemo(() => getTrafficSource(), []);
+
+  useEffect(() => {
+    if (!preselectedServiceId) writeConfirmed(confirmed);
+  }, [confirmed, preselectedServiceId]);
+  // Al ir a otra sección se olvida: el turno pudo cambiar o cancelarse desde ahí. Una recarga no pasa por acá.
+  useEffect(() => () => {
+    if (!preselectedServiceId) writeConfirmed(null);
+  }, [preselectedServiceId]);
 
   useEffect(() => {
     if (!selectedDate && availableDates.length > 0) setSelectedDate(availableDates[0]);
@@ -115,6 +144,12 @@ export default function ReservarView({ services: allServices, availability: allA
       .filter(s => timeToMinutes(s.end) - timeToMinutes(s.start) >= svc.duration)
       .sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
   }, [selectedDate, svc, availabilityByDate]);
+
+  // El crédito por recomendar se descuenta recién al pagar, así que no figura en el turno.
+  function bookingPaymentLink(appt, service) {
+    if (preselectedServiceId || appt.comboId || referralCredit > 0) return "";
+    return servicePaymentLink(service, appt.price - appt.discount);
+  }
 
   async function bookSlot(slot) {
     if (!clientName.trim() || !clientPhone.trim() || !svc || booking) return;
@@ -174,21 +209,22 @@ export default function ReservarView({ services: allServices, availability: allA
     const confirmedAppt = { ...appt, apptId: result.apptId, cancelToken: result.cancelToken };
     saveBookingToLocalStorage(result.apptId, result.cancelToken, appt, svc?.name || "");
     if (typeof window.fbq === "function") window.fbq("track", "Schedule");
+    const paymentLink = bookingPaymentLink(appt, svc);
+    let whatsappUrl = null;
     if (businessInfo?.whatsapp) {
       const msg = `Hola! Reservé un turno de ${svc.name} para el ${formatDateLong(selectedDate)} a las ${slot.start}${multiLoc && location ? ` en ${location.name}` : ""}. Mi nombre es ${clientName.trim()}.`;
-      window.open(`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}?text=${encodeURIComponent(msg)}`, "_blank");
+      whatsappUrl = `https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}?text=${encodeURIComponent(msg)}`;
+      // Abrir WhatsApp sacaría al cliente de la pantalla donde está el botón de pago.
+      if (!paymentLink) window.open(whatsappUrl, "_blank");
     }
     setSelectedSlot(null);
-    setConfirmed(confirmedAppt);
+    setConfirmed({ ...confirmedAppt, whatsappUrl, paymentLink });
     setBooking(false);
   }
 
   if (confirmed) {
     const cSvc = services.find(s => s.id === confirmed.serviceId);
-    // El crédito por recomendar se descuenta recién al pagar, así que no figura en el turno.
-    const payLink = !preselectedServiceId && !confirmed.comboId && !(referralCredit > 0)
-      ? servicePaymentLink(cSvc, confirmed.price - confirmed.discount)
-      : "";
+    const payLink = confirmed.paymentLink;
     return (
       <div style={styles.viewWrap}>
         <div style={styles.confirmCard}>
@@ -214,12 +250,12 @@ export default function ReservarView({ services: allServices, availability: allA
           {payLink && <PayButton href={payLink} style={{ marginTop: 14 }} />}
           {businessInfo?.whatsapp && (
             <a
-              href={`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}`}
+              href={payLink ? confirmed.whatsappUrl : `https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ ...styles.businessWaBtn, marginTop: 14 }}
             >
-              <MessageCircle size={14} /> Cualquier duda, escribime por WhatsApp
+              <MessageCircle size={14} /> {payLink ? "Avisar por WhatsApp" : "Cualquier duda, escribime por WhatsApp"}
             </a>
           )}
           <button style={{ ...styles.saveBtn, marginTop: 16 }} onClick={() => { setConfirmed(null); setClientName(""); setClientPhone(""); setSelectedSlot(null); }}>
