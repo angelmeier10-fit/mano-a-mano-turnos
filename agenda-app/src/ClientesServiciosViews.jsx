@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp, X } from "lucide-react";
-import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong, clientHistory, clientStats } from "../../shared/helpers";
+import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong, clientHistory, clientStats, isHttpsUrl } from "../../shared/helpers";
 import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession, createCombo, deleteCombo, activateCombo, updateCombo } from "../../shared/firestoreApi";
 import { Package } from "lucide-react";
 import styles from "../../shared/styles";
@@ -876,6 +876,24 @@ function ServiceLocationFields({ locations, locationIds, setLocationIds, priceBy
   );
 }
 
+function PaymentLinkField({ label, value, onChange }) {
+  const invalid = value.trim() && !isHttpsUrl(value.trim());
+  return (
+    <>
+      <label style={styles.fieldLabel}>{label}</label>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <input style={{ ...styles.input, flex: 1, minWidth: 0 }} inputMode="url" value={value} onChange={e => onChange(e.target.value)} placeholder="Opcional · https://..." />
+        {value && (
+          <button type="button" style={styles.iconBtnGhost} title={`Quitar ${label}`} onClick={() => onChange("")}>
+            <X size={15} />
+          </button>
+        )}
+      </div>
+      {invalid && <p style={{ fontSize: 12, color: "#A6483A", margin: "4px 0 0" }}>El link tiene que empezar con https://</p>}
+    </>
+  );
+}
+
 // Solo se guardan precios por lugar de lugares donde se ofrece el servicio.
 function cleanPriceByLocation(priceByLocation, locationIds) {
   return Object.fromEntries(Object.entries(priceByLocation)
@@ -920,18 +938,39 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
     />
   );
   const locationData = () => ({ locationIds, priceByLocation: cleanPriceByLocation(priceByLocation, locationIds) });
+  const [paymentLink, setPaymentLink] = useState("");
+  const [paymentLink2, setPaymentLink2] = useState("");
+  const [paymentLink3, setPaymentLink3] = useState("");
+  // Un combo sin precio no se vende: su link no se muestra ni se guarda.
+  const paymentData = () => ({
+    paymentLink: paymentLink.trim(),
+    paymentLink2: Number(price2) > 0 ? paymentLink2.trim() : "",
+    paymentLink3: Number(price3) > 0 ? paymentLink3.trim() : "",
+  });
+  const paymentLinksValid = () => Object.values(paymentData()).every(l => !l || isHttpsUrl(l));
+  const paymentFields = (
+    <>
+      <PaymentLinkField label="Link de pago" value={paymentLink} onChange={setPaymentLink} />
+      {Number(price2) > 0 && <PaymentLinkField label="Link de pago combo x2" value={paymentLink2} onChange={setPaymentLink2} />}
+      {Number(price3) > 0 && <PaymentLinkField label="Link de pago combo x3" value={paymentLink3} onChange={setPaymentLink3} />}
+      <p style={{ fontSize: 11.5, color: "#8A8275", margin: "6px 0 10px" }}>
+        Si cambiás un precio, actualizá su link. Para borrar un link, quitalo y guardá. El botón de pago no aparece cuando el precio final es distinto, por ejemplo con descuento o precio por lugar.
+      </p>
+    </>
+  );
 
   const palette = ["#B5654A", "#6E7F5C", "#8B4226", "#4A5A6B", "#7A5C3E", "#5C4A6B"];
 
   function resetForm() {
     setName(""); setDuration(60); setPrice(20000); setPrice2(0); setPrice3(0); setColor("#B5654A");
     setLocationIds([]); setPriceByLocation({});
+    setPaymentLink(""); setPaymentLink2(""); setPaymentLink3("");
   }
 
   function addService(e) {
     e.preventDefault();
-    if (!name.trim()) return;
-    onAddService({ name: name.trim(), duration: Number(duration), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData() });
+    if (!name.trim() || !paymentLinksValid()) return;
+    onAddService({ name: name.trim(), duration: Number(duration), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData(), ...paymentData() });
     resetForm();
     setShowForm(false);
   }
@@ -940,13 +979,14 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
     setEditingService(s);
     setName(s.name); setDuration(s.duration); setPrice(s.price || 0); setPrice2(s.price2 || 0); setPrice3(s.price3 || 0); setColor(s.color);
     setLocationIds(s.locationIds || []); setPriceByLocation(s.priceByLocation || {});
+    setPaymentLink(s.paymentLink || ""); setPaymentLink2(s.paymentLink2 || ""); setPaymentLink3(s.paymentLink3 || "");
     setShowForm(false);
   }
 
   function saveEdit(e) {
     e.preventDefault();
-    if (!name.trim()) return;
-    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData() });
+    if (!name.trim() || !paymentLinksValid()) return;
+    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData(), ...paymentData() });
     setEditingService(null);
     resetForm();
   }
@@ -981,8 +1021,11 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
                           style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex", color: "#A6483A" }}
                           onClick={() => {
                             if (!window.confirm(`¿Quitar el combo ${label} de ${s.name}? Ya no se va a poder comprar desde reservas.`)) return;
-                            onUpdateService(s.id, { [k]: 0 });
-                            if (editingService?.id === s.id) (k === "price2" ? setPrice2 : setPrice3)(0);
+                            onUpdateService(s.id, { [k]: 0, [k === "price2" ? "paymentLink2" : "paymentLink3"]: "" });
+                            if (editingService?.id === s.id) {
+                              (k === "price2" ? setPrice2 : setPrice3)(0);
+                              (k === "price2" ? setPaymentLink2 : setPaymentLink3)("");
+                            }
                           }}
                         >
                           <X size={12} />
@@ -990,6 +1033,9 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
                       </span>
                     ))}
                   </div>
+                )}
+                {(s.paymentLink || s.paymentLink2 || s.paymentLink3) && (
+                  <div style={{ ...styles.serviceRowMeta, fontSize: 11, color: "#8A7E70", marginTop: 4 }}>Con link de pago</div>
                 )}
               </div>
               <button style={styles.iconBtnGhost} onClick={() => editingService?.id === s.id ? setEditingService(null) : startEdit(s)}>
@@ -1023,7 +1069,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
                     <input type="number" style={styles.input} value={price3} onChange={e => setPrice3(e.target.value)} min={0} step={500} placeholder="Opcional" />
                   </div>
                 </div>
-                {locationFields}
+                {locationFields}{paymentFields}
                 <label style={styles.fieldLabel}>Color</label>
                 <div style={styles.colorRow}>
                   {palette.map(c => (
@@ -1069,7 +1115,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
               <input type="number" style={styles.input} value={price3} onChange={e => setPrice3(e.target.value)} min={0} step={500} placeholder="Opcional" />
             </div>
           </div>
-          {locationFields}
+          {locationFields}{paymentFields}
           <label style={styles.fieldLabel}>Color</label>
           <div style={styles.colorRow}>
             {palette.map(c => (

@@ -1,15 +1,64 @@
 import React, { useState } from "react";
-import { login } from "./auth";
+import { login, loginWithGoogle, resetPassword } from "./auth";
+
+const RESET_SENT = "Si hay una cuenta con ese email, te mandamos un link para elegir una contraseña nueva. Revisá también el correo no deseado.";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+
+  async function handleGoogle() {
+    setError("");
+    setNotice("");
+    setLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      if (err.code === "auth/account-exists-with-different-credential") {
+        setError("Ese email ya tiene una cuenta. Entrá con tu contraseña.");
+      } else if (err.code === "auth/popup-blocked") {
+        setError("El navegador bloqueó la ventana de Google. Permitila y probá de nuevo.");
+      } else if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") {
+        console.error("[login] Google:", err);
+        setError("No se pudo entrar con Google. Probá de nuevo.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError("");
+    setNotice("");
+    if (!email.trim()) {
+      setError("Escribí tu email y volvé a tocar \"Olvidé mi contraseña\".");
+      return;
+    }
+    setLoading(true);
+    try {
+      await resetPassword(email.trim());
+      setNotice(RESET_SENT);
+    } catch (err) {
+      if (err.code === "auth/user-not-found") {
+        setNotice(RESET_SENT);
+      } else if (err.code === "auth/invalid-email") {
+        setError("Ese email no es válido.");
+      } else {
+        console.error("[login] Recuperar contraseña:", err);
+        setError("No se pudo enviar el mail. Probá de nuevo en unos minutos.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
     try {
       await login(email, password);
@@ -45,10 +94,17 @@ export default function LoginScreen() {
             required
           />
           {error && <p style={styles.error}>{error}</p>}
+          {notice && <p style={styles.notice}>{notice}</p>}
           <button style={styles.button} type="submit" disabled={loading}>
-            {loading ? "Entrando…" : "Entrar"}
+            {loading ? "Un momento…" : "Entrar"}
+          </button>
+          <button style={styles.linkButton} type="button" onClick={handleForgotPassword} disabled={loading}>
+            Olvidé mi contraseña
           </button>
         </form>
+        <button style={styles.googleButton} type="button" onClick={handleGoogle} disabled={loading}>
+          Entrar con Google
+        </button>
       </div>
     </div>
   );
@@ -74,6 +130,15 @@ const styles = {
     background: "#fff", color: "#2A2622", boxSizing: "border-box",
   },
   error: { color: "#A6483A", fontSize: 13, margin: "10px 0 0" },
+  notice: { color: "#4A5A40", fontSize: 13, margin: "10px 0 0" },
+  linkButton: {
+    display: "block", margin: "12px auto 0", padding: 4, border: "none", background: "none",
+    color: "#B5654A", fontSize: 13, fontWeight: 600, cursor: "pointer",
+  },
+  googleButton: {
+    width: "100%", marginTop: 14, padding: "12px", borderRadius: 10, border: "1.5px solid #2A2622",
+    background: "transparent", color: "#2A2622", fontWeight: 600, fontSize: 14, cursor: "pointer",
+  },
   button: {
     width: "100%", marginTop: 20, padding: "12px", borderRadius: 10, border: "none",
     background: "#2A2622", color: "#EFE9DF", fontWeight: 600, fontSize: 14, cursor: "pointer",

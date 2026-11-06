@@ -63,6 +63,20 @@ export function servicePrice(service, locationId) {
   const p = locationId ? service?.priceByLocation?.[locationId] : undefined;
   return p > 0 ? p : (service?.price || 0);
 }
+export function isHttpsUrl(value) {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+// El link cobra un monto fijo: si el precio final es otro (descuento, precio por lugar), no se ofrece.
+export function servicePaymentLink(service, amount, sessions = 1) {
+  const suffix = sessions === 1 ? "" : sessions;
+  const link = service?.[`paymentLink${suffix}`]?.trim();
+  const price = service?.[`price${suffix}`];
+  return link && isHttpsUrl(link) && price > 0 && amount === price ? link : "";
+}
 // Datos de lugar que se guardan en el turno, para que queden aunque después se edite o borre el lugar.
 export function locationSnapshot(location) {
   if (!location) return {};

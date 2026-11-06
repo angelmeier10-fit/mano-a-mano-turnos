@@ -139,3 +139,23 @@ Registro abierto, cobro de suscripción, dominio propio, estadísticas por lugar
 - Combo regalado ahora usa el id de Firestore como código de canje (`?combo=<id>`), en vez de un código corto tipo gift card — más simple, sin riesgo de colisión.
 - "Mis combos" (búsqueda por teléfono) se mantuvo y ahora también permite abrir la vista de canje y reenviar por WhatsApp.
 - Quedó pendiente probar el flujo end-to-end manualmente en el sitio ya desplegado (no se pudo levantar navegador en esta sesión).
+
+---
+
+# Mejoras para vender a colegas: contraseña, Google y link de pago
+
+Fuera de esta etapa: mails al profesional, alta de negocios sin script, cobro de la suscripción.
+
+## Plan
+- [x] Login: "Olvidé mi contraseña" con mail en español y mensaje neutro
+- [x] Login: "Entrar con Google" (solo agenda; una cuenta sin negocio ve el aviso que ya existe)
+- [x] Servicios: links opcionales para el servicio, combo x2 y combo x3; se pueden editar y borrar; solo `https://`
+- [x] Reservas: botón "Pagar" al confirmar el turno y junto a los datos de transferencia en combos y gift cards
+- [x] El botón no aparece si el precio final no coincide con el del link (descuento, crédito, precio por lugar, turno pago con combo o gift card)
+- [x] Prueba de la regla del botón, builds y prueba en el emulador
+- [ ] Activar Google en la consola de Firebase (lo hace Angel) y probar en producción, en computadora y celular
+
+## Review
+- `npm run test:unit` pasa y las dos apps compilan. Probado en el emulador, en tamaño celular: recuperación, Google, crear/editar/borrar links, botón en turno, combo y gift card, y sin botón con descuento o crédito.
+- Sin probar en navegador: precio por lugar y canje de combo o gift card (solo cubierto por la regla o la condición en el código), el envío real del mail y el mensaje de cuenta existente con otro proveedor.
+- Google con el mismo mail conserva la cuenta y el negocio. Si el mail no estaba verificado, se borra la contraseña (visto en el emulador); se recupera con "Olvidé mi contraseña".

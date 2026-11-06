@@ -4,8 +4,9 @@ import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
   applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS, getReferralAmount,
-  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, servicePaymentLink,
 } from "../../shared/helpers";
+import { PayButton } from "./TransferInfo";
 import { getClientDiscountPublic, getCombosByPhone, isExistingClientPublic, getReferralCreditPublic } from "../../shared/firestoreApi";
 import { MiniCalendar } from "../../shared/MiniCalendar";
 import styles from "../../shared/styles";
@@ -184,6 +185,10 @@ export default function ReservarView({ services: allServices, availability: allA
 
   if (confirmed) {
     const cSvc = services.find(s => s.id === confirmed.serviceId);
+    // El crédito por recomendar se descuenta recién al pagar, así que no figura en el turno.
+    const payLink = !preselectedServiceId && !confirmed.comboId && !(referralCredit > 0)
+      ? servicePaymentLink(cSvc, confirmed.price - confirmed.discount)
+      : "";
     return (
       <div style={styles.viewWrap}>
         <div style={styles.confirmCard}>
@@ -206,6 +211,7 @@ export default function ReservarView({ services: allServices, availability: allA
           <p style={styles.confirmDetail}>{formatDateLong(confirmed.dateKey)}</p>
           {multiLoc && confirmed.locationName && <p style={{ ...styles.confirmDetail, marginTop: 10, fontWeight: 700 }}>{confirmed.locationName}</p>}
           <p style={{ ...styles.confirmDetail, marginTop: multiLoc ? 2 : 10 }}>{confirmed.locationAddress || businessInfo?.address}</p>
+          {payLink && <PayButton href={payLink} style={{ marginTop: 14 }} />}
           {businessInfo?.whatsapp && (
             <a
               href={`https://wa.me/${formatPhoneForWhatsapp(businessInfo.whatsapp)}`}
@@ -380,7 +386,7 @@ export default function ReservarView({ services: allServices, availability: allA
         </>
       )}
 
-      <label style={styles.fieldLabel}>Tipo de masaje</label>
+      <label style={styles.fieldLabel}>Servicio</label>
       {preselectedServiceId ? (
         <div style={styles.serviceChips}>
           {services.filter(s => s.id === preselectedServiceId).map(s => (

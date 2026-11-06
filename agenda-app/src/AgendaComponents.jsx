@@ -61,7 +61,7 @@ export function AgendaView({
     const template = businessInfo?.msgRecordatorio || "Hola {nombre}! Te recuerdo tu turno de {servicio} {cuando} a las {hora} hs en {direccion}. ¡Te espero!";
     const msg = template
       .replace("{nombre}", appt.clientName)
-      .replace("{servicio}", svc?.name || "masaje")
+      .replace("{servicio}", svc?.name || "servicio")
       .replace("{cuando}", when)
       .replace("{hora}", appt.start)
       .replace("{direccion}", appointmentAddress(appt, businessInfo));

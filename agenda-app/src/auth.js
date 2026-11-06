@@ -9,6 +9,9 @@ import { initializeApp, getApps } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   setPersistence,
@@ -19,12 +22,21 @@ import { firebaseConfig } from "../../shared/firebaseConfig";
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+auth.languageCode = "es";
 if (import.meta.env.VITE_USE_EMULATOR) connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 
 setPersistence(auth, browserLocalPersistence);
 
 export function login(email, password) {
   return signInWithEmailAndPassword(auth, email, password);
+}
+
+export function loginWithGoogle() {
+  return signInWithPopup(auth, new GoogleAuthProvider());
+}
+
+export function resetPassword(email) {
+  return sendPasswordResetEmail(auth, email);
 }
 
 export function logout() {

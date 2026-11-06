@@ -315,7 +315,7 @@ export default function MiTurnoView({
 
         {services.length > 1 && (
           <>
-            <label style={styles.fieldLabel}>Tipo de masaje</label>
+            <label style={styles.fieldLabel}>Servicio</label>
             <div style={styles.serviceChips}>
               {services.map(s => (
                 <button key={s.id} onClick={() => { setReschedServiceId(s.id); setReschedSlot(null); }}
@@ -430,7 +430,7 @@ export default function MiTurnoView({
                     </span>
                   </div>
                   <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6E6555" }}>
-                    {b.start} hs · {svc?.name || "Masaje"}
+                    {b.start} hs · {svc?.name || "Servicio"}
                     {multiLoc && b.locationName ? ` · ${b.locationName}` : ""}
                   </p>
 

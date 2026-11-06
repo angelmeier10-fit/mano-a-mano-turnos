@@ -335,7 +335,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
         <ShareLinkCard
           label={`Link de referidos: ${formatPrice(getReferralAmount(businessInfo))} de descuento en la primera sesión`}
           url={reservasUrl({ ref: "amigo" })}
-          shareTitle="Te recomiendo este lugar de masajes"
+          shareTitle="Te recomiendo este lugar"
         />
       )}
 
@@ -367,7 +367,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
         <input style={styles.input} value={transferHolder} onChange={e => setTransferHolder(e.target.value)} placeholder="Nombre y apellido" />
 
         <label style={styles.fieldLabel}>Alias o CVU</label>
-        <input style={styles.input} value={transferAlias} onChange={e => setTransferAlias(e.target.value)} placeholder="Ej: maria.masajes" />
+        <input style={styles.input} value={transferAlias} onChange={e => setTransferAlias(e.target.value)} placeholder="Ej: maria.turnos" />
         <p style={styles.helperText}>Se muestran a quien compra una gift card o un combo. Si lo dejás vacío, se le pide coordinar el pago por WhatsApp.</p>
 
         <label style={styles.fieldLabel}>Descuento por referidos ($)</label>

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Package, ChevronLeft } from "lucide-react";
-import { formatPrice } from "../../shared/helpers";
+import { formatPrice, servicePaymentLink } from "../../shared/helpers";
 import { createCombo, reservasUrl } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 import TransferInfo from "./TransferInfo";
@@ -67,14 +67,14 @@ export default function ComboView({ services, businessInfo, onBack, onGoReservar
           )}
         </div>
 
-        <TransferInfo businessInfo={businessInfo} amount={done.pricePaid} />
+        <TransferInfo businessInfo={businessInfo} amount={done.pricePaid} paymentLink={servicePaymentLink(svc, done.pricePaid, done.totalSessions)} />
 
         <div style={{ background: "#FFF8EC", border: "1.5px solid #C9973A", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 13.5, color: "#7A5C20", marginBottom: 4 }}>Esperando confirmación de pago</div>
           <div style={{ fontSize: 12.5, color: "#8A7040" }}>
             {done.fromName
-              ? "Podés transferir ahora o pagar en efectivo en la primera sesión — confirmo el pago de cualquiera de las dos formas. Una vez confirmado, el destinatario ya puede reservar buscando sus combos con su teléfono."
-              : "Podés transferir ahora o pagar en efectivo en tu primera sesión — confirmo el pago de cualquiera de las dos formas. Mientras tanto ya podés reservar tu turno con normalidad."}
+              ? "Podés pagar ahora o pagar en efectivo en la primera sesión — confirmo el pago de cualquiera de las dos formas. Una vez confirmado, el destinatario ya puede reservar buscando sus combos con su teléfono."
+              : "Podés pagar ahora o pagar en efectivo en tu primera sesión — confirmo el pago de cualquiera de las dos formas. Mientras tanto ya podés reservar tu turno con normalidad."}
           </div>
         </div>
 
