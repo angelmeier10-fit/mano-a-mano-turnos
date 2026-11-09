@@ -21,6 +21,8 @@ import {
   getDocs,
   writeBatch,
   runTransaction,
+  serverTimestamp,
+  arrayUnion,
 } from "firebase/firestore";
 import { firebaseConfig } from "./firebaseConfig";
 import { timeToMinutes, publicApptFields } from "./helpers";
@@ -67,6 +69,47 @@ export async function getBusinessForOwner(uid) {
 export async function businessExists(id) {
   const snap = await getDoc(doc(db, "businesses", id));
   return snap.exists();
+}
+
+// ---------- Alta y suscripción ----------
+export async function createOwnBusiness({ slug, name, uid, email }) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, "businesses", slug), { name: name.trim(), ownerUid: uid, createdAt: serverTimestamp(), showQuiz: false, whatsapp: "" });
+  batch.set(doc(db, "billing", slug), { ownerEmail: email, plan: "regular", termsAcceptedAt: serverTimestamp() });
+  batch.set(doc(db, "businessOwners", uid), { bizId: slug });
+  await batch.commit();
+}
+export async function getBillingConfig() {
+  const snap = await getDoc(doc(db, "appConfig", "billing"));
+  return snap.exists() ? snap.data() : {};
+}
+export async function saveBillingConfig(data) {
+  return setDoc(doc(db, "appConfig", "billing"), data, { merge: true });
+}
+export async function getOwnBilling() {
+  const snap = await getDoc(doc(db, "billing", currentBusinessId()));
+  return snap.exists() ? snap.data() : null;
+}
+// Solo el admin: combina cada negocio con sus datos de cobro.
+export async function listSubscriptions() {
+  const [businesses, billing] = await Promise.all([
+    getDocs(collection(db, "businesses")),
+    getDocs(collection(db, "billing")),
+  ]);
+  const billingById = Object.fromEntries(billing.docs.map(d => [d.id, d.data()]));
+  return businesses.docs.map(d => ({ id: d.id, business: d.data(), billing: billingById[d.id] || null }));
+}
+export async function registerSubscriptionPayment(id, { activeUntil, amount, plan }) {
+  const batch = writeBatch(db);
+  batch.update(doc(db, "businesses", id), { activeUntil });
+  batch.set(doc(db, "billing", id), { payments: arrayUnion({ at: Date.now(), amount, plan, activeUntil }) }, { merge: true });
+  await batch.commit();
+}
+export async function updateSubscription(id, data) {
+  return updateDoc(doc(db, "businesses", id), data);
+}
+export async function updateBilling(id, data) {
+  return setDoc(doc(db, "billing", id), data, { merge: true });
 }
 
 // Lugar del turno que se copia a phoneIndex/bookings para mostrarlo en "Mi turno".
@@ -1037,7 +1080,8 @@ export function listenBusinessInfo(callback) {
   }, (err) => console.error("[listenBusinessInfo] snapshot error:", err));
 }
 export async function setBusinessInfo(data) {
-  const { ownerUid, ...info } = data;
+  // Las reglas no dejan cambiarlos; además, reenviar un valor viejo pisaría un pago recién registrado.
+  const { ownerUid, createdAt, activeUntil, exempt, ...info } = data;
   return setDoc(doc(db, "businesses", currentBusinessId()), info, { merge: true });
 }
 

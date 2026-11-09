@@ -288,17 +288,24 @@ function ComboSection({ client, services, combos }) {
   async function sell(e) {
     e.preventDefault();
     if (!serviceId || !price) return;
-    await createCombo({
-      clientId: client.id,
-      clientName: client.name,
-      clientPhone: client.phone || "",
-      serviceId,
-      serviceName: svc?.name || "",
-      totalSessions: Number(sessions),
-      pricePaid: Number(price) || 0,
-      activatedAt: Date.now(),
-    });
-    setSelling(false);
+    try {
+      await createCombo({
+        clientId: client.id,
+        clientName: client.name,
+        clientPhone: client.phone || "",
+        serviceId,
+        serviceName: svc?.name || "",
+        totalSessions: Number(sessions),
+        pricePaid: Number(price) || 0,
+        activatedAt: Date.now(),
+      });
+      setSelling(false);
+    } catch (err) {
+      console.error("[combos] No se pudo vender:", err);
+      alert(err.code === "permission-denied"
+        ? "No se pudo crear el combo. Revisá si tu suscripción está vencida en Negocio."
+        : "No se pudo crear el combo. Probá de nuevo.");
+    }
   }
 
   return (

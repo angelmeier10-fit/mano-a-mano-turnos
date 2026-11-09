@@ -1,7 +1,6 @@
 // agenda-app/src/auth.js
 //
-// Login simple por email/contraseña. Solo vos vas a tener una cuenta acá.
-// La sesión queda guardada en el navegador (persistencia local), así que
+// Login y registro de cuentas de la agenda. La sesión queda guardada en el navegador (persistencia local), así que
 // no te va a pedir login cada vez que abrís la app, solo si cerrás sesión
 // manualmente o borrás los datos del navegador.
 
@@ -10,6 +9,8 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   signInWithPopup,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
   GoogleAuthProvider,
   sendPasswordResetEmail,
   signOut,
@@ -37,6 +38,22 @@ export function loginWithGoogle() {
 
 export function resetPassword(email) {
   return sendPasswordResetEmail(auth, email);
+}
+
+export async function signUp(email, password) {
+  const { user } = await createUserWithEmailAndPassword(auth, email, password);
+  await sendEmailVerification(user);
+}
+
+export function resendVerification() {
+  return sendEmailVerification(auth.currentUser);
+}
+
+// Fuerza un token nuevo: las reglas leen email_verified del token, no de la cuenta.
+export async function refreshEmailVerified() {
+  await auth.currentUser.reload();
+  if (auth.currentUser.emailVerified) await auth.currentUser.getIdToken(true);
+  return auth.currentUser.emailVerified;
 }
 
 export function logout() {

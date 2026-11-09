@@ -27,6 +27,8 @@ export async function createBusiness(db, { slug, name, ownerUid }) {
     if (err.code === 6) throw new Error(`El negocio "${slug}" ya existe`);
     throw err;
   }
+  // Sin este doc, la misma cuenta podría crearse otro negocio desde el alta de la agenda.
+  await db.collection("businessOwners").doc(ownerUid).set({ bizId: slug });
 }
 
 async function main() {

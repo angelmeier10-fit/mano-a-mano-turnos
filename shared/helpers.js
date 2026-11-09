@@ -77,6 +77,60 @@ export function servicePaymentLink(service, amount, sessions = 1) {
   const price = service?.[`price${suffix}`];
   return link && isHttpsUrl(link) && price > 0 && amount === price ? link : "";
 }
+// ---------- Suscripción ----------
+const DAY_MS = 86400000;
+export const TRIAL_DAYS = 30;
+export const GRACE_DAYS = 7;
+export const FOUNDER_MONTHS = 12;
+export const FOUNDER_LIMIT = 10;
+export const DEFAULT_PRICES = { priceRegular: 14900, priceFounder: 9900 };
+
+function toMillis(value) {
+  if (value == null) return null;
+  return typeof value === "number" ? value : value.toMillis?.() ?? null;
+}
+// firestore.rules (acceptsNew) aplica el mismo bloqueo: cambiar los plazos en los dos lugares.
+export function subscriptionStatus(business, now = Date.now()) {
+  const created = toMillis(business?.createdAt);
+  const paid = toMillis(business?.activeUntil);
+  if (business?.exempt === true || (created == null && paid == null)) {
+    return { state: "exempt", until: null, blocksAt: null };
+  }
+  const trialEnd = created == null ? 0 : created + TRIAL_DAYS * DAY_MS;
+  const until = Math.max(paid ?? 0, trialEnd);
+  const blocksAt = until + GRACE_DAYS * DAY_MS;
+  let state = "blocked";
+  if (paid != null && now < paid) state = "active";
+  else if (now < trialEnd) state = "trial";
+  else if (now < blocksAt) state = "grace";
+  return { state, until, blocksAt };
+}
+export function addOneMonth(ms) {
+  const d = new Date(ms);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + 1);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return d.getTime();
+}
+export function subscriptionPlan(billing, config, now = Date.now()) {
+  const founder = billing?.plan === "founder" && (billing.founderUntil || 0) > now;
+  return founder
+    ? { plan: "founder", price: config?.priceFounder ?? DEFAULT_PRICES.priceFounder, link: config?.linkFounder || "" }
+    : { plan: "regular", price: config?.priceRegular ?? DEFAULT_PRICES.priceRegular, link: config?.linkRegular || "" };
+}
+// firestore.rules valida lo mismo al crear el negocio.
+const RESERVED_SLUGS = ["admin", "agenda", "reservas", "www", "api", "test", "soporte"];
+export function isValidSlug(slug) {
+  return /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug || "")
+    && slug.length >= 3 && slug.length <= 40
+    && !RESERVED_SLUGS.includes(slug);
+}
+export function slugFromName(name) {
+  return (name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "");
+}
 // Datos de lugar que se guardan en el turno, para que queden aunque después se edite o borre el lugar.
 export function locationSnapshot(location) {
   if (!location) return {};

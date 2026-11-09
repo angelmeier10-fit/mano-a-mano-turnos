@@ -42,7 +42,7 @@ function isMoreThan24hAway(dKey, startTime) {
 export default function MiTurnoView({
   services: allServices, availability: allAvailability, locations = [], businessInfo,
   onGetMyBookings, onCancelAppointment, onReschedule,
-  initialPhone = "",
+  initialPhone = "", canReschedule = true,
 }) {
   const [step, setStep] = useState("phone");
   const [phone, setPhone] = useState(initialPhone);
@@ -442,12 +442,14 @@ export default function MiTurnoView({
                       >
                         <X size={14} /> Cancelar turno
                       </button>
-                      <button
-                        style={{ ...styles.saveBtn, flex: 1, justifyContent: "center", fontSize: 13 }}
-                        onClick={() => startReschedule(b)}
-                      >
-                        Cambiar horario
-                      </button>
+                      {canReschedule && (
+                        <button
+                          style={{ ...styles.saveBtn, flex: 1, justifyContent: "center", fontSize: 13 }}
+                          onClick={() => startReschedule(b)}
+                        >
+                          Cambiar horario
+                        </button>
+                      )}
                     </div>
                   )}
 

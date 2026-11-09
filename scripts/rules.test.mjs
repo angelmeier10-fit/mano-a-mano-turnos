@@ -5,7 +5,7 @@ import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection, query, where } from "firebase/firestore";
+import { doc, getDoc, getDocs, setDoc, updateDoc, addDoc, collection, query, where, writeBatch, serverTimestamp, Timestamp } from "firebase/firestore";
 import { initializeApp as initAdmin } from "firebase-admin/app";
 import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
 import { migrateToBusiness } from "./migrate-to-businesses.mjs";
@@ -175,6 +175,163 @@ test("alta de negocio: crea el doc con el dueño, sin quiz, y no pisa uno existe
   const colega = env.authenticatedContext("uidC").firestore();
   await assertSucceeds(setDoc(doc(colega, "businesses/colega/services/s1"), { name: "Descontracturante" }));
   await assertFails(setDoc(doc(colega, "businesses/a/services/s9"), { name: "X" }));
+});
+
+// ---------- Alta y suscripción ----------
+const DAY = 86400000;
+const verified = (uid, email = `${uid}@test.com`) => env.authenticatedContext(uid, { email, email_verified: true }).firestore();
+const adminUser = () => env.authenticatedContext("uidAngel").firestore();
+
+async function seedPlatform({ signupOpen = true } = {}) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "businesses/mano-a-mano"), { name: "Mano a Mano", ownerUid: "uidAngel" });
+    await setDoc(doc(db, "appConfig/billing"), { signupOpen });
+  });
+}
+function signupBatch(db, uid, slug, { business = {}, billing = {}, email = `${uid}@test.com`, owners = true } = {}) {
+  const batch = writeBatch(db);
+  batch.set(doc(db, "businesses", slug), { name: "Nuevo", ownerUid: uid, createdAt: serverTimestamp(), showQuiz: false, whatsapp: "", ...business });
+  batch.set(doc(db, "billing", slug), { ownerEmail: email, plan: "regular", termsAcceptedAt: serverTimestamp(), ...billing });
+  if (owners) batch.set(doc(db, "businessOwners", uid), { bizId: slug });
+  return batch.commit();
+}
+async function seedBusiness(id, data) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "businesses", id), { name: id, ownerUid: `owner-${id}`, ...data });
+  });
+}
+const appt = { clientName: "Beto", status: "pendiente" };
+const combo = { status: "pending", clientName: "Beto", clientPhone: "11", totalSessions: 2 };
+const gift = { status: "pending", fromName: "Ana", buyerPhone: "11" };
+
+test("alta: con mail verificado y registro abierto crea negocio, billing y dueño juntos", async () => {
+  await seedPlatform();
+  await assertSucceeds(signupBatch(verified("uidN"), "uidN", "nuevo-negocio"));
+  await assertSucceeds(getDocs(query(collection(verified("uidN"), "businesses"), where("ownerUid", "==", "uidN"))));
+});
+
+test("alta: se rechaza sin verificar, con registro cerrado, sin login o con datos armados", async () => {
+  await seedPlatform();
+  const unverified = env.authenticatedContext("uidU", { email: "u@test.com", email_verified: false }).firestore();
+  await assertFails(signupBatch(unverified, "uidU", "sin-verificar", { email: "u@test.com" }));
+  await assertFails(signupBatch(anon(), "uidX", "sin-login"));
+  const db = verified("uidN");
+  await assertFails(signupBatch(db, "otro", "ajeno"));
+  await assertFails(signupBatch(db, "uidN", "Con Mayusculas"));
+  await assertFails(signupBatch(db, "uidN", "admin"));
+  await assertFails(signupBatch(db, "uidN", "a"));
+  await assertFails(signupBatch(db, "uidN", "se-regala", { business: { activeUntil: Date.now() + 999 * DAY } }));
+  await assertFails(signupBatch(db, "uidN", "exento", { business: { exempt: true } }));
+  await assertFails(signupBatch(db, "uidN", "fecha-vieja", { business: { createdAt: Timestamp.fromMillis(Date.now() + 999 * DAY) } }));
+  await assertFails(signupBatch(db, "uidN", "fundador", { billing: { plan: "founder" } }));
+  await assertFails(signupBatch(db, "uidN", "mail-ajeno", { email: "otra@test.com" }));
+  await assertFails(signupBatch(db, "uidN", "sin-dueno", { owners: false }));
+  await assertFails(setDoc(doc(db, "businesses/suelto"), { name: "x", ownerUid: "uidN", createdAt: serverTimestamp(), showQuiz: false, whatsapp: "" }));
+
+  await seedPlatform({ signupOpen: false });
+  await assertFails(signupBatch(db, "uidN", "cerrado"));
+});
+
+test("alta: una cuenta tiene un solo negocio y no se pisa uno existente", async () => {
+  await seedPlatform();
+  await assertSucceeds(signupBatch(verified("uidN"), "uidN", "primero"));
+  await assertFails(signupBatch(verified("uidN"), "uidN", "segundo"));
+  await assertFails(signupBatch(verified("uidM"), "uidM", "primero"));
+  await assertFails(signupBatch(verified("uidM"), "uidM", "mano-a-mano"));
+});
+
+test("el listado de negocios queda cerrado: público y otros dueños no pueden, el dueño ve el suyo", async () => {
+  await seedPlatform();
+  await assertFails(getDocs(collection(anon(), "businesses")));
+  await assertFails(getDocs(collection(ownerB(), "businesses")));
+  await assertFails(getDocs(query(collection(ownerB(), "businesses"), where("ownerUid", "==", "uidA"))));
+  await assertSucceeds(getDocs(query(collection(ownerA(), "businesses"), where("ownerUid", "==", "uidA"))));
+  await assertSucceeds(getDoc(doc(anon(), "businesses/a")));
+  await assertSucceeds(getDocs(collection(adminUser(), "businesses")));
+});
+
+test("campos de suscripción: el dueño no los toca y Angel solo toca esos en negocios ajenos", async () => {
+  await seedPlatform();
+  await seedBusiness("n", { ownerUid: "uidN", createdAt: Timestamp.fromMillis(Date.now()), activeUntil: Date.now() });
+  const owner = env.authenticatedContext("uidN").firestore();
+  await assertSucceeds(updateDoc(doc(owner, "businesses/n"), { name: "Otro nombre" }));
+  await assertFails(updateDoc(doc(owner, "businesses/n"), { activeUntil: Date.now() + 999 * DAY }));
+  await assertFails(updateDoc(doc(owner, "businesses/n"), { exempt: true }));
+  await assertFails(updateDoc(doc(owner, "businesses/n"), { createdAt: Timestamp.fromMillis(Date.now() + 999 * DAY) }));
+  const angel = adminUser();
+  await assertSucceeds(updateDoc(doc(angel, "businesses/n"), { activeUntil: Date.now() + 30 * DAY }));
+  await assertSucceeds(updateDoc(doc(angel, "businesses/n"), { exempt: true }));
+  await assertFails(updateDoc(doc(angel, "businesses/n"), { name: "Hackeado" }));
+  await assertFails(updateDoc(doc(angel, "businesses/n"), { ownerUid: "uidAngel" }));
+});
+
+test("billing y configuración: el dueño lee lo suyo, nadie más, y solo Angel escribe", async () => {
+  await seedPlatform();
+  await assertSucceeds(signupBatch(verified("uidN"), "uidN", "con-billing"));
+  await assertSucceeds(getDoc(doc(verified("uidN"), "billing/con-billing")));
+  await assertFails(updateDoc(doc(verified("uidN"), "billing/con-billing"), { plan: "founder" }));
+  await assertFails(getDoc(doc(ownerB(), "billing/con-billing")));
+  await assertFails(getDoc(doc(anon(), "billing/con-billing")));
+  await assertFails(getDocs(collection(ownerB(), "billing")));
+  await assertSucceeds(getDocs(collection(adminUser(), "billing")));
+  await assertSucceeds(updateDoc(doc(adminUser(), "billing/con-billing"), { plan: "founder" }));
+  await assertSucceeds(getDoc(doc(anon(), "appConfig/billing")));
+  await assertFails(setDoc(doc(ownerB(), "appConfig/billing"), { signupOpen: true }));
+  await assertSucceeds(updateDoc(doc(adminUser(), "appConfig/billing"), { signupOpen: false }));
+});
+
+const canSell = async (id, ownerUid, expectOk) => {
+  const check = expectOk ? assertSucceeds : assertFails;
+  for (const db of [anon(), env.authenticatedContext(ownerUid).firestore()]) {
+    await check(addDoc(collection(db, `businesses/${id}/appointments`), appt));
+    await check(addDoc(collection(db, `businesses/${id}/combos`), combo));
+    await check(setDoc(doc(db, `businesses/${id}/giftCards/${Math.random().toString(36).slice(2)}`), gift));
+  }
+};
+
+test("suscripción: exento, prueba, activo y gracia aceptan turnos, combos y gift cards", async () => {
+  const now = Date.now();
+  await seedBusiness("sin-campos", {});
+  await canSell("sin-campos", "owner-sin-campos", true);
+  await seedBusiness("exento", { exempt: true, createdAt: Timestamp.fromMillis(now - 900 * DAY), activeUntil: now - 800 * DAY });
+  await canSell("exento", "owner-exento", true);
+  await seedBusiness("prueba", { createdAt: Timestamp.fromMillis(now - 29 * DAY) });
+  await canSell("prueba", "owner-prueba", true);
+  await seedBusiness("gracia-prueba", { createdAt: Timestamp.fromMillis(now - 36 * DAY) });
+  await canSell("gracia-prueba", "owner-gracia-prueba", true);
+  await seedBusiness("activo", { createdAt: Timestamp.fromMillis(now - 90 * DAY), activeUntil: now + DAY });
+  await canSell("activo", "owner-activo", true);
+  await seedBusiness("gracia", { createdAt: Timestamp.fromMillis(now - 90 * DAY), activeUntil: now - 6 * DAY });
+  await canSell("gracia", "owner-gracia", true);
+});
+
+test("suscripción: bloqueado rechaza lo nuevo, pero cancelar sigue funcionando y no se pierde nada", async () => {
+  const now = Date.now();
+  await seedBusiness("fin-prueba", { createdAt: Timestamp.fromMillis(now - 38 * DAY) });
+  await canSell("fin-prueba", "owner-fin-prueba", false);
+  await seedBusiness("vencido", { createdAt: Timestamp.fromMillis(now - 90 * DAY), activeUntil: now - 8 * DAY });
+  await canSell("vencido", "owner-vencido", false);
+
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "businesses/vencido/appointments/t1"), { clientName: "Ana", status: "confirmado", cancelToken: "tok" });
+    await setDoc(doc(db, "businesses/vencido/availability/s1"), { dateKey: "2099-01-01", start: "10:00", end: "11:00", booked: false });
+  });
+  await assertSucceeds(updateDoc(doc(anon(), "businesses/vencido/appointments/t1"), { status: "cancelado", cancelProof: "tok" }));
+  const owner = env.authenticatedContext("owner-vencido").firestore();
+  await assertSucceeds(getDocs(collection(owner, "businesses/vencido/appointments")));
+  await assertSucceeds(updateDoc(doc(owner, "businesses/vencido/appointments/t1"), { notes: "ok" }));
+
+  // Reserva atómica: si el turno se rechaza, el cupo no queda marcado como ocupado.
+  const db = anon();
+  const batch = writeBatch(db);
+  batch.update(doc(db, "businesses/vencido/availability/s1"), { booked: true });
+  batch.set(doc(collection(db, "businesses/vencido/appointments")), appt);
+  await assertFails(batch.commit());
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    assert.equal((await getDoc(doc(ctx.firestore(), "businesses/vencido/availability/s1"))).data().booked, false);
+  });
 });
 
 test("consultas livianas: el público lee solo cupos futuros y el dueño solo turnos nuevos", async () => {

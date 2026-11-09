@@ -159,3 +159,113 @@ Fuera de esta etapa: mails al profesional, alta de negocios sin script, cobro de
 - `npm run test:unit` pasa y las dos apps compilan. Probado en el emulador, en tamaño celular: recuperación, Google, crear/editar/borrar links, botón en turno, combo y gift card, y sin botón con descuento o crédito.
 - Sin probar en navegador: precio por lugar y canje de combo o gift card (solo cubierto por la regla o la condición en el código), el envío real del mail y el mensaje de cuenta existente con otro proveedor.
 - Google con el mismo mail conserva la cuenta y el negocio. Si el mail no estaba verificado, se borra la contraseña (visto en el emulador); se recupera con "Olvidé mi contraseña".
+
+---
+
+# Varios profesionales en un negocio (diseño, sin construir)
+
+Estado: diseño aprobado por Angel el 2026-11-06 para guardar. No hay interesados todavía; se construye después del alta y la suscripción.
+
+## Objetivo
+Que un lugar con varios profesionales, de cualquier rubro, use una sola cuenta de negocio y un solo link de reservas. El lugar cobra todo y arregla por su cuenta con sus empleados.
+
+## Cliente
+- Elige el servicio y después con quién atenderse, o "cualquiera".
+- Ve los horarios de los profesionales que hacen ese servicio.
+- Un turno con "cualquiera" queda sin asignar hasta que el dueño lo reparte.
+- Los links y datos de pago siguen siendo del negocio.
+
+## Dueño
+- Suma y quita empleados, e indica qué servicios hace cada uno.
+- Ve todas las agendas y, si quiere, también atiende con la suya.
+- Reparte turnos, y confirma, cancela y mueve turnos.
+- Edita servicios, precios, pagos, datos del negocio y equipo.
+- Ve clientes, ingresos y estadísticas, también por profesional.
+- La comunicación por WhatsApp con los clientes queda a su cargo.
+
+## Empleado
+- Entra con su propia cuenta (mail y contraseña o Google) y ve solo su agenda.
+- Marca turnos como realizados, completa anamnesis y notas, y carga sus horarios.
+- Ve nombre, turnos, anamnesis y notas solo de sus clientes.
+- No ve teléfonos ni dinero. Sí ve si un turno está pago.
+- No edita servicios, precios, pagos, combos ni datos del negocio, y no ve estadísticas.
+
+## Decisiones técnicas
+- Los negocios con un solo profesional siguen igual y no notan el cambio.
+- Dos profesionales pueden tener turnos a la misma hora, pero uno solo no. Hoy los controles de superposición son por negocio y fecha (`shared/firestoreApi.js`, `agenda-app/src/AgendaComponents.jsx`).
+- Si un empleado se va, sus turnos y clientes quedan en el negocio.
+- Los permisos quedan preparados para sumar recepción después.
+- Teléfonos y dinero se separan de los documentos que lee el empleado y se bloquean en `firestore.rules`, no solo en pantalla. Implica migrar datos reales.
+
+## Fuera de esta etapa
+Recepción, liquidación de sueldos o comisiones, y división de pagos.
+
+## Sin definir
+Si la suscripción se cobra por lugar o por profesional.
+
+---
+
+# Alta de negocios y suscripción manual
+
+Estado: construido y probado en el emulador. Falta publicar y lo que debe hacer Angel.
+
+## Decisiones comerciales
+- Se cobra en pesos: $14.900 por mes.
+- Primeros 10 colegas: $9.900 durante 12 meses. Angel asigna ese plan a mano.
+- Prueba gratis de 30 días, sin pedir medio de pago.
+- Cobro manual con links de Mercado Pago; Angel registra cada pago en el panel.
+- Vencido: aviso durante 7 días de gracia. Después no se aceptan reservas, turnos, combos ni gift cards nuevos.
+- Sigue permitido ver y exportar datos, y cancelar turnos. Nunca se borra nada.
+- Mano a Mano y Momento Relax quedan exentos hasta que Angel decida.
+
+## Decisiones técnicas
+- `businesses/{id}` suma `createdAt` y `activeUntil`. Sin ninguno de los dos, el negocio está exento: no hace falta migrar datos.
+- Activo = `activeUntil` vigente, o `createdAt` dentro de los 30 días. El bloqueo se aplica desde el fin de esa fecha más 7 días de gracia.
+- El bloqueo vive en `firestore.rules`, no solo en pantalla.
+- El dueño no puede cambiar `ownerUid`, `createdAt` ni `activeUntil`.
+- `billing/{id}` (solo dueño y Angel): mail, plan, precio e historial de pagos.
+- `appConfig/billing` (lectura pública, edita Angel): precios, links de Mercado Pago y WhatsApp de Angel, para cambiarlos sin publicar la app.
+- Un negocio por cuenta: documento `businessOwners/{uid}` creado en el mismo batch que el negocio.
+- Crear un negocio exige mail verificado, `ownerUid` propio y un link libre con formato válido. Se reservan nombres como `admin`.
+- Reprogramar desde reservas queda bloqueado si el negocio está bloqueado, con un mensaje claro.
+
+## Plan
+
+### Seguridad y reglas
+- [x] Tests de reglas primero en `scripts/rules.test.mjs`: alta válida e inválidas, segundo negocio, campos protegidos, activo, gracia, bloqueado y exento
+- [x] Separar lectura de un negocio y listado: `allow read: if true` permitía listar todos los negocios. Listar queda solo para el dueño (su propia búsqueda) y Angel
+- [x] Reglas de alta, campos protegidos, `billing`, `appConfig`, rol de Angel y bloqueo de creación de turnos, combos y gift cards
+
+### Alta
+- [x] `agenda-app/src/LoginScreen.jsx`: "Crear cuenta" con mail y contraseña, y verificación de mail
+- [x] `agenda-app/src/App.jsx`: distinguir "la cuenta no tiene negocio" de "falló la búsqueda"
+- [x] Pantalla de alta en lugar del aviso actual: nombre, link de reservas con disponibilidad, aceptación de términos
+- [x] `shared/firestoreApi.js`: crear negocio, `billing` y `businessOwners` en un batch
+- [x] Guía inicial en la agenda vacía: datos del negocio, servicios, horarios y compartir el link
+
+### Suscripción
+- [x] Regla única de estado en `shared/helpers.js` (exento, prueba, activo, gracia, bloqueado) con tests en `npm run test:unit`
+- [x] Agenda: avisos de prueba y vencimiento, y sección "Suscripción" con estado, precio, botón de pago y "Avisar que pagué" por WhatsApp
+- [x] Agenda con negocio bloqueado: sin crear turnos, con cancelar y exportar disponibles
+- [x] Reservas con negocio bloqueado: mensaje con el WhatsApp del negocio, sin cupos para reservar; "Mis turnos" y cancelar siguen andando
+- [x] Panel "Cobros" solo para Angel: negocios, estado, vencimiento, plan, registrar pago (suma un mes), prórroga y exención, precios y links
+
+### Términos
+- [x] Borrador de términos y privacidad en `agenda-app/public/terminos.html`, con datos por completar, para que lo revise un profesional
+
+### Prueba y publicación
+- [x] Builds y emulador en tamaño celular, recorriendo completos: alta con mail, alta con Google, prueba, vencimiento, gracia, bloqueo, pago y desbloqueo, y negocio exento sin cambios
+- [x] Comprobar qué pasa con el cupo si la creación del turno es rechazada: no queda ocupado (test de reglas)
+- [ ] Confirmar con Angel antes de publicar reglas y apps; publicar reglas, luego apps, y revisar Mano a Mano y Momento Relax
+- [ ] Angel: crear los dos links de Mercado Pago, cargar precios y WhatsApp en Cobros y hacer revisar los términos antes de abrir el registro
+
+## Fuera de esta etapa
+Cobro automático, facturación, varios profesionales, mails automáticos y página de venta.
+
+## Review
+- Pruebas: 13 unitarias y 20 de reglas pasan, las dos apps compilan, y el recorrido en navegador pasa en tamaño celular. La prueba anterior de reservas sigue pasando después del cambio de reglas.
+- Agregado al plan: `signupOpen` en `appConfig/billing`. El registro queda cerrado al publicar hasta que Angel lo abra en Cobros, y pide los dos links y su WhatsApp.
+- Agregado al plan: Mano a Mano no aparece en Cobros, para que un vencimiento cargado por error no la bloquee.
+- Decisión: Mano a Mano y Momento Relax no tienen `businessOwners`. Las reglas permitirían que esas dos cuentas creen otro negocio, pero la app no les ofrece el alta. Se aceptó porque son cuentas de confianza.
+- Sin probar en navegador: el mensaje al crear un turno manual con el negocio bloqueado, y que "Cambiar horario" desaparezca en un turno real. Las reglas sí rechazan crear turnos en ese estado.
+- Sin probar en producción: el mail real de verificación, Google real y las reglas publicadas.

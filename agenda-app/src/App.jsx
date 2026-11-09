@@ -6,8 +6,10 @@ import { AgendaView } from "./AgendaComponents";
 import { ClientesView, ServiciosView, CombosView } from "./ClientesServiciosViews";
 import NegocioView from "./NegocioView";
 import GiftCardsView from "./GiftCardsView";
+import { NoBusinessScreen, StartGuide } from "./AltaViews";
+import { AdminView, SubscriptionBanner, SubscriptionSection } from "./SuscripcionViews";
 import {
-  setBusinessId, getBusinessForOwner,
+  DEFAULT_BUSINESS_ID, setBusinessId, getBusinessForOwner,
   listenServices, addService, updateService, deleteService,
   listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
   listenAppointments, listenIncomingPendingAppointments, createAppointment, updateAppointment, deleteAppointment,
@@ -17,7 +19,7 @@ import {
   listenIncomingPendingGiftCards, listenIncomingPendingCombos,
   listenLocations, addLocation, updateLocation, deleteLocation,
 } from "../../shared/firestoreApi";
-import { DEFAULT_BUSINESS_INFO, GoogleFontsHref, sortLocations } from "../../shared/helpers";
+import { DEFAULT_BUSINESS_INFO, GoogleFontsHref, sortLocations, subscriptionStatus } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
 function GoogleFontsLoader() {
@@ -36,6 +38,8 @@ export default function App() {
   const [user, setUser] = useState(null);
   // undefined = buscando, null = la cuenta no tiene negocio, string = id del negocio
   const [bizId, setBizId] = useState(undefined);
+  // Un error de red no significa que la cuenta no tenga negocio: no debe mostrar el alta.
+  const [bizLookupFailed, setBizLookupFailed] = useState(false);
 
   const [view, setView] = useState("agenda");
   const [services, setServices] = useState([]);
@@ -71,7 +75,7 @@ export default function App() {
       })
       .catch(err => {
         console.error("[agenda] No se pudo buscar el negocio de la cuenta:", err);
-        if (!cancelled) setBizId(null);
+        if (!cancelled) setBizLookupFailed(true);
       });
     return () => { cancelled = true; };
   }, [user]);
@@ -158,6 +162,18 @@ export default function App() {
     }));
   }, [giftCards, combos]);
 
+  if (bizLookupFailed) {
+    return (
+      <div style={{ ...styles.loadingScreen, flexDirection: "column", gap: 16, padding: 24, textAlign: "center" }}>
+        <GoogleFontsLoader />
+        <p style={{ fontSize: 15, color: "#2A2622", margin: 0 }}>No pudimos cargar tu agenda. Revisá tu conexión y probá de nuevo.</p>
+        <button onClick={() => window.location.reload()} style={{ background: "#2A2622", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 14, cursor: "pointer" }}>
+          Reintentar
+        </button>
+      </div>
+    );
+  }
+
   if (!authChecked || (user && bizId === undefined)) {
     return (
       <div style={styles.loadingScreen}>
@@ -177,21 +193,33 @@ export default function App() {
 
   if (!bizId) {
     return (
-      <div style={{ ...styles.loadingScreen, flexDirection: "column", gap: 16, padding: 24, textAlign: "center" }}>
+      <>
         <GoogleFontsLoader />
-        <p style={{ fontSize: 15, color: "#2A2622", margin: 0 }}>Esta cuenta todavía no tiene un negocio configurado.</p>
-        <button onClick={handleLogout} style={{ background: "#2A2622", color: "#fff", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 14, cursor: "pointer" }}>
-          Cerrar sesión
-        </button>
-      </div>
+        <NoBusinessScreen
+          user={user}
+          onLogout={handleLogout}
+          onCreated={(id) => { setBusinessId(id); setBizId(id); }}
+        />
+      </>
     );
+  }
+
+  const isAdmin = bizId === DEFAULT_BUSINESS_ID;
+  const subscription = subscriptionStatus(businessInfo);
+
+  async function handleCreateAppt(appt) {
+    if (subscription.state === "blocked") {
+      throw new Error("Tu suscripción venció. Para crear turnos nuevos, pagala desde Negocio.");
+    }
+    return createAppointment(appt);
   }
 
   return (
     <div style={styles.app}>
       <GoogleFontsLoader />
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-        <Header businessName={businessName} view={view} setView={setView} onLogout={handleLogout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "pending" || (c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000)).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} />
+        <Header businessName={businessName} view={view} setView={setView} onLogout={handleLogout} pendingGiftCards={giftCards.filter(g => g.status === "pending").length} pendingCombos={combos.filter(c => c.status === "pending" || (c.status === "active" && c.expiresAt <= Date.now() + 7 * 24 * 60 * 60 * 1000)).length} pendingApptsList={appointments.filter(a => a.status === "pendiente")} onOpenAppt={(id) => { setView("agenda"); setOpenApptId(id); }} isAdmin={isAdmin} />
+        <SubscriptionBanner status={subscription} onOpen={() => setView("negocio")} />
         {notifPermission === "default" && (
           <div
             onClick={handleEnableNotifications}
@@ -230,6 +258,10 @@ export default function App() {
         ))}
       </div>
       <main style={styles.main}>
+        {view === "admin" && isAdmin && <AdminView />}
+        {businessInfo.createdAt && view !== "admin" && (
+          <StartGuide businessInfo={businessInfo} services={services} availability={availability} setView={setView} />
+        )}
         {view === "agenda" && (
           <AgendaView
             services={services}
@@ -240,7 +272,7 @@ export default function App() {
             locations={locations}
             combos={combos}
             giftCards={giftCards}
-            onCreateAppt={createAppointment}
+            onCreateAppt={handleCreateAppt}
             onUpdateAppt={updateAppointment}
             onDeleteAppt={deleteAppointment}
             onAddSlot={addAvailabilitySlot}
@@ -280,6 +312,9 @@ export default function App() {
             businessInfo={businessInfo}
             onSaveBusinessInfo={setBusinessInfo}
           />
+        )}
+        {view === "negocio" && subscription.state !== "exempt" && (
+          <SubscriptionSection businessId={bizId} businessInfo={businessInfo} status={subscription} />
         )}
         {view === "negocio" && (
           <NegocioView

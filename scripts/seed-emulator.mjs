@@ -3,7 +3,7 @@
 // Cuentas: angel@test.com / colega@test.com, contraseña test1234.
 
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { migrateToBusiness } from "./migrate-to-businesses.mjs";
 
@@ -50,4 +50,16 @@ await db.doc("businesses/tres-lugares/availability/n2").set({ dateKey: tomorrow,
 await db.doc("businesses/tres-lugares/availability/s1").set({ dateKey: tomorrow, start: "19:00", end: "20:00", booked: false, locationId: "sur" });
 await db.doc("businesses/tres-lugares/availability/s2").set({ dateKey: tomorrow, start: "21:00", end: "22:00", booked: false, locationId: "sur" });
 await db.doc("businesses/tres-lugares/giftCards/GIFT-0001").set({ code: "GIFT-0001", status: "active", serviceId: "desc", fromName: "Ana", buyerPhone: "1100000000", toName: "Beto" });
+
+// Suscripción: un negocio en cada estado. Cuentas: vencido@test.com, gracia@test.com.
+const DAY = 86400000;
+await db.doc("appConfig/billing").set({ signupOpen: true, priceRegular: 14900, priceFounder: 9900, linkRegular: "https://mpago.la/normal", linkFounder: "https://mpago.la/fundador", whatsapp: "1190000000" });
+for (const [id, activeUntil] of [["vencido", Date.now() - 20 * DAY], ["gracia", Date.now() - 2 * DAY]]) {
+  await createUser(`${id}@test.com`, `uid-${id}`);
+  await db.doc(`businesses/${id}`).set({ name: `Negocio ${id}`, whatsapp: "1180000000", ownerUid: `uid-${id}`, createdAt: Timestamp.fromMillis(Date.now() - 90 * DAY), activeUntil });
+  await db.doc(`billing/${id}`).set({ ownerEmail: `${id}@test.com`, plan: "regular" });
+  await db.doc(`businessOwners/uid-${id}`).set({ bizId: id });
+  await db.doc(`businesses/${id}/services/s1`).set({ name: "Manicura", duration: 60, color: "#6E7F5C", price: 15000 });
+  await db.doc(`businesses/${id}/availability/slot1`).set({ dateKey: tomorrow, start: "09:00", end: "10:00", booked: false });
+}
 console.log("Listo. Turnos de prueba para", tomorrow);

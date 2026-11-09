@@ -21,7 +21,7 @@ import {
   setBusinessId,
   DEFAULT_BUSINESS_ID,
 } from "../../shared/firestoreApi";
-import { GoogleFontsHref, sortLocations, dateKey } from "../../shared/helpers";
+import { GoogleFontsHref, sortLocations, dateKey, subscriptionStatus, formatPhoneForWhatsapp } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
 function isInAppBrowser() {
@@ -228,6 +228,41 @@ export default function App() {
       <div style={{ ...styles.loadingScreen, padding: 24, textAlign: "center" }}>
         <GoogleFontsLoader />
         <p style={{ fontSize: 15, color: "#2A2622", margin: 0 }}>No encontramos este negocio. Revisá que el link esté completo.</p>
+      </div>
+    );
+  }
+
+  // Suscripción vencida: el cliente no ve el motivo y solo puede consultar o cancelar sus turnos.
+  if (subscriptionStatus(businessInfo).state === "blocked") {
+    const whatsapp = formatPhoneForWhatsapp(businessInfo.whatsapp);
+    return (
+      <div style={styles.app}>
+        <GoogleFontsLoader />
+        <header style={styles.header}>
+          <div style={styles.headerTop}>
+            <h1 style={styles.brandName}>{businessInfo.name}</h1>
+          </div>
+        </header>
+        <main style={styles.main}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 16, margin: "16px 16px 0", color: "#2A2622" }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Por ahora no se pueden hacer reservas online.</p>
+            {whatsapp && (
+              <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 8, color: "#A6483A", fontSize: 14, fontWeight: 600 }}>
+                Consultar por WhatsApp
+              </a>
+            )}
+          </div>
+          <MiTurnoView
+            services={services}
+            availability={availability}
+            locations={locations}
+            businessInfo={businessInfo}
+            onGetMyBookings={getMyBookingRefs}
+            onCancelAppointment={cancelAppointmentPublic}
+            onReschedule={rescheduleAppointmentPublic}
+            canReschedule={false}
+          />
+        </main>
       </div>
     );
   }

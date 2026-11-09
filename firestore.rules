@@ -15,11 +15,76 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/businesses/$(bizId)).data.ownerUid == request.auth.uid;
     }
 
-    // Los negocios se crean y se borran solo por script (admin); el dueño no puede cambiar ownerUid.
+    // El dueño de mano-a-mano administra la plataforma (precios, cobros y registro).
+    function isAdmin() {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/businesses/mano-a-mano).data.ownerUid == request.auth.uid;
+    }
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+    // Misma regla que subscriptionStatus en shared/helpers.js. Sin createdAt ni activeUntil el negocio
+    // está exento. Con vencimiento: 7 días de gracia (604800000 ms). Con prueba: 30 + 7 días (3196800000 ms).
+    function acceptsNew(bizId) {
+      let biz = get(/databases/$(database)/documents/businesses/$(bizId)).data;
+      let now = request.time.toMillis();
+      let created = biz.get('createdAt', null);
+      let until = biz.get('activeUntil', null);
+      return biz.get('exempt', false) == true
+        || (created == null && until == null)
+        || (until != null && until + 604800000 > now)
+        || (created != null && created.toMillis() + 3196800000 > now);
+    }
+
+    match /appConfig/{docId} {
+      allow get: if true;
+      allow write: if isAdmin();
+    }
+
+    // Un negocio por cuenta: se crea junto con el negocio y no se puede borrar.
+    match /businessOwners/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isVerified()
+                    && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['bizId'])
+                    && getAfter(/databases/$(database)/documents/businesses/$(request.resource.data.bizId)).data.ownerUid == uid;
+    }
+
+    match /billing/{bizId} {
+      allow get: if isOwner(bizId) || isAdmin();
+      allow list, update: if isAdmin();
+      allow create: if isAdmin()
+                    || (isVerified()
+                        && request.resource.data.keys().hasOnly(['ownerEmail', 'plan', 'termsAcceptedAt'])
+                        && request.resource.data.plan == 'regular'
+                        && request.resource.data.ownerEmail == request.auth.token.email
+                        && request.resource.data.termsAcceptedAt == request.time
+                        && !exists(/databases/$(database)/documents/businessOwners/$(request.auth.uid))
+                        && getAfter(/databases/$(database)/documents/businesses/$(bizId)).data.ownerUid == request.auth.uid);
+    }
+
+    // El alta crea negocio, billing y businessOwners en el mismo batch. El dueño no puede
+    // cambiar ownerUid ni los campos de suscripción; el admin solo cambia estos últimos.
     match /businesses/{bizId} {
-      allow read: if true;
-      allow update: if isOwner(bizId)
-                    && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow get: if true;
+      allow list: if isAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if isVerified()
+                    && get(/databases/$(database)/documents/appConfig/billing).data.signupOpen == true
+                    && bizId.matches('^[a-z0-9]+(-[a-z0-9]+)*$')
+                    && bizId.size() >= 3 && bizId.size() <= 40
+                    && !(bizId in ['admin', 'agenda', 'reservas', 'www', 'api', 'test', 'soporte'])
+                    && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'createdAt', 'showQuiz', 'whatsapp'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 80
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.createdAt == request.time
+                    && !exists(/databases/$(database)/documents/businessOwners/$(request.auth.uid))
+                    && getAfter(/databases/$(database)/documents/businessOwners/$(request.auth.uid)).data.bizId == bizId
+                    && existsAfter(/databases/$(database)/documents/billing/$(bizId));
+      allow update: if (isOwner(bizId)
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerUid', 'createdAt', 'activeUntil', 'exempt']))
+                    || (isAdmin()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeUntil', 'exempt']));
 
       match /services/{serviceId} {
         allow read: if true;
@@ -46,7 +111,8 @@ service cloud.firestore {
 
       match /appointments/{apptId} {
         // cualquiera puede crear una reserva (vía la app pública)
-        allow create: if (request.resource.data.status == "confirmado"
+        allow create: if acceptsNew(bizId)
+                      && (request.resource.data.status == "confirmado"
                           || request.resource.data.status == "pendiente")
                       && request.resource.data.clientName is string
                       && request.resource.data.clientName.size() > 0;
@@ -83,7 +149,8 @@ service cloud.firestore {
 
       // Gift Cards: cualquiera puede crear y leer por código. Solo autenticado puede actualizar (activar/canjear).
       match /giftCards/{code} {
-        allow create: if request.resource.data.status == "pending"
+        allow create: if acceptsNew(bizId)
+                      && request.resource.data.status == "pending"
                       && request.resource.data.fromName is string
                       && request.resource.data.fromName.size() > 0
                       && request.resource.data.buyerPhone is string
@@ -114,7 +181,8 @@ service cloud.firestore {
       // Combos de sesiones prepagas: cualquiera puede pedir uno (queda "pending" hasta que
       // el profesional confirma el pago). Solo autenticado puede activar/canjear/borrar.
       match /combos/{comboId} {
-        allow create: if request.resource.data.status == "pending"
+        allow create: if acceptsNew(bizId)
+                      && request.resource.data.status == "pending"
                       && request.resource.data.clientName is string
                       && request.resource.data.clientName.size() > 0
                       && request.resource.data.clientPhone is string

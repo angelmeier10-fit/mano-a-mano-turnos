@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { login, loginWithGoogle, resetPassword } from "./auth";
+import React, { useEffect, useState } from "react";
+import { login, loginWithGoogle, resetPassword, signUp } from "./auth";
+import { getBillingConfig } from "../../shared/firestoreApi";
 
 const RESET_SENT = "Si hay una cuenta con ese email, te mandamos un link para elegir una contraseña nueva. Revisá también el correo no deseado.";
 
@@ -9,6 +10,20 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    getBillingConfig()
+      .then(config => setSignupOpen(config.signupOpen === true))
+      .catch(err => console.error("[login] No se pudo leer la configuración:", err));
+  }, []);
+
+  function switchMode() {
+    setCreating(v => !v);
+    setError("");
+    setNotice("");
+  }
 
   async function handleGoogle() {
     setError("");
@@ -61,9 +76,17 @@ export default function LoginScreen() {
     setNotice("");
     setLoading(true);
     try {
-      await login(email, password);
+      if (creating) await signUp(email.trim(), password);
+      else await login(email, password);
     } catch (err) {
-      setError("Email o contraseña incorrectos.");
+      if (!creating) setError("Email o contraseña incorrectos.");
+      else if (err.code === "auth/email-already-in-use") setError("Ese email ya tiene una cuenta. Entrá con tu contraseña o con Google.");
+      else if (err.code === "auth/weak-password") setError("La contraseña debe tener al menos 6 caracteres.");
+      else if (err.code === "auth/invalid-email") setError("Ese email no es válido.");
+      else {
+        console.error("[login] Crear cuenta:", err);
+        setError("No se pudo crear la cuenta. Probá de nuevo.");
+      }
     } finally {
       setLoading(false);
     }
@@ -73,7 +96,7 @@ export default function LoginScreen() {
     <div style={styles.wrap}>
       <div style={styles.card}>
         <h1 style={styles.title}>Agenda de turnos</h1>
-        <p style={styles.subtitle}>Iniciá sesión para ver tu agenda</p>
+        <p style={styles.subtitle}>{creating ? "Creá tu cuenta para empezar la prueba gratis" : "Iniciá sesión para ver tu agenda"}</p>
         <form onSubmit={handleSubmit}>
           <label style={styles.label}>Email</label>
           <input
@@ -90,21 +113,28 @@ export default function LoginScreen() {
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            autoComplete="current-password"
+            autoComplete={creating ? "new-password" : "current-password"}
             required
           />
           {error && <p style={styles.error}>{error}</p>}
           {notice && <p style={styles.notice}>{notice}</p>}
           <button style={styles.button} type="submit" disabled={loading}>
-            {loading ? "Un momento…" : "Entrar"}
+            {loading ? "Un momento…" : creating ? "Crear cuenta" : "Entrar"}
           </button>
-          <button style={styles.linkButton} type="button" onClick={handleForgotPassword} disabled={loading}>
-            Olvidé mi contraseña
-          </button>
+          {!creating && (
+            <button style={styles.linkButton} type="button" onClick={handleForgotPassword} disabled={loading}>
+              Olvidé mi contraseña
+            </button>
+          )}
         </form>
         <button style={styles.googleButton} type="button" onClick={handleGoogle} disabled={loading}>
-          Entrar con Google
+          {creating ? "Continuar con Google" : "Entrar con Google"}
         </button>
+        {signupOpen && (
+          <button style={styles.linkButton} type="button" onClick={switchMode} disabled={loading}>
+            {creating ? "Ya tengo cuenta" : "Crear una cuenta nueva"}
+          </button>
+        )}
       </div>
     </div>
   );

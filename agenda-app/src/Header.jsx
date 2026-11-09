@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Calendar, Users, Settings, Sliders, LogOut, Gift, Bell, Package } from "lucide-react";
+import { Calendar, Users, Settings, Sliders, LogOut, Gift, Bell, Package, CreditCard } from "lucide-react";
 import styles from "../../shared/styles";
 import { formatDateShort } from "../../shared/helpers";
 
@@ -13,7 +13,7 @@ function addSeenId(id) {
   if (!seen.includes(id)) localStorage.setItem(SEEN_KEY, JSON.stringify([...seen, id]));
 }
 
-export default function Header({ businessName = "", view, setView, onLogout, pendingGiftCards = 0, pendingCombos = 0, pendingApptsList = [], onOpenAppt }) {
+export default function Header({ businessName = "", view, setView, onLogout, pendingGiftCards = 0, pendingCombos = 0, pendingApptsList = [], onOpenAppt, isAdmin = false }) {
   const [open, setOpen] = useState(false);
   const [seenIds, setSeenIds] = useState(getSeenIds);
   const bellRef = useRef(null);
@@ -45,6 +45,7 @@ export default function Header({ businessName = "", view, setView, onLogout, pen
     { id: "clientes", label: "Clientes", icon: Users },
     { id: "servicios", label: "Servicios", icon: Settings },
     { id: "negocio", label: "Negocio", icon: Sliders },
+    ...(isAdmin ? [{ id: "admin", label: "Cobros", icon: CreditCard }] : []),
   ];
 
   return (
@@ -127,7 +128,7 @@ export default function Header({ businessName = "", view, setView, onLogout, pen
         </div>
       </div>
 
-      <nav style={styles.tabBar}>
+      <nav style={isAdmin ? { ...styles.tabBar, padding: "0 6px", overflowX: "auto" } : styles.tabBar}>
         {tabs.map(t => {
           const Icon = t.icon;
           const active = view === t.id;
@@ -135,7 +136,7 @@ export default function Header({ businessName = "", view, setView, onLogout, pen
             <button
               key={t.id}
               onClick={() => setView(t.id)}
-              style={{ ...styles.tabBtn, ...(active ? styles.tabBtnActive : {}) }}
+              style={{ ...styles.tabBtn, ...(isAdmin ? { padding: "9px 1px 11px", fontSize: 10.5 } : {}), ...(active ? styles.tabBtnActive : {}) }}
             >
               <div style={{ position: "relative", display: "inline-flex" }}>
                 <Icon size={16} strokeWidth={2.2} />
