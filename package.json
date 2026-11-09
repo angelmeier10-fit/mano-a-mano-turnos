@@ -10,7 +10,7 @@
     "build": "npm run build:agenda && npm run build:reservas",
     "install:all": "npm install --prefix agenda-app && npm install --prefix reservas-app",
     "deploy": "npm run build && firebase deploy",
-    "test:unit": "node --test scripts/payment-link.test.mjs scripts/subscription.test.mjs",
+    "test:unit": "node --test scripts/payment-link.test.mjs scripts/subscription.test.mjs scripts/instagram.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-mano-a-mano \"node --test scripts/rules.test.mjs\"",
     "migrate": "node scripts/migrate-to-businesses.mjs"
   },

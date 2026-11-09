@@ -28,6 +28,11 @@ export const STATUS = {
   ausente: { label: "No vino", color: "#B08A3E" },
 };
 
+export function instagramHandle(value) {
+  const path = (value || "").trim().replace(/^(https?:\/\/)?(www\.)?instagram\.com\//i, "");
+  return path.split(/[/?#]/)[0].replace(/^@/, "");
+}
+
 export function pad(n) { return n.toString().padStart(2, "0"); }
 export function dateKey(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 export function timeToMinutes(t) { const [h,m] = t.split(":").map(Number); return h*60+m; }

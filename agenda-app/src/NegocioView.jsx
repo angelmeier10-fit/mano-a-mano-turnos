@@ -268,6 +268,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
   const [addressDetail, setAddressDetail] = useState(businessInfo?.addressDetail || "");
   const [hoursLabel, setHoursLabel] = useState(businessInfo?.hoursLabel || "");
   const [whatsapp, setWhatsapp] = useState(businessInfo?.whatsapp || "");
+  const [instagram, setInstagram] = useState(businessInfo?.instagram || "");
   const [referralAmount, setReferralAmount] = useState(String(getReferralAmount(businessInfo)));
   const [transferHolder, setTransferHolder] = useState(businessInfo?.transferHolder || "");
   const [transferAlias, setTransferAlias] = useState(businessInfo?.transferAlias || "");
@@ -279,6 +280,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
     setAddressDetail(businessInfo?.addressDetail || "");
     setHoursLabel(businessInfo?.hoursLabel || "");
     setWhatsapp(businessInfo?.whatsapp || "");
+    setInstagram(businessInfo?.instagram || "");
     setReferralAmount(String(getReferralAmount(businessInfo)));
     setTransferHolder(businessInfo?.transferHolder || "");
     setTransferAlias(businessInfo?.transferAlias || "");
@@ -286,7 +288,7 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
 
   function handleSubmit(e) {
     e.preventDefault();
-    onSave({ name, address, addressDetail, hoursLabel, whatsapp, referralAmount: Math.max(0, Number(referralAmount) || 0), transferHolder: transferHolder.trim(), transferAlias: transferAlias.trim() });
+    onSave({ name, address, addressDetail, hoursLabel, whatsapp, instagram: instagram.trim(), referralAmount: Math.max(0, Number(referralAmount) || 0), transferHolder: transferHolder.trim(), transferAlias: transferAlias.trim() });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -362,6 +364,10 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
         <label style={styles.fieldLabel}>Tu WhatsApp (para que te escriban tus clientes)</label>
         <input style={styles.input} value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="Ej: 1112345678 (sin 0 ni 15)" />
         <p style={styles.helperText}>Se va a mostrar como botón de contacto en la app de reservas.</p>
+
+        <label style={styles.fieldLabel}>Tu Instagram (opcional)</label>
+        <input style={styles.input} value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="Ej: @tunegocio" />
+        <p style={styles.helperText}>Aparece en las gift cards junto con tu WhatsApp.</p>
 
         <label style={styles.fieldLabel}>Titular de la cuenta (para transferencias)</label>
         <input style={styles.input} value={transferHolder} onChange={e => setTransferHolder(e.target.value)} placeholder="Nombre y apellido" />

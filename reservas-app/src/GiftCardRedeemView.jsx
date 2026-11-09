@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Download, Check, Gift } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import { getGiftCard, reservasUrl } from "../../shared/firestoreApi";
-import { formatPrice, formatDateLong, dateKey } from "../../shared/helpers";
+import { formatPrice, formatDateLong, dateKey, instagramHandle } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import ReservarView from "./ReservarView";
 
 
-function GiftCardVisual({ gc, canvasRef, businessInfo }) {
+export function GiftCardVisual({ gc, canvasRef, businessInfo }) {
+  const instagram = instagramHandle(businessInfo.instagram);
   return (
     <div ref={canvasRef} style={{ ...styles.giftCardVisual, display: "flex", flexDirection: "column", padding: 0 }}>
       <div style={{ position: "relative", height: 110, overflow: "hidden", flexShrink: 0 }}>
@@ -32,7 +34,16 @@ function GiftCardVisual({ gc, canvasRef, businessInfo }) {
         <div style={styles.giftCardVisualTo}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
         {gc.message && <div style={styles.giftCardVisualMessage}>"{gc.message}"</div>}
         <div style={styles.giftCardVisualCode}>Código: {gc.code}</div>
-        <div style={styles.giftCardVisualLink}>{reservasUrl({ giftcard: gc.code })}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12 }}>
+          <div style={{ background: "#fff", padding: 6, borderRadius: 8, lineHeight: 0, flexShrink: 0 }}>
+            <QRCodeCanvas value={reservasUrl({ giftcard: gc.code })} size={120} marginSize={2} />
+          </div>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, lineHeight: 1.6, color: "rgba(239,233,223,0.85)", minWidth: 0, overflowWrap: "anywhere" }}>
+            <div style={{ fontWeight: 600, color: "#C9A84C", marginBottom: 4 }}>Escaneá para pedir tu turno</div>
+            {instagram && <div>Instagram @{instagram}</div>}
+            {businessInfo.whatsapp && <div>WhatsApp {businessInfo.whatsapp}</div>}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -97,7 +108,7 @@ export default function GiftCardRedeemView({ code, services, availability, locat
 
   if (showBooking) {
     // Importamos ReservarView dinámicamente para el canje
-    return <BookingForGiftCard gc={gc} services={services} availability={availability} businessInfo={businessInfo} onBookSlot={onBookSlot} onUpsertClient={onUpsertClient} onBack={() => setShowBooking(false)} />;
+    return <BookingForGiftCard gc={gc} services={services} availability={availability} locations={locations} businessInfo={businessInfo} onBookSlot={onBookSlot} onUpsertClient={onUpsertClient} onBack={() => setShowBooking(false)} />;
   }
 
   return (
@@ -159,7 +170,7 @@ export default function GiftCardRedeemView({ code, services, availability, locat
 }
 
 // Sub-componente: flujo de reserva adaptado para gift card
-function BookingForGiftCard({ gc, services, availability, businessInfo, onBookSlot, onUpsertClient, onBack }) {
+function BookingForGiftCard({ gc, services, availability, locations, businessInfo, onBookSlot, onUpsertClient, onBack }) {
   return (
     <ReservarView
       services={services}

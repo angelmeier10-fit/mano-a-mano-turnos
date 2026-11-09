@@ -4,6 +4,7 @@ import { formatPrice, formatDateLong, dateKey, addDays, generateCode, servicePay
 import { createGiftCard, reservasUrl } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 import TransferInfo from "./TransferInfo";
+import { GiftCardVisual } from "./GiftCardRedeemView";
 
 
 export default function GiftCardView({ services, businessInfo, onBack }) {
@@ -84,35 +85,8 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
   if (done) {
     return (
       <div style={{ padding: "20px 16px" }}>
-        <div style={{ ...styles.giftCardVisual, marginBottom: 20, display: "flex", flexDirection: "column", padding: 0 }}>
-          {/* zona decorativa superior */}
-          <div style={{ position: "relative", height: 110, overflow: "hidden", flexShrink: 0 }}>
-            <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1.5, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #F0D060 50%, #C9A84C 80%, transparent)" }} />
-            <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 1.5, background: "linear-gradient(180deg, transparent, #C9A84C 20%, #F0D060 50%, #C9A84C 80%, transparent)" }} />
-            <div style={{ position: "absolute", top: 8, left: 8, width: 60, height: 60, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.15) 0%, transparent 70%)" }} />
-            <div style={{ position: "absolute", top: 20, right: 25, width: 40, height: 40, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)" }} />
-            <div style={{ position: "absolute", bottom: 10, right: 12, width: 55, height: 55, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%)" }} />
-            <div style={{ position: "absolute", top: 5, right: 80, width: 25, height: 25, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)" }} />
-            <svg style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }} width="72" height="60" viewBox="0 0 72 60" fill="none">
-              <path d="M36 30 C24 18, 2 12, 5 26 C7 38, 26 34, 36 30Z" fill="#C9A84C"/>
-              <path d="M36 30 C48 18, 70 12, 67 26 C65 38, 46 34, 36 30Z" fill="#C9A84C"/>
-              <path d="M36 30 C24 42, 2 48, 5 34 C7 22, 26 26, 36 30Z" fill="#A87E2A"/>
-              <path d="M36 30 C48 42, 70 48, 67 34 C65 22, 46 26, 36 30Z" fill="#A87E2A"/>
-              <ellipse cx="36" cy="30" rx="5.5" ry="5" fill="#D4AF37"/>
-              <ellipse cx="36" cy="30" rx="3" ry="2.8" fill="#F0D060"/>
-            </svg>
-          </div>
-          {/* separador dorado */}
-          <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #D4AF37 50%, #C9A84C 80%, transparent)", flexShrink: 0 }} />
-          {/* zona de texto inferior */}
-          <div style={{ padding: "18px 22px 20px", flex: 1 }}>
-            <div style={styles.giftCardVisualLogo}>{businessInfo.name}</div>
-            <div style={styles.giftCardVisualService}>{done.data.serviceName}</div>
-            <div style={styles.giftCardVisualTo}>Para {done.data.toName} · de parte de {done.data.fromName}</div>
-            {done.data.message && <div style={styles.giftCardVisualMessage}>"{done.data.message}"</div>}
-            <div style={styles.giftCardVisualCode}>Código: {done.code}</div>
-            <div style={styles.giftCardVisualLink}>{done.link}</div>
-          </div>
+        <div style={{ marginBottom: 20 }}>
+          <GiftCardVisual gc={done.data} businessInfo={businessInfo} />
         </div>
 
         <TransferInfo businessInfo={businessInfo} amount={done.data.servicePrice} paymentLink={servicePaymentLink(svc, done.data.servicePrice)} />

@@ -269,3 +269,17 @@ Cobro automático, facturación, varios profesionales, mails automáticos y pág
 - Decisión: Mano a Mano y Momento Relax no tienen `businessOwners`. Las reglas permitirían que esas dos cuentas creen otro negocio, pero la app no les ofrece el alta. Se aceptó porque son cuentas de confianza.
 - Sin probar en navegador: el mensaje al crear un turno manual con el negocio bloqueado, y que "Cambiar horario" desaparezca en un turno real. Las reglas sí rechazan crear turnos en ese estado.
 - Sin probar en producción: el mail real de verificación, Google real y las reglas publicadas.
+
+# Gift card con QR, Instagram y WhatsApp (2026-11-09)
+
+- [x] Arreglar "Reservar turno con esta gift card" (`locations is not defined`)
+- [x] QR en lugar del link escrito, con el código a la vista
+- [x] Instagram y WhatsApp del negocio en la tarjeta
+- [x] Campo "Instagram" en Negocio
+- [x] Misma tarjeta en compra y canje
+
+## Review
+- Probado en emulador, tamaño celular: el error se reprodujo antes del arreglo; el QR de la imagen descargada se lee y trae el negocio y el código; un turno completo marca la gift card como usada.
+- 16 pruebas unitarias pasan y las dos apps compilan.
+- Sin probar en navegador: la tarjeta en la pantalla de compra y guardar el campo Instagram en Negocio.
+- Pendiente aparte: el moño de la tarjeta no sale en la imagen descargada, aunque en pantalla se ve. Cambiar el centrado (transform → calc) no lo arregló; el problema está en cómo html2canvas dibuja el SVG.

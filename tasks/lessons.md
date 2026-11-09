@@ -1,5 +1,9 @@
 # Lecciones
 
+## Buscar en toda la función antes de decir que algo no existe (2026-11-09)
+- **Error:** dije que la gift card no tenía botón para descargar porque solo leí la pantalla de compra; el botón está en `GiftCardRedeemView.jsx`.
+- **Regla:** antes de afirmar que algo no existe, buscarlo en todas las pantallas de esa función (compra, canje, consulta y panel).
+
 ## Revisar qué pasa alrededor de una función nueva (2026-11-06)
 - **Error:** agregué el botón "Pagar" en la confirmación sin tener en cuenta que WhatsApp se abría solo al reservar y lo tapaba. Las pruebas no lo detectaron porque simulaban `window.open`.
 - **Regla:** antes de sumar algo a una pantalla, recorrer el flujo completo como el usuario real y revisar qué se abre, redirige o tapa esa pantalla.
