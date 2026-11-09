@@ -210,8 +210,8 @@ Si la suscripción se cobra por lugar o por profesional.
 Estado: construido y probado en el emulador. Falta publicar y lo que debe hacer Angel.
 
 ## Decisiones comerciales
-- Se cobra en pesos: $14.900 por mes.
-- Primeros 10 colegas: $9.900 durante 12 meses. Angel asigna ese plan a mano.
+- Se cobra en pesos: $19.900 por mes (antes se había pensado $14.900; Angel lo cambió el 2026-11-09).
+- Primeros 10 colegas: $14.900 durante 12 meses (antes $9.900). Angel asigna ese plan a mano.
 - Prueba gratis de 30 días, sin pedir medio de pago.
 - Cobro manual con links de Mercado Pago; Angel registra cada pago en el panel.
 - Vencido: aviso durante 7 días de gracia. Después no se aceptan reservas, turnos, combos ni gift cards nuevos.
@@ -256,7 +256,7 @@ Estado: construido y probado en el emulador. Falta publicar y lo que debe hacer 
 ### Prueba y publicación
 - [x] Builds y emulador en tamaño celular, recorriendo completos: alta con mail, alta con Google, prueba, vencimiento, gracia, bloqueo, pago y desbloqueo, y negocio exento sin cambios
 - [x] Comprobar qué pasa con el cupo si la creación del turno es rechazada: no queda ocupado (test de reglas)
-- [ ] Confirmar con Angel antes de publicar reglas y apps; publicar reglas, luego apps, y revisar Mano a Mano y Momento Relax
+- [x] Confirmar con Angel antes de publicar reglas y apps; publicar reglas, luego apps, y revisar Mano a Mano y Momento Relax (2026-11-09, commit 4fe11b2)
 - [ ] Angel: crear los dos links de Mercado Pago, cargar precios y WhatsApp en Cobros y hacer revisar los términos antes de abrir el registro
 
 ## Fuera de esta etapa
