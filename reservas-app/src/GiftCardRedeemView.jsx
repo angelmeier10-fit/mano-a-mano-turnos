@@ -18,7 +18,9 @@ export function GiftCardVisual({ gc, canvasRef, businessInfo }) {
         <div style={{ position: "absolute", top: 20, right: 25, width: 40, height: 40, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)" }} />
         <div style={{ position: "absolute", bottom: 10, right: 12, width: 55, height: 55, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%)" }} />
         <div style={{ position: "absolute", top: 5, right: 80, width: 25, height: 25, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)" }} />
-        <svg style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }} width="72" height="60" viewBox="0 0 72 60" fill="none">
+        {/* La posición va en un contenedor: html2canvas copia el estilo del svg adentro de la imagen y lo dejaría fuera de cuadro. */}
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", lineHeight: 0 }}>
+        <svg width="72" height="60" viewBox="0 0 72 60" fill="none">
           <path d="M36 30 C24 18, 2 12, 5 26 C7 38, 26 34, 36 30Z" fill="#C9A84C"/>
           <path d="M36 30 C48 18, 70 12, 67 26 C65 38, 46 34, 36 30Z" fill="#C9A84C"/>
           <path d="M36 30 C24 42, 2 48, 5 34 C7 22, 26 26, 36 30Z" fill="#A87E2A"/>
@@ -26,6 +28,7 @@ export function GiftCardVisual({ gc, canvasRef, businessInfo }) {
           <ellipse cx="36" cy="30" rx="5.5" ry="5" fill="#D4AF37"/>
           <ellipse cx="36" cy="30" rx="3" ry="2.8" fill="#F0D060"/>
         </svg>
+        </div>
       </div>
       <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #D4AF37 50%, #C9A84C 80%, transparent)", flexShrink: 0 }} />
       <div style={{ padding: "18px 22px 20px", flex: 1 }}>

@@ -282,4 +282,5 @@ Cobro automático, facturación, varios profesionales, mails automáticos y pág
 - Probado en emulador, tamaño celular: el error se reprodujo antes del arreglo; el QR de la imagen descargada se lee y trae el negocio y el código; un turno completo marca la gift card como usada.
 - 16 pruebas unitarias pasan y las dos apps compilan.
 - Sin probar en navegador: la tarjeta en la pantalla de compra y guardar el campo Instagram en Negocio.
-- Pendiente aparte: el moño de la tarjeta no sale en la imagen descargada, aunque en pantalla se ve. Cambiar el centrado (transform → calc) no lo arregló; el problema está en cómo html2canvas dibuja el SVG.
+- Moño arreglado: html2canvas copia el estilo calculado del svg (position/inset) dentro de la imagen del svg y lo deja fuera de cuadro. La posición pasó a un div contenedor; la prueba mira el color del ala en la imagen descargada (oscuro antes, dorado después).
+- Pendiente: el combo (`ComboRedeemView.jsx`) tiene el mismo moño con el mismo problema.
