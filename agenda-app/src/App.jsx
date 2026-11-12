@@ -117,7 +117,7 @@ export default function App() {
     const unsubBiz = listenBusinessInfo((data) => {
       if (data) setBusinessInfoState(data);
       setBusinessName(data?.name || "");
-      document.title = data?.name ? `${data.name} · Agenda` : "Agenda";
+      document.title = data?.name ? `${data.name} · Cupo` : "Cupo";
     });
     const unsubGiftCards = listenGiftCards(setGiftCards);
     const unsubCombos = listenCombos(setCombos);
