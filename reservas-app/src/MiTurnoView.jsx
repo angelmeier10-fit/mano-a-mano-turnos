@@ -3,7 +3,7 @@ import { Clock, Check, MessageCircle, X, ChevronLeft, Search } from "lucide-reac
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
-  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, bookableStarts,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
@@ -94,11 +94,8 @@ export default function MiTurnoView({
   const reschedSvc = allServices.find(s => s.id === reschedServiceId);
   const reschedSlots = useMemo(() => {
     if (!reschedDate || !reschedSvc) return [];
-    return (availabilityByDate[reschedDate] || [])
-      .filter(s => !s.booked)
-      .filter(s => !isPastSlot(reschedDate, s.start, s.allowLastMinute ? 0 : 60))
-      .filter(s => timeToMinutes(s.end) - timeToMinutes(s.start) >= reschedSvc.duration)
-      .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+    return bookableStarts(availabilityByDate[reschedDate] || [], reschedSvc.duration)
+      .filter(s => !isPastSlot(reschedDate, s.start, s.allowLastMinute ? 0 : 60));
   }, [reschedDate, reschedSvc, availabilityByDate]);
 
   // ---- Handlers ----
@@ -212,6 +209,7 @@ export default function MiTurnoView({
           clientId: selected.clientId || null,
           notes: "",
           fromAvailabilityId: reschedSlot.id,
+          ...(reschedSlot.slotIds.length > 1 ? { extraAvailabilityIds: reschedSlot.slotIds.slice(1) } : {}),
           ...locationSnapshot(reschedLocation),
           ...(reschedSvc.id !== selected.serviceId ? { price: servicePrice(reschedSvc, reschedLocation?.id) } : {}),
         },

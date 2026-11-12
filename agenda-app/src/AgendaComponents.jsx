@@ -4,7 +4,7 @@ import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
   formatPhoneForWhatsapp, parseDateKeyAsLocal, getReferralAmount,
-  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, appointmentAddress,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, appointmentAddress, apptSlotIds,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
@@ -188,8 +188,9 @@ export function AgendaView({
     }
     await onUpdateAppt(id, updates);
     if (status === "cancelado") {
-      if (fromAvailabilityId && onFreeSlot) {
-        try { await onFreeSlot(fromAvailabilityId); } catch (e) {
+      for (const slotId of apptSlotIds({ fromAvailabilityId, extraAvailabilityIds: appt?.extraAvailabilityIds })) {
+        if (!onFreeSlot) break;
+        try { await onFreeSlot(slotId); } catch (e) {
           console.error("No se pudo liberar el cupo:", e);
         }
       }
@@ -258,8 +259,9 @@ export function AgendaView({
     }
     if (editingAppt) {
       const mergedData = { ...data, ...(clientId ? { clientId } : {}) };
+      let slotFields;
       try {
-        await updateAppointmentWithSlotSwap(editingAppt.id, editingAppt.fromAvailabilityId || null, mergedData);
+        slotFields = await updateAppointmentWithSlotSwap(editingAppt.id, apptSlotIds(editingAppt), mergedData);
       } catch (e) {
         alert(e.message || "No se pudo guardar el turno.");
         return;
@@ -270,6 +272,7 @@ export function AgendaView({
           dateKey: data.dateKey,
           start: data.start,
           end: data.end,
+          ...slotFields,
           serviceName: svc?.name || "",
           ...(data.locationId ? { locationId: data.locationId, locationName: data.locationName, locationAddress: data.locationAddress } : {}),
         }).catch((e) => console.error("[saveAppt] updateBookingRef falló:", e));
@@ -471,7 +474,7 @@ export function AgendaView({
               const dKey = dateKey(d);
               const dayAppts = apptsForDay(d);
               const dayAvail = (availabilityByDate[dKey] || []).slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
-              const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
+              const bookedSlotIds = new Set(dayAppts.flatMap(apptSlotIds));
               const openSlots = dayAvail.filter(s => !bookedSlotIds.has(s.id) && !s.booked);
 
               return (
@@ -594,8 +597,7 @@ export function AgendaView({
           bookedSlotIds={new Set(
             appointments
               .filter(a => a.dateKey === showAvailForm && a.status !== "cancelado")
-              .map(a => a.fromAvailabilityId)
-              .filter(Boolean)
+              .flatMap(apptSlotIds)
           )}
           locations={locations}
           onClose={() => setShowAvailForm(null)}
@@ -1401,7 +1403,7 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, l
       const dayAvail = availability.filter(s => s.dateKey === dKey && inLocation(s));
       if (dayAvail.length === 0) continue;
       const dayAppts = appointments.filter(a => a.dateKey === dKey && a.status !== "cancelado");
-      const bookedSlotIds = new Set(dayAppts.map(a => a.fromAvailabilityId).filter(Boolean));
+      const bookedSlotIds = new Set(dayAppts.flatMap(apptSlotIds));
       const open = dayAvail
         .filter(s => !bookedSlotIds.has(s.id) && !s.booked)
         .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));

@@ -37,6 +37,37 @@ export function pad(n) { return n.toString().padStart(2, "0"); }
 export function dateKey(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 export function timeToMinutes(t) { const [h,m] = t.split(":").map(Number); return h*60+m; }
 export function minutesToTime(min) { return `${pad(Math.floor(min/60))}:${pad(min%60)}`; }
+// Cupos que ocupa un turno: el principal y, si el servicio dura más que un cupo, los siguientes.
+export function apptSlotIds(appt) {
+  return [appt.fromAvailabilityId, ...(appt.extraAvailabilityIds || [])].filter(Boolean);
+}
+
+// Horarios en que entra un servicio: un cupo libre que alcanza solo, o cupos libres
+// seguidos (uno termina cuando empieza el otro) que juntos alcanzan. Cada resultado es el
+// primer cupo con slotIds, los cupos que ocuparía la reserva.
+export function bookableStarts(slots, duration) {
+  const free = slots.filter(s => !s.booked).sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+  const result = [];
+  free.forEach((first, i) => {
+    const start = timeToMinutes(first.start);
+    const slotIds = [first.id];
+    let end = timeToMinutes(first.end);
+    for (let j = i + 1; end - start < duration && j < free.length && timeToMinutes(free[j].start) === end; j++) {
+      slotIds.push(free[j].id);
+      end = timeToMinutes(free[j].end);
+    }
+    if (end - start >= duration) result.push({ ...first, slotIds });
+  });
+  return result;
+}
+
+// Cupos libres que se pisan con un horario: los que ocupa un turno cargado desde la agenda.
+export function slotsCoveringRange(slots, start, end) {
+  const s = timeToMinutes(start), e = timeToMinutes(end);
+  return slots
+    .filter(slot => !slot.booked && timeToMinutes(slot.start) < e && s < timeToMinutes(slot.end))
+    .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+}
 export function addDays(d, n) { const nd = new Date(d); nd.setDate(nd.getDate()+n); return nd; }
 export function startOfWeek(d) { const nd = new Date(d); const day = nd.getDay(); return addDays(nd, -day); }
 export function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }

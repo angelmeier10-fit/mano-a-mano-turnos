@@ -4,7 +4,7 @@ import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
   applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS, getReferralAmount,
-  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, servicePaymentLink,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, servicePaymentLink, bookableStarts,
 } from "../../shared/helpers";
 import { PayButton } from "./TransferInfo";
 import { getClientDiscountPublic, getCombosByPhone, isExistingClientPublic, getReferralCreditPublic } from "../../shared/firestoreApi";
@@ -138,11 +138,8 @@ export default function ReservarView({ services: allServices, availability: allA
 
   const slotsForSelectedDate = useMemo(() => {
     if (!selectedDate || !svc) return [];
-    return (availabilityByDate[selectedDate] || [])
-      .filter(s => !s.booked)
-      .filter(s => !isPastSlot(selectedDate, s.start, s.allowLastMinute ? 0 : 60))
-      .filter(s => timeToMinutes(s.end) - timeToMinutes(s.start) >= svc.duration)
-      .sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
+    return bookableStarts(availabilityByDate[selectedDate] || [], svc.duration)
+      .filter(s => !isPastSlot(selectedDate, s.start, s.allowLastMinute ? 0 : 60));
   }, [selectedDate, svc, availabilityByDate]);
 
   // El crédito por recomendar se descuenta recién al pagar, así que no figura en el turno.
@@ -188,6 +185,7 @@ export default function ReservarView({ services: allServices, availability: allA
       notes: "",
       status: "pendiente",
       fromAvailabilityId: slot.id,
+      ...(slot.slotIds.length > 1 ? { extraAvailabilityIds: slot.slotIds.slice(1) } : {}),
       price: usingCombo ? 0 : svcPrice,
       discount: usingCombo ? 0 : svcDiscountAmount,
       ...locationSnapshot(location),

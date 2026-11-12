@@ -25,7 +25,7 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 import { firebaseConfig } from "./firebaseConfig";
-import { timeToMinutes, publicApptFields } from "./helpers";
+import { timeToMinutes, publicApptFields, apptSlotIds, slotsCoveringRange } from "./helpers";
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -364,14 +364,14 @@ export async function bookSlotAtomic(appt) {
     return { apptId: ref.id, cancelToken };
   }
 
-  const slotRef = bdoc("availability", slotId);
+  const slotRefs = apptSlotIds(appt).map(id => bdoc("availability", id));
   let apptId;
   await runTransaction(db, async (transaction) => {
-    const slotSnap = await transaction.get(slotRef);
-    if (!slotSnap.exists() || slotSnap.data().booked) {
+    const slotSnaps = await Promise.all(slotRefs.map(ref => transaction.get(ref)));
+    if (slotSnaps.some(snap => !snap.exists() || snap.data().booked)) {
       throw new Error("Este horario ya fue reservado. Por favor elegí otro.");
     }
-    transaction.update(slotRef, { booked: true });
+    slotRefs.forEach(ref => transaction.update(ref, { booked: true }));
     const apptRef = doc(bcol("appointments"));
     apptId = apptRef.id;
     transaction.set(apptRef, apptData);
@@ -390,6 +390,7 @@ export async function bookSlotAtomic(appt) {
         end: appt.end,
         serviceId: appt.serviceId || null,
         fromAvailabilityId: slotId,
+        ...(appt.extraAvailabilityIds ? { extraAvailabilityIds: appt.extraAvailabilityIds } : {}),
         clientName: appt.clientName || "",
         clientId: appt.clientId || null,
         status: apptData.status || "confirmado",
@@ -474,9 +475,9 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
     status: "cancelado",
     cancelProof,
   });
-  if (availabilitySlotId) {
+  for (const slotId of apptSlotIds({ fromAvailabilityId: availabilitySlotId, extraAvailabilityIds: appt.extraAvailabilityIds })) {
     try {
-      await updateDoc(bdoc("availability", availabilitySlotId), { booked: false });
+      await updateDoc(bdoc("availability", slotId), { booked: false });
     } catch (e) {
       console.error("[availability] No se pudo liberar el cupo:", e);
     }
@@ -549,20 +550,20 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
     status: "confirmado",
     createdAt: Date.now(),
   };
-  const newSlotRef = bdoc("availability", newAppt.fromAvailabilityId);
+  const newSlotRefs = apptSlotIds(newAppt).map(id => bdoc("availability", id));
   const newApptRef = doc(bcol("appointments"));
   const newApptId = newApptRef.id;
 
   await runTransaction(db, async (t) => {
-    const newSlotSnap = await t.get(newSlotRef);
-    if (!newSlotSnap.exists() || newSlotSnap.data().booked) {
+    const newSlotSnaps = await Promise.all(newSlotRefs.map(ref => t.get(ref)));
+    if (newSlotSnaps.some(snap => !snap.exists() || snap.data().booked)) {
       throw new Error("Este horario ya fue tomado. Por favor elegí otro.");
     }
     // No incluimos el cupo viejo en la transacción: su regla exige booked:true,
     // y si ya estuviera en false (estado inconsistente) haría fallar toda la transacción.
     // Se libera best-effort después de que lo crítico ya se confirmó.
     t.update(oldApptRef, { status: "cancelado", cancelProof: oldCancelProof });
-    t.update(newSlotRef, { booked: true });
+    newSlotRefs.forEach(ref => t.update(ref, { booked: true }));
     t.set(newApptRef, newApptData);
   });
 
@@ -581,10 +582,10 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
     }
   }
 
-  // Liberar cupo viejo fuera de la transacción (best-effort)
-  if (oldSlotId) {
+  // Liberar cupos viejos fuera de la transacción (best-effort)
+  for (const slotId of apptSlotIds({ fromAvailabilityId: oldSlotId, extraAvailabilityIds: oldAppt.extraAvailabilityIds })) {
     try {
-      await updateDoc(bdoc("availability", oldSlotId), { booked: false });
+      await updateDoc(bdoc("availability", slotId), { booked: false });
     } catch (e) {
       console.error("[reschedule] No se pudo liberar el cupo anterior:", e);
     }
@@ -602,6 +603,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
         end: newAppt.end,
         serviceId: newAppt.serviceId || null,
         fromAvailabilityId: newAppt.fromAvailabilityId,
+        ...(newAppt.extraAvailabilityIds ? { extraAvailabilityIds: newAppt.extraAvailabilityIds } : {}),
         clientName: newAppt.clientName || "",
         clientId: newAppt.clientId || null,
         status: "confirmado",
@@ -681,45 +683,32 @@ export async function createAppointment(appt) {
     throw new Error(`Ya existe un turno que se superpone con ${appt.start}-${appt.end} el ${appt.dateKey}.`);
   }
 
-  let slotId = appt.fromAvailabilityId || null;
-  let apptRef;
-
-  if (slotId) {
-    // Si viene de un cupo existente, marcar booked:true y crear el turno atómicamente
-    // para evitar que un cliente reserve el mismo horario simultáneamente.
-    apptRef = doc(bcol("appointments"));
-    const slotRef = bdoc("availability", slotId);
+  // El turno ocupa los cupos libres que se pisan con su horario (varios si dura más que un cupo).
+  // Si se cargó desde un cupo, ese queda como principal. Todo en una transacción para que un
+  // cliente no reserve el mismo horario a la vez.
+  const covering = slotsCoveringRange(await getDaySlots(appt.dateKey), appt.start, appt.end).map(s => s.id);
+  const slotId = appt.fromAvailabilityId || covering[0] || null;
+  const slotIds = slotId ? [slotId, ...covering.filter(id => id !== slotId)] : [];
+  const extraIds = slotIds.slice(1);
+  const apptData = {
+    ...appt,
+    ...(slotId ? { fromAvailabilityId: slotId } : {}),
+    ...(extraIds.length ? { extraAvailabilityIds: extraIds } : {}),
+    createdAt: Date.now(),
+  };
+  const apptRef = doc(bcol("appointments"));
+  if (slotIds.length) {
+    const slotRefs = slotIds.map(id => bdoc("availability", id));
     await runTransaction(db, async (t) => {
-      const slotSnap = await t.get(slotRef);
-      if (!slotSnap.exists() || slotSnap.data().booked) {
+      const slotSnaps = await Promise.all(slotRefs.map(ref => t.get(ref)));
+      if (slotSnaps.some(snap => !snap.exists() || snap.data().booked)) {
         throw new Error("Este cupo ya fue reservado.");
       }
-      t.update(slotRef, { booked: true });
-      t.set(apptRef, { ...appt, createdAt: Date.now() });
+      slotRefs.forEach(ref => t.update(ref, { booked: true }));
+      t.set(apptRef, apptData);
     });
   } else {
-    // Sin fromAvailabilityId: buscar si existe un cupo con el mismo día y hora de inicio
-    const slotQuery = query(
-      bcol("availability"),
-      where("dateKey", "==", appt.dateKey),
-      where("start", "==", appt.start),
-    );
-    const slotSnap = await getDocs(slotQuery);
-    if (slotSnap.size > 1) {
-      console.warn(`[createAppointment] Se encontraron ${slotSnap.size} cupos para ${appt.dateKey} ${appt.start}. Se ocupa el primero.`);
-    }
-    if (slotSnap.size >= 1) {
-      const matchedSlot = slotSnap.docs[0];
-      apptRef = doc(bcol("appointments"));
-      const matchedSlotRef = bdoc("availability", matchedSlot.id);
-      slotId = matchedSlot.id;
-      await runTransaction(db, async (t) => {
-        t.update(matchedSlotRef, { booked: true });
-        t.set(apptRef, { ...appt, fromAvailabilityId: slotId, createdAt: Date.now() });
-      });
-    } else {
-      apptRef = await addDoc(bcol("appointments"), { ...appt, createdAt: Date.now() });
-    }
+    await setDoc(apptRef, apptData);
   }
 
   const phoneDigits = normalizePhone(appt.clientPhone);
@@ -731,6 +720,7 @@ export async function createAppointment(appt) {
         end: appt.end,
         serviceId: appt.serviceId || null,
         fromAvailabilityId: slotId,
+        ...(extraIds.length ? { extraAvailabilityIds: extraIds } : {}),
         clientName: appt.clientName || "",
         clientId: appt.clientId || null,
         status: appt.status || "confirmado",
@@ -747,9 +737,15 @@ export async function createAppointment(appt) {
 export async function updateAppointment(id, data) {
   return updateDoc(bdoc("appointments", id), data);
 }
-// Al editar un turno desde la Agenda: libera el cupo anterior (si había uno distinto al nuevo),
-// busca un cupo coincidente con el nuevo dateKey+start y lo ocupa, y actualiza el turno — todo atómicamente.
-export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityId, newData) {
+async function getDaySlots(dKey) {
+  const snap = await getDocs(query(bcol("availability"), where("dateKey", "==", dKey)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// Al editar un turno desde la Agenda: libera los cupos anteriores que ya no usa, ocupa los
+// cupos libres que se pisan con el nuevo horario y actualiza el turno, todo atómicamente.
+// Devuelve los cupos que quedó ocupando.
+export async function updateAppointmentWithSlotSwap(apptId, oldSlotIds, newData) {
   // La query no puede ir dentro de la transacción (limitación del SDK web de Firestore)
   const dupCheck = await getDocs(query(
     bcol("appointments"),
@@ -764,30 +760,25 @@ export async function updateAppointmentWithSlotSwap(apptId, oldFromAvailabilityI
     throw new Error(`Ya existe un turno que se superpone con ${newData.start}-${newData.end} el ${newData.dateKey}.`);
   }
 
-  const slotQuery = query(
-    bcol("availability"),
-    where("dateKey", "==", newData.dateKey),
-    where("start", "==", newData.start),
-  );
-  const slotSnap = await getDocs(slotQuery);
-  const newSlotId = slotSnap.empty ? null : slotSnap.docs[0].id;
-
-  const sameSlot = newSlotId !== null && newSlotId === oldFromAvailabilityId;
+  // Los cupos que ya ocupa este turno cuentan como libres para el nuevo horario.
+  const daySlots = (await getDaySlots(newData.dateKey)).map(s => oldSlotIds.includes(s.id) ? { ...s, booked: false } : s);
+  const newSlotIds = slotsCoveringRange(daySlots, newData.start, newData.end).map(s => s.id);
+  const toFree = oldSlotIds.filter(id => !newSlotIds.includes(id)).map(id => bdoc("availability", id));
+  const toBook = newSlotIds.filter(id => !oldSlotIds.includes(id)).map(id => bdoc("availability", id));
   const apptRef = bdoc("appointments", apptId);
-  const oldSlotRef = (oldFromAvailabilityId && !sameSlot) ? bdoc("availability", oldFromAvailabilityId) : null;
-  const newSlotRef = (newSlotId && !sameSlot) ? bdoc("availability", newSlotId) : null;
 
   await runTransaction(db, async (t) => {
     // Firestore exige todos los reads antes de cualquier write en la transacción
-    if (oldSlotRef) await t.get(oldSlotRef);
-    if (newSlotRef) await t.get(newSlotRef);
-
-    if (oldSlotRef) t.update(oldSlotRef, { booked: false });
-    if (newSlotRef) t.update(newSlotRef, { booked: true });
-    t.update(apptRef, { ...newData, fromAvailabilityId: newSlotId });
+    const bookSnaps = await Promise.all([...toFree, ...toBook].map(ref => t.get(ref))).then(s => s.slice(toFree.length));
+    if (bookSnaps.some(snap => !snap.exists() || snap.data().booked)) {
+      throw new Error("Uno de los cupos de ese horario ya fue reservado.");
+    }
+    toFree.forEach(ref => t.update(ref, { booked: false }));
+    toBook.forEach(ref => t.update(ref, { booked: true }));
+    t.update(apptRef, { ...newData, fromAvailabilityId: newSlotIds[0] || null, extraAvailabilityIds: newSlotIds.slice(1) });
   });
 
-  return newSlotId;
+  return { fromAvailabilityId: newSlotIds[0] || null, extraAvailabilityIds: newSlotIds.slice(1) };
 }
 export async function deleteAppointment(id) {
   return deleteDoc(bdoc("appointments", id));
