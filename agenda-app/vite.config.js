@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["apple-touch-icon.png"],
       manifest: {
-        name: "Angel Meier · Agenda",
-        short_name: "Agenda",
+        name: "Cupo · Agenda de turnos",
+        short_name: "Cupo",
         description: "Gestión de turnos, clientes y disponibilidad",
         start_url: "/mano-a-mano-turnos/mano-a-mano-agenda/",
         scope: "/mano-a-mano-turnos/mano-a-mano-agenda/",

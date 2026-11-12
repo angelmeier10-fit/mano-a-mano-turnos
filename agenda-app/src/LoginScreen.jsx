@@ -11,12 +11,17 @@ export default function LoginScreen() {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  // La landing de Cupo enlaza con ?registro para abrir directo en "Crear cuenta".
+  const [creating, setCreating] = useState(() => new URLSearchParams(window.location.search).has("registro"));
 
   useEffect(() => {
     getBillingConfig()
-      .then(config => setSignupOpen(config.signupOpen === true))
-      .catch(err => console.error("[login] No se pudo leer la configuración:", err));
+      .then(config => {
+        const open = config.signupOpen === true;
+        setSignupOpen(open);
+        if (!open) setCreating(false);
+      })
+      .catch(err => { console.error("[login] No se pudo leer la configuración:", err); setCreating(false); });
   }, []);
 
   function switchMode() {
@@ -95,7 +100,7 @@ export default function LoginScreen() {
   return (
     <div style={styles.wrap}>
       <div style={styles.card}>
-        <h1 style={styles.title}>Agenda de turnos</h1>
+        <h1 style={styles.title}>Cupo</h1>
         <p style={styles.subtitle}>{creating ? "Creá tu cuenta para empezar la prueba gratis" : "Iniciá sesión para ver tu agenda"}</p>
         <form onSubmit={handleSubmit}>
           <label style={styles.label}>Email</label>

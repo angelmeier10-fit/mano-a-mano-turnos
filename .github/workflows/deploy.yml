@@ -57,6 +57,8 @@ jobs:
           cp -r agenda-app/dist/* public-site/mano-a-mano-agenda/
           cp -r reservas-app/dist/* public-site/mano-a-mano-reservas/
           cp -r landing-app/dist/* public-site/
+          mkdir -p public-site/cupo
+          cp -r cupo-landing/* public-site/cupo/
 
       - name: Preparar Pages
         uses: actions/configure-pages@v5

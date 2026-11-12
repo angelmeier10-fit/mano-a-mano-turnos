@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guía de Cupo</title>
+<meta name="description" content="Cómo dejar tu agenda Cupo lista para que tus clientes reserven solos, y cómo manejar turnos, clientes, gift cards y combos.">
+<meta name="theme-color" content="#2A2622">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .intro { display: flex; flex-direction: column; gap: 14px; padding-block: 24px 28px; max-width: 920px; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn-sm { padding: 10px 18px; font-size: 14px; }
+
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .toc a { font-size: 14px; font-weight: 500; color: var(--fg); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; background: var(--bg); }
+  .toc a:hover { border-color: var(--accent); }
+
+  .part { border-top: 1px solid var(--line); padding-top: 40px; margin-top: 16px; scroll-margin-top: 16px; max-width: 920px; }
+  .part-head { display: flex; flex-direction: column; gap: 6px; }
+  .part-head .label { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .part-head p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  .item { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 40px; align-items: center; padding-block: 40px; border-bottom: 1px solid var(--line); }
+  .item:last-child { border-bottom: 0; }
+  .item.noimg { grid-template-columns: minmax(0, 1fr); }
+  ol.steps > .item { counter-increment: step; }
+  .text { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .num { font-family: var(--display); font-size: 15px; color: var(--accent); font-weight: 600; }
+  .num::before { content: "Paso " counter(step); }
+  .item h3 { font-size: 25px; }
+  .text p { margin: 0; max-width: 60ch; }
+  .text ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 60ch; }
+  .tab { font-weight: 600; white-space: nowrap; }
+  .tip { font-size: 14px; color: var(--muted); border-left: 3px solid var(--green); padding-left: 12px; }
+
+  .states { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 14px; margin: 0; max-width: 60ch; }
+  .states dt { font-size: 13px; font-weight: 600; border-radius: 999px; padding: 2px 10px; justify-self: start; border: 1px solid var(--line); }
+  .states dd { margin: 0; font-size: 15px; }
+  .s-pend { background: color-mix(in srgb, #C9973A 22%, var(--bg)); }
+  .s-conf { background: color-mix(in srgb, var(--green) 22%, var(--bg)); }
+  .s-comp { background: color-mix(in srgb, #4A5A6B 22%, var(--bg)); }
+  .s-canc, .s-nov { background: var(--surface); }
+
+  figure { margin: 0; justify-self: center; width: 100%; max-width: 250px; }
+
+  .faq { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; padding-block: 28px 8px; }
+  .faq div { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .faq b { font-size: 15px; }
+  .faq p { margin: 0; font-size: 14px; color: var(--muted); }
+
+  .note { margin-top: 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+  .note h3 { font-size: 20px; }
+  .note p { margin: 0; color: var(--muted); }
+
+  @media (max-width: 720px) {
+    .item { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-block: 32px; }
+    figure { max-width: 240px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <a class="brand" href="./">Cupo<span>.</span></a>
+    <nav aria-label="Secciones">
+      <a href="./">Inicio</a>
+      <a href="../mano-a-mano-agenda/">Entrar</a>
+    </nav>
+  </header>
+
+  <div class="intro">
+    <span class="eyebrow">Guía de uso</span>
+    <h1>Guía de Cupo</h1>
+    <p class="lead">Cómo dejar todo listo para que tus clientes reserven solos, y cómo manejar tus turnos, clientes, gift cards y combos en el día a día. Las capturas son de un negocio de ejemplo: vos vas a ver los tuyos.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary btn-sm" href="../mano-a-mano-agenda/?registro">Probala gratis un mes</a>
+    </div>
+    <nav class="toc" aria-label="Partes de la guía">
+      <a href="#inicio">Primera vez</a>
+      <a href="#dia-a-dia">Día a día</a>
+      <a href="#clientes">Lo que ven tus clientes</a>
+      <a href="#preguntas">Preguntas frecuentes</a>
+    </nav>
+  </div>
+
+  <!-- PARTE 1 -->
+  <section class="part" id="inicio">
+    <div class="part-head">
+      <span class="label">Parte 1</span>
+      <h2>Primera vez</h2>
+      <p>Lleva unos 15 minutos y lo hacés una sola vez.</p>
+    </div>
+
+    <ol class="steps">
+      <li class="item">
+        <div class="text">
+          <span class="num"></span>
+          <h3>Creá tu cuenta</h3>
+          <p>Tocá <a href="../mano-a-mano-agenda/?registro">Probala gratis</a> y creá tu cuenta con tu email y una contraseña, o con Google.</p>
+          <p>Si usaste email, te llega un mail para verificarlo: tocá el link y volvé a la agenda.</p>
+          <p>Después elegís el <b>nombre de tu negocio</b> y tu <b>link de reservas</b>, aceptás los términos y listo: arranca tu mes gratis, sin cargar tarjeta.</p>
+          <p class="tip">Desde el celular, en el menú del navegador tocá "Agregar a pantalla de inicio" y te queda como una app.</p>
+        </div>
+        <figure><div class="phone"><img src="img/01-login.png" alt="Pantalla para crear la cuenta con email y contraseña" loading="lazy"></div></figure>
+      </li>
+
+      <li class="item">
+        <div class="text">
+          <span class="num"></span>
+          <h3>Completá tus datos en Negocio</h3>
+          <p>En la pestaña <span class="tab">Negocio</span>, en el formulario de abajo:</p>
+          <ul>
+            <li><b>Nombre</b>: es el que aparece arriba en tu página de reservas.</li>
+            <li><b>Horario de atención</b>, como texto. Ej: "Lunes a sábado de 9 a 19 hs".</li>
+            <li><b>Tu WhatsApp</b>, sin 0 ni 15. Tus clientes lo ven como botón para escribirte, y ahí te llegan los avisos de reserva.</li>
+          </ul>
+          <p>Tocá <b>Guardar</b>.</p>
+        </div>
+        <figure><div class="phone"><img src="img/02-negocio.png" alt="Formulario de Negocio con nombre, horario y WhatsApp" loading="lazy"></div></figure>
+      </li>
+
+      <li class="item">
+        <div class="text">
+          <span class="num"></span>
+          <h3>Cargá cómo te pagan y los referidos</h3>
+          <p>En el mismo formulario:</p>
+          <ul>
+            <li><b>Titular de la cuenta</b> y <b>Alias o CVU</b>: es lo que ve quien te compra una gift card o un combo para transferirte. Si lo dejás vacío, se le pide que coordine el pago con vos por WhatsApp.</li>
+            <li><b>Descuento por referidos ($)</b>: lo que se descuenta en el primer turno quien llega recomendado, y lo mismo que gana de crédito el cliente que lo recomendó. Poné <b>0</b> si no querés usar referidos.</li>
+          </ul>
+          <p>Tocá <b>Guardar</b>.</p>
+        </div>
+        <figure><div class="phone"><img src="img/09-cobros.png" alt="Campos de titular, alias y descuento por referidos" loading="lazy"></div></figure>
+      </li>
+
+      <li class="item">
+        <div class="text">
+          <span class="num"></span>
+          <h3>Cargá tus lugares de atención</h3>
+          <p>En <span class="tab">Negocio</span> → <b>Lugares de atención</b>, tocá <b>Agregar lugar</b> y cargá cada lugar: nombre, dirección y una referencia (piso, entre calles).</p>
+          <p>Tus clientes eligen primero el lugar y después ven los servicios y horarios de ese lugar.</p>
+          <p class="tip">Si atendés en un solo lugar, no hace falta cargarlo: alcanza con la dirección del formulario de Negocio.</p>
+        </div>
+        <figure><div class="phone"><img src="img/03-lugares.png" alt="Lista de lugares de atención con botón Agregar lugar" loading="lazy"></div></figure>
+      </li>
+
+      <li class="item">
+        <div class="text">
+          <span class="num"></span>
+          <h3>Cargá tus servicios</h3>
+          <p>En <span class="tab">Servicios</span> tocá <b>Agregar servicio</b> y completá nombre, duración en minutos y precio.</p>
+          <ul>
+            <li><b>Combo x2 / x3</b>: el precio de 2 o 3 sesiones juntas. Si lo dejás en 0, ese combo no se ofrece.</li>
+            <li><b>Lugares donde se ofrece</b>: destildá los lugares donde no lo hacés. Si en algún lugar cobrás distinto, escribí ese precio al lado; vacío usa el precio base.</li>
+          </ul>
+        </div>
+        <figure><div class="phone"><img src="img/05-servicio.png" alt="Formulario de servicio con precio distinto en un lugar" loading="lazy"></div></figure>
+      </li>
+
+      <li class="item">
+        <div class="text">
+          <span class="num"></span>
+          <h3>Escribí tus mensajes de WhatsApp</h3>
+          <p>Abajo de todo en <span class="tab">Servicios</span>, abrí <b>Mensajes de WhatsApp</b>. Son los textos que se arman solos cuando tocás "Recordar" o "Enviar confirmación por WhatsApp" en un turno.</p>
+          <p>Podés usar <b>{nombre}</b>, <b>{servicio}</b>, <b>{hora}</b> y <b>{direccion}</b>, que se reemplazan por los datos del turno. En el recordatorio también <b>{cuando}</b> (hoy / mañana) y en la confirmación <b>{fecha}</b>.</p>
+          <p class="tip">Si los dejás vacíos se usa un mensaje estándar. Cada palabra entre llaves se reemplaza una sola vez: no la repitas.</p>
+        </div>
+        <figure><div class="phone"><img src="img/17-mensajes.png" alt="Plantillas de mensajes de recordatorio y confirmación" loading="lazy"></div></figure>
+      </li>
+
+      <li class="item">
+        <div class="text">
+          <span class="num"></span>
+          <h3>Abrí tus horarios disponibles</h3>
+          <p>En <span class="tab">Agenda</span>, en cada día tocá el ícono del calendario. Elegí el <b>lugar</b>, la <b>duración</b> y tocá los horarios en que podés atender. Verde es cupo abierto; tocalo de nuevo para quitarlo.</p>
+          <p>Solo esos horarios les aparecen a tus clientes.</p>
+          <p class="tip">Para no cargar día por día: <b>Cargar horario semanal recurrente</b> repite tus horarios durante 1 a 8 semanas, y <b>Copiar cupos de esta semana a la siguiente</b> copia lo que ya cargaste.</p>
+        </div>
+        <figure><div class="phone"><img src="img/06-cupos.png" alt="Selector de cupos con lugar, duración y grilla de horarios" loading="lazy"></div></figure>
+      </li>
+
+      <li class="item">
+        <div class="text">
+          <span class="num"></span>
+          <h3>Compartí tu link de reservas</h3>
+          <p>Arriba de todo en <span class="tab">Negocio</span> está tu link, con botones para copiarlo o compartirlo. Ponelo en tu Instagram, en tu estado de WhatsApp o mandáselo a cada cliente.</p>
+          <p>Si usás referidos, abajo está el <b>link de referidos</b>: pasáselo a tus clientes para que lo compartan.</p>
+          <p class="tip">Tocá "Activar notificaciones" arriba de la agenda para que te avise cuando entra una reserva o una compra.</p>
+        </div>
+        <figure><div class="phone"><img src="img/07-link.png" alt="Tarjetas con el link de reservas y el de referidos" loading="lazy"></div></figure>
+      </li>
+    </ol>
+  </section>
+
+  <!-- PARTE 2 -->
+  <section class="part" id="dia-a-dia">
+    <div class="part-head">
+      <span class="label">Parte 2</span>
+      <h2>Día a día</h2>
+      <p>Lo que vas a usar todas las semanas.</p>
+    </div>
+
+    <div class="item">
+      <div class="text">
+        <h3>Tu agenda de hoy</h3>
+        <p>Arriba de la <span class="tab">Agenda</span> ves los turnos de <b>hoy</b> y de <b>mañana</b>, cada uno con un botón <b>Recordar</b> que abre WhatsApp con el recordatorio ya escrito.</p>
+        <p>También ves lo <b>cobrado este mes</b> (turnos completados más gift cards y combos que confirmaste) y lo que queda <b>por cobrar</b> de turnos confirmados.</p>
+        <p class="tip">La campanita de arriba muestra los turnos pendientes de confirmar. Los numeritos en las pestañas avisan gift cards y combos por confirmar.</p>
+      </div>
+      <figure><div class="phone"><img src="img/10-hoy.png" alt="Agenda con turnos de hoy, botón Recordar y cobrado del mes" loading="lazy"></div></figure>
+    </div>
+
+    <div class="item">
+      <div class="text">
+        <h3>Confirmar y manejar un turno</h3>
+        <p>Tocá un turno para abrirlo. Arriba están los estados; tocar uno lo guarda al instante:</p>
+        <dl class="states">
+          <dt class="s-pend">Pendiente</dt><dd>Así llegan las reservas de tus clientes. Revisalas y confirmalas.</dd>
+          <dt class="s-conf">Confirmado</dt><dd>Turno firme. Los que cargás vos ya entran así.</dd>
+          <dt class="s-comp">Completado</dt><dd>Marcalo después de atender: suma a tus ingresos y descuenta el crédito por recomendar si el cliente tiene.</dd>
+          <dt class="s-canc">Cancelado</dt><dd>Libera el horario para que otro lo reserve. Si estaba pago con gift card o combo, se le devuelve.</dd>
+          <dt class="s-nov">No vino</dt><dd>Queda contado como inasistencia en la ficha del cliente.</dd>
+        </dl>
+        <p>Desde ahí también podés cambiar fecha, hora, lugar o servicio, aplicar un descuento o recargo, y tocar <b>Enviar confirmación por WhatsApp</b>.</p>
+        <p class="tip">Para cargar un turno vos (por ejemplo, alguien que te escribió): <b>Agregar turno</b> al pie de cada día, o el <b>+</b> de un cupo libre. Podés marcarlo para que se repita todas las semanas.</p>
+      </div>
+      <figure><div class="phone"><img src="img/11-turno.png" alt="Turno abierto con los botones de estado" loading="lazy"></div></figure>
+    </div>
+
+    <div class="item">
+      <div class="text">
+        <h3>Tus clientes</h3>
+        <p>En <span class="tab">Clientes</span> buscás por nombre o teléfono. Cada cliente se crea solo cuando reserva. En su ficha tenés:</p>
+        <ul>
+          <li>Botones para editar, escribirle por WhatsApp y guardarlo en tus contactos.</li>
+          <li>Sesiones, total gastado e inasistencias.</li>
+          <li><b>Anamnesis</b> y <b>notas</b>, y un <b>seguimiento de sesiones</b> para registrar lo que hiciste en cada una.</li>
+          <li><b>Descuento VIP</b> por servicio, que se le aplica solo cuando reserva online.</li>
+          <li><b>Vender combo</b>, si te lo paga en persona: queda activo al instante.</li>
+          <li>El <b>crédito por recomendar</b> que tenga acumulado.</li>
+        </ul>
+        <p class="tip">"Eliminar cliente" lo borra sin pedir confirmación.</p>
+      </div>
+      <figure><div class="phone"><img src="img/15-clienta.png" alt="Ficha de un cliente con crédito, sesiones y notas" loading="lazy"></div></figure>
+    </div>
+
+    <div class="item">
+      <div class="text">
+        <h3>Gift cards</h3>
+        <p>Cuando alguien compra una gift card en tu página, le aparecen tus datos para transferir y la gift card queda <b>pendiente de pago</b>.</p>
+        <p>Cuando ves la transferencia, en <span class="tab">Gift Cards</span> tocá <b>Confirmar pago</b>. Recién ahí la gift card queda activa y quien la recibe puede reservar con el link: el servicio ya figura pago.</p>
+        <p class="tip">Vence a los 30 días de la fecha de entrega. Con <b>Validar por código</b> buscás una gift card que te muestren.</p>
+      </div>
+      <figure><div class="phone"><img src="img/14-giftcards.png" alt="Pestaña Gift Cards con una pendiente de pago y el botón Confirmar pago" loading="lazy"></div></figure>
+    </div>
+
+    <div class="item noimg">
+      <div class="text">
+        <h3>Combos</h3>
+        <p>Un combo son 2 o 3 sesiones pagas por adelantado al precio que pusiste en el servicio. Tu cliente lo pide desde tu página (para él o para regalar) y queda <b>pendiente de pago</b>. Puede transferirte o pagarte en efectivo en la primera sesión.</p>
+        <p>En <span class="tab">Combos</span> tocá <b>Confirmar pago</b> cuando te pague. Desde ese momento tiene <b>60 días</b> para usar las sesiones. Cuando reserva con su teléfono, le aparece "Usar una sesión de este combo" y el turno le sale gratis.</p>
+        <p class="tip">El numerito en la pestaña Combos te avisa los pendientes y los que vencen en menos de una semana.</p>
+      </div>
+    </div>
+
+    <div class="item noimg">
+      <div class="text">
+        <h3>Referidos</h3>
+        <p>Si un cliente nuevo entra por tu link de referidos, ve el descuento en su primer turno y escribe quién lo recomendó.</p>
+        <p>Cuando completás ese turno, aparece <b>Recomendado por</b>: elegí al cliente que lo recomendó y tocá <b>Acreditar</b>. Ese crédito se le descuenta solo la próxima vez que marques uno de sus turnos como completado.</p>
+        <p class="tip">El descuento es solo para clientes nuevos. El monto lo cambiás en Negocio.</p>
+      </div>
+    </div>
+
+    <div class="item noimg">
+      <div class="text">
+        <h3>Ingresos y respaldo</h3>
+        <p>En <span class="tab">Negocio</span> → <b>Ingresos</b> ves lo cobrado por turnos completados hoy, en la semana, en el mes o en el rango de fechas que elijas.</p>
+        <p>En <b>Exportar datos</b> descargás tus turnos y tus clientes en una planilla (se abre en Excel o Google Sheets). Sirve de respaldo y para impuestos.</p>
+        <p class="tip"><b>Exportar disponibilidad</b>, arriba de la agenda, arma una imagen con tus horarios libres de la semana para subir a historias.</p>
+      </div>
+    </div>
+
+    <div class="item noimg">
+      <div class="text">
+        <h3>Tu suscripción</h3>
+        <p>El primer mes es gratis. Unos días antes de que termine, la agenda te muestra un aviso arriba. En <span class="tab">Negocio</span> → <b>Suscripción</b> tenés el link para pagar los $19.900 del mes y un botón para avisar que pagaste.</p>
+        <p class="tip">Si no pagás, tenés 7 días de margen. Después se pausan las reservas nuevas, pero tus turnos y clientes no se borran: al pagar, todo sigue como estaba.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PARTE 3 -->
+  <section class="part" id="clientes">
+    <div class="part-head">
+      <span class="label">Parte 3</span>
+      <h2>Lo que ven tus clientes</h2>
+      <p>Así funciona tu link de reservas del otro lado. Hacé una reserva de prueba vos para verlo.</p>
+    </div>
+
+    <div class="item">
+      <div class="text">
+        <h3>Reservar un turno</h3>
+        <p>Eligen el lugar, ponen su nombre y WhatsApp, eligen el servicio, el día y el horario, y tocan <b>Confirmar turno</b>.</p>
+        <p>Les queda <b>pendiente de confirmación</b> y se les abre WhatsApp con un mensaje para vos. El turno te aparece en la agenda como Pendiente.</p>
+        <p class="tip">Un horario deja de mostrarse cuando falta menos de 1 hora. Si querés ofrecerlo igual, tocá el rayito del cupo en tu agenda.</p>
+      </div>
+      <figure><div class="phone"><img src="img/18-reservar.png" alt="Página de reservas con lugar, datos, servicio y horarios" loading="lazy"></div></figure>
+    </div>
+
+    <div class="item">
+      <div class="text">
+        <h3>Gift cards y combos</h3>
+        <p>Desde <b>Regalar</b> y <b>Combos</b> compran una gift card o un combo. Al terminar ven tus datos para transferir y que el pago queda esperando tu confirmación.</p>
+      </div>
+      <figure><div class="phone"><img src="img/13-giftcard-compra.png" alt="Compra de gift card con los datos para transferir" loading="lazy"></div></figure>
+    </div>
+
+    <div class="item noimg">
+      <div class="text">
+        <h3>Mis turnos</h3>
+        <p>En <b>Mis turnos</b> buscan con su teléfono y pueden <b>cancelar</b> o <b>cambiar el horario</b> solos, siempre que falten más de 24 horas. Con menos tiempo, les aparece un botón para escribirte por WhatsApp.</p>
+        <p>Si cancelan, el horario vuelve a quedar libre y, si habían pagado con gift card o combo, se les devuelve.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PREGUNTAS -->
+  <section class="part" id="preguntas">
+    <div class="part-head">
+      <span class="label">Preguntas frecuentes</span>
+      <h2>Para tener a mano</h2>
+    </div>
+    <div class="faq">
+      <div><b>Un cliente no ve un horario</b><p>Revisá que el cupo esté abierto en ese lugar, que dure al menos lo que dura el servicio y que falte más de 1 hora.</p></div>
+      <div><b>No me llegó el aviso de una reserva</b><p>Los avisos llegan con la agenda abierta y las notificaciones activadas. Igual, todo turno nuevo queda en la campanita de pendientes.</p></div>
+      <div><b>Quiero dejar de ofrecer un servicio</b><p>Borralo en Servicios, o destildá los lugares donde ya no lo hacés.</p></div>
+      <div><b>No quiero usar referidos</b><p>Poné 0 en "Descuento por referidos" en Negocio: desaparece el link y nadie recibe el descuento.</p></div>
+    </div>
+    <div class="note">
+      <h3>¿Algo no anda?</h3>
+      <p>Escribinos a <a href="mailto:angelmeier10@gmail.com">angelmeier10@gmail.com</a> con una captura de pantalla de lo que ves.</p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <span>Cupo · Agenda de turnos online</span>
+    <span><a href="./">Inicio</a> · <a href="../mano-a-mano-agenda/terminos.html">Términos y privacidad</a></span>
+  </footer>
+</div>
+</body>
+</html>
