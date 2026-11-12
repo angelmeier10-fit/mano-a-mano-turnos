@@ -17,3 +17,7 @@
 ## Ante dudas de diseño, frenar y proponer el modelo antes de codear (2026-11-12)
 - **Error:** empecé a programar "cupos por servicio" apenas el usuario dijo "sí", y el usuario me frenó ("esperá, pensemoslo bien"): el problema de fondo era el modelo de cupos fijos, no la falta de un filtro.
 - **Regla:** cuando un pedido es un parche sobre un problema que vuelve a aparecer (cupos que no entran, huecos, ahora por servicio), primero proponer el modelo alternativo con pros y contras y esperar la decisión.
+
+## Buscar la función, no solo el texto literal (2026-11-12)
+- **Error:** dije que la agenda no mostraba el link de reservas porque busqué la URL literal (`?b=`); el link está en Negocio, armado por `reservasUrl()`.
+- **Regla:** antes de afirmar que algo falta, buscar también por la función o el texto visible ("Link de reservas"), no solo por cómo se escribe en una parte del código.

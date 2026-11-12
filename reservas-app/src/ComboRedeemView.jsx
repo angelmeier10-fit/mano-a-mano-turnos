@@ -90,7 +90,8 @@ export default function ComboRedeemView({ comboId, services, availability, locat
   }
 
   const today = dateKey(new Date());
-  const isExpired = combo.status === "active" && today > combo.expiresAt;
+  const expiresKey = dateKey(new Date(combo.expiresAt));
+  const isExpired = combo.status === "active" && today > expiresKey;
   const isCompleted = combo.status === "completed";
   const isPending = combo.status === "pending";
   const isActive = combo.status === "active" && !isExpired;
@@ -104,6 +105,7 @@ export default function ComboRedeemView({ comboId, services, availability, locat
         businessInfo={businessInfo}
         onBookSlot={onBookSlot}
         onUpsertClient={onUpsertClient}
+        combo={{ ...combo, id: comboId }}
         preselectedServiceId={combo.serviceId}
         onBack={() => setShowBooking(false)}
       />
@@ -140,7 +142,7 @@ export default function ComboRedeemView({ comboId, services, availability, locat
       {isExpired && (
         <div style={{ background: "#FDF0EE", border: "1.5px solid #A6483A", borderRadius: 12, padding: "16px", marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#A6483A" }}>Combo vencido</div>
-          <div style={{ fontSize: 12.5, color: "#8A4A40", marginTop: 4 }}>Este combo venció el {formatDateLong(combo.expiresAt)}.</div>
+          <div style={{ fontSize: 12.5, color: "#8A4A40", marginTop: 4 }}>Este combo venció el {formatDateLong(expiresKey)}.</div>
         </div>
       )}
 
@@ -154,7 +156,7 @@ export default function ComboRedeemView({ comboId, services, availability, locat
       {isActive && (
         <div style={{ marginTop: 4 }}>
           <div style={{ background: "#EBF3E6", border: "1.5px solid #9AB88A", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 12.5, color: "#4A5A40" }}>
-            <strong>Combo activo</strong> · {combo.sessionsRemaining}/{combo.totalSessions} sesiones disponibles · Válido hasta el {formatDateLong(combo.expiresAt)}
+            <strong>Combo activo</strong> · {combo.sessionsRemaining}/{combo.totalSessions} sesiones disponibles · Válido hasta el {formatDateLong(expiresKey)}
           </div>
           <button
             style={{ ...styles.saveBtn, width: "100%", justifyContent: "center" }}

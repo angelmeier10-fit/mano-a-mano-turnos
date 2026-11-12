@@ -43,7 +43,7 @@ function writeConfirmed(booking) {
   }
 }
 
-export default function ReservarView({ services: allServices, availability: allAvailability, locations = [], businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, preselectedServiceId, initialServiceId, onBack, onGoGiftCard, onGoCombo, referralMode = false }) {
+export default function ReservarView({ services: allServices, availability: allAvailability, locations = [], businessInfo, onBookSlot, onUpsertClient, onNavigateToMiTurno, giftCardCode, combo, preselectedServiceId, initialServiceId, onBack, onGoGiftCard, onGoCombo, referralMode = false }) {
   // Con 0 o 1 lugar no hay que elegir. Con varios, se filtran servicios y cupos por el lugar elegido.
   const multiLoc = locations.length > 1;
   const [locationId, setLocationId] = useState(multiLoc ? null : (locations[0]?.id || null));
@@ -81,6 +81,8 @@ export default function ReservarView({ services: allServices, availability: allA
   const [clientDiscount, setClientDiscount] = useState(null);
   const [myCombos, setMyCombos] = useState([]);
   const [useCombo, setUseCombo] = useState(true);
+  // Sesiones del combo recibido que ya se usaron en esta pantalla (el dato que llega no se actualiza solo).
+  const [comboUses, setComboUses] = useState(0);
   const [confirmed, setConfirmed] = useState(() => (preselectedServiceId ? null : readConfirmed()));
   const [booking, setBooking] = useState(false);
   const [dateViewMode, setDateViewMode] = useState("list");
@@ -139,7 +141,10 @@ export default function ReservarView({ services: allServices, availability: allA
   const svc = services.find(s => s.id === serviceId);
   const svcPrice = svc ? servicePrice(svc, locationId) : 0;
   const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount, referralDiscount: svcReferralDiscount } = priceWithDiscounts(svcPrice, serviceId);
-  const matchingCombo = myCombos.find(c => c.status === "active" && c.sessionsRemaining > 0 && c.serviceId === serviceId);
+  // Desde la pantalla de un combo se usa ese combo, sin depender de que se busque por teléfono.
+  const comboNow = combo && { ...combo, sessionsRemaining: combo.sessionsRemaining - comboUses };
+  const matchingCombo = [...(comboNow ? [comboNow] : []), ...myCombos]
+    .find(c => c.status === "active" && c.sessionsRemaining > 0 && c.serviceId === serviceId);
 
   const slotsForSelectedDate = useMemo(
     () => (selectedDate ? openTimes(selectedDate, svc) : []),
@@ -207,6 +212,7 @@ export default function ReservarView({ services: allServices, availability: allA
       setBooking(false);
       return;
     }
+    if (combo && appt.comboId === combo.id) setComboUses(n => n + 1);
     const confirmedAppt = { ...appt, apptId: result.apptId, cancelToken: result.cancelToken };
     saveBookingToLocalStorage(result.apptId, result.cancelToken, appt, svc?.name || "");
     if (typeof window.fbq === "function") window.fbq("track", "Schedule");
@@ -285,6 +291,11 @@ export default function ReservarView({ services: allServices, availability: allA
       {giftCardCode && (
         <div style={{ background: "#EBF3E6", border: "1.5px solid #9AB88A", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#4A5A40", fontWeight: 600 }}>
           🎁 Reserva con gift card — este turno ya está pago
+        </div>
+      )}
+      {combo && matchingCombo?.id === combo.id && (
+        <div style={{ background: "#EBF3E6", border: "1.5px solid #9AB88A", borderRadius: 12, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#4A5A40", fontWeight: 600 }}>
+          📦 Reserva con tu combo — quedan {comboNow.sessionsRemaining} de {combo.totalSessions} sesiones
         </div>
       )}
       {!giftCardCode && onGoGiftCard && (
