@@ -673,6 +673,25 @@ function ServiceOnlyPicker({ services, value, onChange }) {
   );
 }
 
+// Dos formas de abrir horarios: de corrido ("de 9 a 13") o turnos sueltos (tocando cada hora).
+function OpenModePicker({ value, onChange }) {
+  const options = [{ value: "range", label: "De corrido" }, { value: "single", label: "Turnos sueltos" }];
+  return (
+    <div style={{ ...styles.weekdayPicker, margin: "10px 0 0" }}>
+      {options.map(o => (
+        <button
+          type="button"
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          style={{ ...styles.weekdayChip, flex: 1, width: "auto", ...(value === o.value ? styles.weekdayChipActive : {}) }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function TimeRangeInputs({ start, end, onChange }) {
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -684,33 +703,85 @@ function TimeRangeInputs({ start, end, onChange }) {
   );
 }
 
+// Horarios cada 30 min entre las 8 y las 22, que alcancen a terminar antes de las 22.
+function halfHourTimes(slotLength) {
+  const times = [];
+  for (let t = 8 * 60; t + slotLength <= 22 * 60; t += 30) times.push(minutesToTime(t));
+  return times;
+}
+
+function DurationPicker({ value, onChange }) {
+  return (
+    <div style={{ ...styles.weekdayPicker, alignItems: "center" }}>
+      {[30, 45, 60, 90, 120].map(len => (
+        <button
+          type="button"
+          key={len}
+          onClick={() => onChange(len)}
+          style={{ ...styles.weekdayChip, width: 52, ...(value === len ? styles.weekdayChipActive : {}) }}
+        >
+          {len}
+        </button>
+      ))}
+      <input
+        type="number" min={10} step={5}
+        style={{ ...styles.input, width: 70, margin: 0, height: 38 }}
+        value={value}
+        onChange={e => { const n = Number(e.target.value); if (n >= 10) onChange(n); }}
+      />
+      <span style={{ fontSize: 12.5, color: "#8A8275" }}>min</span>
+    </div>
+  );
+}
+
+function CustomTimeInput({ onAdd }) {
+  const [time, setTime] = useState("");
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
+      <span style={{ fontSize: 12.5, color: "#8A8275" }}>Otro horario:</span>
+      <input type="time" style={{ ...styles.input, flex: 1, margin: 0, height: 38 }} value={time} onChange={e => setTime(e.target.value)} />
+      <button
+        type="button"
+        disabled={!time}
+        onClick={() => { onAdd(time); setTime(""); }}
+        style={{ ...styles.weekdayChip, width: 42, opacity: time ? 1 : 0.5 }}
+      >
+        <Plus size={14} />
+      </button>
+    </div>
+  );
+}
+
 const validRange = (r) => r.start && r.end && timeToMinutes(r.end) > timeToMinutes(r.start);
 const serviceNames = (ids, services) => ids.map(id => services.find(s => s.id === id)?.name).filter(Boolean).join(", ");
+const franjaTaken = (f) => f.booked || f.busy?.length > 0;
 
 function AvailabilityFormModal({ dateKey: dKey, existing, services = [], locations = [], onClose, onAdd, onRemove, onCloseDay }) {
   const [errorMsg, setErrorMsg] = useState(null);
   const [locationId, setLocationId] = useState(
     (existing[0] && slotLocationId(existing[0], locations)) || locations[0]?.id || null
   );
+  const [mode, setMode] = useState("range");
   const [range, setRange] = useState({ start: "09:00", end: "13:00" });
+  const [slotLength, setSlotLength] = useState(60);
   const [serviceIds, setServiceIds] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [pending, setPending] = useState(new Set());
 
   const sorted = existing.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
-  const isTaken = (f) => f.booked || f.busy?.length > 0;
-  const removableIds = sorted.filter(f => !isTaken(f)).map(f => f.id);
-  const hasReservedSlots = sorted.some(isTaken);
+  const removableIds = sorted.filter(f => !franjaTaken(f)).map(f => f.id);
+  const hasReservedSlots = sorted.some(franjaTaken);
+  const extraFields = () => ({
+    ...(serviceIds.length ? { serviceIds } : {}),
+    ...(locations.length > 1 && locationId ? { locationId } : {}),
+  });
 
   async function addFranja() {
     if (!validRange(range)) { setErrorMsg("La hora de fin tiene que ser después de la de inicio."); return; }
     setErrorMsg(null);
     setSaving(true);
     try {
-      await onAdd({
-        start: range.start, end: range.end,
-        ...(serviceIds.length ? { serviceIds } : {}),
-        ...(locations.length > 1 && locationId ? { locationId } : {}),
-      });
+      await onAdd({ start: range.start, end: range.end, ...extraFields() });
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -722,6 +793,42 @@ function AvailabilityFormModal({ dateKey: dKey, existing, services = [], locatio
     setErrorMsg(null);
     try { await onRemove(id); } catch (err) { setErrorMsg(err.message); }
   }
+
+  // Turnos sueltos: cada hora tocada abre un horario de la duración elegida.
+  const overlaps = (s, e, other) => s < timeToMinutes(other.end) && timeToMinutes(other.start) < e;
+  const chipTimes = [...new Set([...halfHourTimes(slotLength), ...existing.map(f => f.start)])]
+    .sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+  function chipFor(time) {
+    const slot = existing.find(f => f.start === time);
+    if (slot) return { time, slot, state: franjaTaken(slot) ? "booked" : "open" };
+    const s = timeToMinutes(time);
+    return { time, state: existing.some(f => overlaps(s, s + slotLength, f)) ? "blocked" : "free" };
+  }
+  const chips = chipTimes.map(chipFor);
+  async function toggleChip(chip) {
+    if (pending.has(chip.time)) return;
+    setErrorMsg(null);
+    setPending(prev => new Set(prev).add(chip.time));
+    try {
+      if (chip.state === "open") await onRemove(chip.slot.id);
+      else if (chip.state === "free") await onAdd({ start: chip.time, end: minutesToTime(timeToMinutes(chip.time) + slotLength), ...extraFields() });
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setPending(prev => { const next = new Set(prev); next.delete(chip.time); return next; });
+    }
+  }
+  function addCustomTime(time) {
+    const chip = chipFor(time);
+    if (chip.state === "free") toggleChip(chip);
+    else setErrorMsg(`Las ${time} se superponen con otro horario abierto.`);
+  }
+  const chipStyle = {
+    open:    { background: "#6E7F5C", borderColor: "#6E7F5C", color: "#fff" },
+    booked:  { background: "#F5EBD6", borderColor: "#B08A3E", color: "#B08A3E", cursor: "default" },
+    blocked: { background: "#F0EDE8", borderColor: "#E2DCD0", color: "#B8AFA0", cursor: "default" },
+    free:    {},
+  };
 
   function handleCloseDay() {
     if (removableIds.length === 0) return;
@@ -741,40 +848,71 @@ function AvailabilityFormModal({ dateKey: dKey, existing, services = [], locatio
           <h3 style={styles.modalTitle}>Horarios · {formatDateLong(dKey)}</h3>
           <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
-        <p style={styles.helperText}>Abrí el horario en que atendés. Los turnos se arman solos según lo que dura cada servicio y su descanso.</p>
-
-        {sorted.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "10px 0 4px" }}>
-            {sorted.map(f => (
-              <div key={f.id} style={{ ...styles.openSlotCard, alignItems: "flex-start" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 13 }}>
-                  <strong>{f.start}–{f.end}</strong>
-                  {locations.length > 1 && <span style={{ fontSize: 11.5, color: "#8A8275" }}>{locations.find(l => l.id === slotLocationId(f, locations))?.name}</span>}
-                  {f.serviceIds?.length > 0 && <span style={{ fontSize: 11.5, color: "#8A8275" }}>Solo {serviceNames(f.serviceIds, services)}</span>}
-                  {f.booked && <span style={{ fontSize: 11.5, color: "#B08A3E", fontWeight: 600 }}>Reservado</span>}
-                  {f.busy?.length > 0 && (
-                    <span style={{ fontSize: 11.5, color: "#B08A3E", fontWeight: 600 }}>
-                      {f.busy.length} turno{f.busy.length !== 1 ? "s" : ""}: {f.busy.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)).map(b => b.start).join(", ")}
-                    </span>
-                  )}
-                </div>
-                {!isTaken(f) && (
-                  <button type="button" style={styles.slotMiniBtnGhost} onClick={() => removeFranja(f.id)} title="Quitar horario">
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <label style={{ ...styles.fieldLabel, marginTop: 12 }}>Abrir horario</label>
-        <TimeRangeInputs start={range.start} end={range.end} onChange={(start, end) => setRange({ start, end })} />
-        <LocationPicker locations={locations} value={locationId} onChange={setLocationId} />
+        <p style={styles.helperText}>
+          En cada horario abierto entran los turnos que quepan según lo que dura cada servicio y su descanso.
+        </p>
+        <OpenModePicker value={mode} onChange={(m) => { setMode(m); setErrorMsg(null); }} />
+        <LocationPicker locations={locations} value={locationId} onChange={setLocationId} label="Lugar de los horarios nuevos" />
         <ServiceOnlyPicker services={services} value={serviceIds} onChange={setServiceIds} />
-        <button type="button" style={{ ...styles.recurringBtn, margin: "12px 0 0" }} onClick={addFranja} disabled={saving}>
-          <Plus size={15} /> {saving ? "Agregando…" : "Agregar horario"}
-        </button>
+
+        {mode === "range" ? (
+          <>
+            {sorted.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "12px 0 4px" }}>
+                {sorted.map(f => (
+                  <div key={f.id} style={{ ...styles.openSlotCard, alignItems: "flex-start" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 13 }}>
+                      <strong>{f.start}–{f.end}</strong>
+                      {locations.length > 1 && <span style={{ fontSize: 11.5, color: "#8A8275" }}>{locations.find(l => l.id === slotLocationId(f, locations))?.name}</span>}
+                      {f.serviceIds?.length > 0 && <span style={{ fontSize: 11.5, color: "#8A8275" }}>Solo {serviceNames(f.serviceIds, services)}</span>}
+                      {f.booked && <span style={{ fontSize: 11.5, color: "#B08A3E", fontWeight: 600 }}>Reservado</span>}
+                      {f.busy?.length > 0 && (
+                        <span style={{ fontSize: 11.5, color: "#B08A3E", fontWeight: 600 }}>
+                          {f.busy.length} turno{f.busy.length !== 1 ? "s" : ""}: {f.busy.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)).map(b => b.start).join(", ")}
+                        </span>
+                      )}
+                    </div>
+                    {!franjaTaken(f) && (
+                      <button type="button" style={styles.slotMiniBtnGhost} onClick={() => removeFranja(f.id)} title="Quitar horario">
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <label style={{ ...styles.fieldLabel, marginTop: 12 }}>Abrir horario</label>
+            <TimeRangeInputs start={range.start} end={range.end} onChange={(start, end) => setRange({ start, end })} />
+            <button type="button" style={{ ...styles.recurringBtn, margin: "12px 0 0" }} onClick={addFranja} disabled={saving}>
+              <Plus size={15} /> {saving ? "Agregando…" : "Agregar horario"}
+            </button>
+          </>
+        ) : (
+          <>
+            <label style={{ ...styles.fieldLabel, marginTop: 12 }}>Duración de cada horario</label>
+            <DurationPicker value={slotLength} onChange={setSlotLength} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, margin: "12px 0 0" }}>
+              {chips.map(chip => (
+                <button
+                  type="button"
+                  key={chip.time}
+                  disabled={chip.state === "booked" || chip.state === "blocked"}
+                  onClick={() => toggleChip(chip)}
+                  title={chip.state === "booked" ? "Tiene turnos" : chip.state === "blocked" ? "Se superpone con otro horario abierto" : chip.slot ? `${chip.slot.start}–${chip.slot.end}` : undefined}
+                  style={{ ...styles.weekdayChip, width: "100%", ...chipStyle[chip.state], opacity: pending.has(chip.time) ? 0.5 : 1 }}
+                >
+                  {chip.time}
+                </button>
+              ))}
+            </div>
+            <CustomTimeInput onAdd={addCustomTime} />
+            <p style={{ fontSize: 11.5, color: "#8A8275", margin: "10px 0 0" }}>
+              Tocá una hora para abrirla y tocala de nuevo para quitarla.{" "}
+              <span style={{ color: "#6E7F5C", fontWeight: 700 }}>Verde</span>: abierto ·{" "}
+              <span style={{ color: "#B08A3E", fontWeight: 700 }}>dorado</span>: con turnos
+            </p>
+          </>
+        )}
 
         {errorMsg && (
           <p style={{ fontSize: 12, color: "#A6483A", margin: "10px 0 0", fontWeight: 600 }}>{errorMsg}</p>
@@ -801,7 +939,10 @@ function RecurringAvailabilityModal({ services = [], locations = [], onClose, on
   const todayStr = dateKey(new Date());
   const [locationId, setLocationId] = useState(locations[0]?.id || null);
   const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
+  const [mode, setMode] = useState("range");
   const [ranges, setRanges] = useState([{ start: "09:00", end: "13:00" }]);
+  const [slotLength, setSlotLength] = useState(60);
+  const [selectedTimes, setSelectedTimes] = useState(["10:00", "11:00", "12:00", "13:00"]);
   const [serviceIds, setServiceIds] = useState([]);
   const [weeks, setWeeks] = useState(4);
   const [saving, setSaving] = useState(false);
@@ -818,20 +959,40 @@ function RecurringAvailabilityModal({ services = [], locations = [], onClose, on
   }
   const setRange = (i, start, end) => setRanges(prev => prev.map((r, j) => j === i ? { start, end } : r));
 
-  const sortedRanges = ranges.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
-  const overlapping = sortedRanges.some((r, i) => i > 0 && timeToMinutes(r.start) < timeToMinutes(sortedRanges[i - 1].end));
-  const rangesOk = ranges.length > 0 && ranges.every(validRange) && !overlapping;
+  // Turnos sueltos: horas elegidas con la duración de cada horario.
+  const byTime = (a, b) => timeToMinutes(a) - timeToMinutes(b);
+  const timeOptions = [...new Set([...halfHourTimes(slotLength), ...selectedTimes])].sort(byTime);
+  const clashes = (a, b, len) => Math.abs(timeToMinutes(a) - timeToMinutes(b)) < len;
+  const isBlocked = (time) => !selectedTimes.includes(time) && selectedTimes.some(t => clashes(t, time, slotLength));
+  // Al alargar la duración, se descartan las horas elegidas que pasarían a superponerse.
+  function changeSlotLength(len) {
+    setSlotLength(len);
+    setSelectedTimes(prev => prev.slice().sort(byTime).reduce((kept, t) => {
+      if (kept.length === 0 || !clashes(kept[kept.length - 1], t, len)) kept.push(t);
+      return kept;
+    }, []));
+  }
+  function toggleTime(time) {
+    if (selectedTimes.includes(time)) setSelectedTimes(prev => prev.filter(t => t !== time));
+    else if (!isBlocked(time)) setSelectedTimes(prev => [...prev, time]);
+  }
+
+  const dayRanges = mode === "range"
+    ? ranges.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start))
+    : selectedTimes.slice().sort(byTime).map(t => ({ start: t, end: minutesToTime(timeToMinutes(t) + slotLength) }));
+  const overlapping = mode === "range" && dayRanges.some((r, i) => i > 0 && timeToMinutes(r.start) < timeToMinutes(dayRanges[i - 1].end));
+  const rangesOk = dayRanges.length > 0 && dayRanges.every(validRange) && !overlapping;
   const dateKeys = selectedDays.length > 0 && fromDate
     ? getRecurringDateKeysByRange(selectedDays, fromDate, toDate)
     : [];
-  const totalSlots = rangesOk ? dateKeys.length * ranges.length : 0;
+  const totalSlots = rangesOk ? dateKeys.length * dayRanges.length : 0;
 
   async function handleConfirm() {
     if (totalSlots === 0 || saving) return;
     setSaving(true);
     const allSlots = [];
     dateKeys.forEach(dKey => {
-      sortedRanges.forEach(r => allSlots.push({
+      dayRanges.forEach(r => allSlots.push({
         dateKey: dKey, start: r.start, end: r.end,
         ...(serviceIds.length ? { serviceIds } : {}),
         ...(locations.length > 1 && locationId ? { locationId } : {}),
@@ -859,7 +1020,7 @@ function RecurringAvailabilityModal({ services = [], locations = [], onClose, on
           <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <p style={styles.helperText}>
-          Elegí los días y el horario en que atendés. Los turnos se arman solos según lo que dura cada servicio y su descanso.
+          Elegí los días y los horarios en que atendés. En cada horario entran los turnos que quepan según lo que dura cada servicio y su descanso.
         </p>
         <LocationPicker locations={locations} value={locationId} onChange={setLocationId} />
 
@@ -878,24 +1039,52 @@ function RecurringAvailabilityModal({ services = [], locations = [], onClose, on
         </div>
 
         <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Horario</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {ranges.map((r, i) => (
-            <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <div style={{ flex: 1 }}>
-                <TimeRangeInputs start={r.start} end={r.end} onChange={(start, end) => setRange(i, start, end)} />
-              </div>
-              {ranges.length > 1 && (
-                <button type="button" style={styles.slotMiniBtnGhost} onClick={() => setRanges(prev => prev.filter((_, j) => j !== i))} title="Quitar">
-                  <X size={12} />
-                </button>
-              )}
+        <OpenModePicker value={mode} onChange={setMode} />
+        {mode === "range" ? (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+              {ranges.map((r, i) => (
+                <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div style={{ flex: 1 }}>
+                    <TimeRangeInputs start={r.start} end={r.end} onChange={(start, end) => setRange(i, start, end)} />
+                  </div>
+                  {ranges.length > 1 && (
+                    <button type="button" style={styles.slotMiniBtnGhost} onClick={() => setRanges(prev => prev.filter((_, j) => j !== i))} title="Quitar">
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <button type="button" style={{ ...styles.addMoreBtn, marginTop: 6 }} onClick={() => setRanges(prev => [...prev, { start: "15:00", end: "19:00" }])}>
-          <Plus size={12} /> Agregar otro horario (ej. a la tarde)
-        </button>
-        {overlapping && <p style={{ fontSize: 12, color: "#A6483A", margin: "6px 0 0", fontWeight: 600 }}>Los horarios se superponen.</p>}
+            <button type="button" style={{ ...styles.addMoreBtn, marginTop: 6 }} onClick={() => setRanges(prev => [...prev, { start: "15:00", end: "19:00" }])}>
+              <Plus size={12} /> Agregar otro horario (ej. a la tarde)
+            </button>
+            {overlapping && <p style={{ fontSize: 12, color: "#A6483A", margin: "6px 0 0", fontWeight: 600 }}>Los horarios se superponen.</p>}
+          </>
+        ) : (
+          <>
+            <label style={{ ...styles.fieldLabel, marginTop: 10 }}>Duración de cada horario</label>
+            <DurationPicker value={slotLength} onChange={changeSlotLength} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginTop: 10 }}>
+              {timeOptions.map(time => (
+                <button
+                  type="button"
+                  key={time}
+                  disabled={isBlocked(time)}
+                  onClick={() => toggleTime(time)}
+                  style={{
+                    ...styles.weekdayChip, width: "100%",
+                    ...(selectedTimes.includes(time) ? styles.weekdayChipActive : {}),
+                    ...(isBlocked(time) ? { color: "#C9BFA8", borderColor: "#E8E2D8", cursor: "default" } : {}),
+                  }}
+                >
+                  {time}
+                </button>
+              ))}
+            </div>
+            <CustomTimeInput onAdd={toggleTime} />
+          </>
+        )}
 
         <ServiceOnlyPicker services={services} value={serviceIds} onChange={setServiceIds} />
 
@@ -917,9 +1106,11 @@ function RecurringAvailabilityModal({ services = [], locations = [], onClose, on
         </div>
 
         <p style={styles.recurringPreview}>
-          {totalSlots > 0
-            ? `Se van a abrir ${dateKeys.length} días (del ${formatDateShort(fromDate)} al ${formatDateShort(toDate)}), ${sortedRanges.map(r => `${r.start} a ${r.end}`).join(" y ")}.`
-            : "Elegí al menos un día, un horario válido y la fecha de inicio para ver la vista previa."}
+          {totalSlots === 0
+            ? "Elegí al menos un día, un horario válido y la fecha de inicio para ver la vista previa."
+            : mode === "range"
+              ? `Se van a abrir ${dateKeys.length} días (del ${formatDateShort(fromDate)} al ${formatDateShort(toDate)}), ${dayRanges.map(r => `${r.start} a ${r.end}`).join(" y ")}.`
+              : `Se van a abrir ${totalSlots} horarios de ${slotLength} min (${dayRanges.length} por día, ${dateKeys.length} días, del ${formatDateShort(fromDate)} al ${formatDateShort(toDate)}).`}
         </p>
 
         <div style={styles.modalActions}>
