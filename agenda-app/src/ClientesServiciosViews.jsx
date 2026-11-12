@@ -930,6 +930,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   }
   const [name, setName] = useState("");
   const [duration, setDuration] = useState(60);
+  const [restMinutes, setRestMinutes] = useState(0);
   const [price, setPrice] = useState(20000);
   const [price2, setPrice2] = useState(0);
   const [price3, setPrice3] = useState(0);
@@ -969,7 +970,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   const palette = ["#B5654A", "#6E7F5C", "#8B4226", "#4A5A6B", "#7A5C3E", "#5C4A6B"];
 
   function resetForm() {
-    setName(""); setDuration(60); setPrice(20000); setPrice2(0); setPrice3(0); setColor("#B5654A");
+    setName(""); setDuration(60); setRestMinutes(0); setPrice(20000); setPrice2(0); setPrice3(0); setColor("#B5654A");
     setLocationIds([]); setPriceByLocation({});
     setPaymentLink(""); setPaymentLink2(""); setPaymentLink3("");
   }
@@ -977,14 +978,14 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   function addService(e) {
     e.preventDefault();
     if (!name.trim() || !paymentLinksValid()) return;
-    onAddService({ name: name.trim(), duration: Number(duration), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData(), ...paymentData() });
+    onAddService({ name: name.trim(), duration: Number(duration), restMinutes: Math.max(0, Number(restMinutes) || 0), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData(), ...paymentData() });
     resetForm();
     setShowForm(false);
   }
 
   function startEdit(s) {
     setEditingService(s);
-    setName(s.name); setDuration(s.duration); setPrice(s.price || 0); setPrice2(s.price2 || 0); setPrice3(s.price3 || 0); setColor(s.color);
+    setName(s.name); setDuration(s.duration); setRestMinutes(s.restMinutes || 0); setPrice(s.price || 0); setPrice2(s.price2 || 0); setPrice3(s.price3 || 0); setColor(s.color);
     setLocationIds(s.locationIds || []); setPriceByLocation(s.priceByLocation || {});
     setPaymentLink(s.paymentLink || ""); setPaymentLink2(s.paymentLink2 || ""); setPaymentLink3(s.paymentLink3 || "");
     setShowForm(false);
@@ -993,7 +994,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   function saveEdit(e) {
     e.preventDefault();
     if (!name.trim() || !paymentLinksValid()) return;
-    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData(), ...paymentData() });
+    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), restMinutes: Math.max(0, Number(restMinutes) || 0), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData(), ...paymentData() });
     setEditingService(null);
     resetForm();
   }
@@ -1008,7 +1009,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <div style={styles.serviceRowName}>{s.name}</div>
-                <div style={styles.serviceRowMeta}>{s.duration} minutos{s.price ? ` · ${formatPrice(s.price)}` : ""}</div>
+                <div style={styles.serviceRowMeta}>{s.duration} minutos{s.restMinutes ? ` + ${s.restMinutes} de descanso` : ""}{s.price ? ` · ${formatPrice(s.price)}` : ""}</div>
                 {locations.length > 1 && (
                   <div style={{ ...styles.serviceRowMeta, fontSize: 11, color: "#8A7E70", marginTop: 2 }}>
                     {locations.filter(l => !s.locationIds?.length || s.locationIds.includes(l.id))
@@ -1066,6 +1067,9 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
                     <input type="number" style={styles.input} value={price} onChange={e => setPrice(e.target.value)} min={0} step={500} />
                   </div>
                 </div>
+                <label style={styles.fieldLabel}>Descanso después (min)</label>
+                <input type="number" style={styles.input} value={restMinutes} onChange={e => setRestMinutes(e.target.value)} min={0} step={5} />
+                <p style={{ fontSize: 11.5, color: "#8A8275", margin: "4px 0 10px" }}>Tiempo libre que queda después de cada turno de este servicio, antes del siguiente. Con 0, los turnos van uno detrás del otro.</p>
                 <div style={styles.fieldRow}>
                   <div style={{ flex: 1 }}>
                     <label style={styles.fieldLabel}>Combo x2 ($)</label>
@@ -1112,6 +1116,9 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
               <input type="number" style={styles.input} value={price} onChange={e => setPrice(e.target.value)} min={0} step={500} />
             </div>
           </div>
+          <label style={styles.fieldLabel}>Descanso después (min)</label>
+          <input type="number" style={styles.input} value={restMinutes} onChange={e => setRestMinutes(e.target.value)} min={0} step={5} />
+          <p style={{ fontSize: 11.5, color: "#8A8275", margin: "4px 0 10px" }}>Tiempo libre que queda después de cada turno de este servicio, antes del siguiente. Con 0, los turnos van uno detrás del otro.</p>
           <div style={styles.fieldRow}>
             <div style={{ flex: 1 }}>
               <label style={styles.fieldLabel}>Combo x2 ($)</label>

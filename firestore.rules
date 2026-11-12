@@ -107,6 +107,10 @@ service cloud.firestore {
         allow update: if resource.data.get('booked', false)
                       && request.resource.data.booked == false
                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['booked']);
+        // App pública: ocupar o liberar un horario dentro de una franja, de a un turno por vez.
+        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['busy'])
+                      && request.resource.data.busy is list
+                      && request.resource.data.busy.size() - resource.data.get('busy', []).size() in [1, -1];
       }
 
       match /appointments/{apptId} {

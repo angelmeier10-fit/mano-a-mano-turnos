@@ -4,17 +4,17 @@ import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
   formatPhoneForWhatsapp, parseDateKeyAsLocal, getReferralAmount,
-  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, appointmentAddress, apptSlotIds,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, appointmentAddress, apptSlotIds, freeRanges,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
 import { ANAMNESIS_FIELDS, ClientQuickViewModal } from "./ClientesServiciosViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, addAppointmentHistory, redeemComboSession, restoreComboSession, restoreGiftCard, setAvailabilitySlotLastMinute, setReferralCredit, updateAppointment } from "../../shared/firestoreApi";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, releaseAppointmentFranjas, addAppointmentHistory, redeemComboSession, restoreComboSession, restoreGiftCard, setAvailabilitySlotLastMinute, setReferralCredit, updateAppointment } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo, locations = [], combos = [], giftCards = [],
   onCreateAppt, onUpdateAppt, onDeleteAppt,
-  onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch, onFreeSlot,
+  onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch,
   upsertClientByName, pendingGiftCards = 0, onGoGiftCards,
   openApptId, onOpenApptHandled,
 }) {
@@ -128,10 +128,10 @@ export function AgendaView({
     const weekKeys = new Set(days.map(dateKey));
     const source = availability.filter(s => weekKeys.has(s.dateKey));
     if (source.length === 0) {
-      window.alert("Esta semana no tiene cupos para copiar.");
+      window.alert("Esta semana no tiene horarios abiertos para copiar.");
       return;
     }
-    if (!window.confirm(`¿Copiar los ${source.length} cupos de esta semana a la semana siguiente? Los que se superpongan con cupos o turnos ya cargados se saltan.`)) return;
+    if (!window.confirm(`¿Copiar los ${source.length} horarios abiertos de esta semana a la semana siguiente? Los que se superpongan con horarios ya abiertos se saltan.`)) return;
     setCopyingWeek(true);
     try {
       const slots = source.map(s => ({
@@ -139,13 +139,14 @@ export function AgendaView({
         start: s.start,
         end: s.end,
         ...(s.locationId ? { locationId: s.locationId } : {}),
+        ...(s.serviceIds?.length ? { serviceIds: s.serviceIds } : {}),
       }));
       const created = await onAddSlotsBatch(slots);
       setWeekStart(addDays(weekStart, 7));
-      window.alert(`Se crearon ${created} cupos en la semana siguiente.`);
+      window.alert(`Se abrieron ${created} horarios en la semana siguiente.`);
     } catch (err) {
       console.error(err);
-      window.alert("No se pudieron copiar los cupos. Probá de nuevo.");
+      window.alert("No se pudieron copiar los horarios. Probá de nuevo.");
     } finally {
       setCopyingWeek(false);
     }
@@ -163,6 +164,7 @@ export function AgendaView({
     if (appt?.paidByGiftCard && appt.giftCardCode && appt.status !== "cancelado") {
       restoreGiftCard(appt.giftCardCode).catch((e) => console.error("[deleteAppt] restoreGiftCard falló:", e));
     }
+    if (appt && appt.status !== "cancelado") releaseAppointmentFranjas(id, apptSlotIds(appt));
     onDeleteAppt(id);
     deleteBookingRef(clientPhone, id).catch((e) => console.error("[deleteAppt] deleteBookingRef falló:", e));
   }
@@ -188,12 +190,7 @@ export function AgendaView({
     }
     await onUpdateAppt(id, updates);
     if (status === "cancelado") {
-      for (const slotId of apptSlotIds({ fromAvailabilityId, extraAvailabilityIds: appt?.extraAvailabilityIds })) {
-        if (!onFreeSlot) break;
-        try { await onFreeSlot(slotId); } catch (e) {
-          console.error("No se pudo liberar el cupo:", e);
-        }
-      }
+      await releaseAppointmentFranjas(id, apptSlotIds({ fromAvailabilityId, extraAvailabilityIds: appt?.extraAvailabilityIds }));
       if (appt?.paidByCombo && appt.comboId) {
         restoreComboSession(appt.comboId, id).catch((e) => console.error("[setApptStatus] restoreComboSession falló:", e));
       }
@@ -465,7 +462,7 @@ export function AgendaView({
             </button>
           </div>
           <button style={{ ...styles.recurringBtn, marginBottom: 14 }} onClick={copyWeekToNext} disabled={copyingWeek}>
-            <Copy size={15} /> {copyingWeek ? "Copiando…" : "Copiar cupos de esta semana a la siguiente"}
+            <Copy size={15} /> {copyingWeek ? "Copiando…" : "Copiar horarios de esta semana a la siguiente"}
           </button>
 
           <div style={styles.weekGrid}>
@@ -474,15 +471,16 @@ export function AgendaView({
               const dKey = dateKey(d);
               const dayAppts = apptsForDay(d);
               const dayAvail = (availabilityByDate[dKey] || []).slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
-              const bookedSlotIds = new Set(dayAppts.flatMap(apptSlotIds));
-              const openSlots = dayAvail.filter(s => !bookedSlotIds.has(s.id) && !s.booked);
+              const openSlots = dayAvail.flatMap(franja => freeRanges(franja).map(r => ({
+                ...franja, start: minutesToTime(r.start), end: minutesToTime(r.end), canRemove: !franja.busy?.length,
+              })));
 
               return (
                 <div key={i} style={{ ...styles.dayCol, ...(isToday ? styles.dayColToday : {}) }}>
                   <div style={styles.dayHeader}>
                     <span style={styles.dayName}>{DAY_NAMES[d.getDay()]}</span>
                     <span style={{ ...styles.dayNum, ...(isToday ? styles.dayNumToday : {}) }}>{d.getDate()}</span>
-                    <button style={styles.availAddBtn} onClick={() => setShowAvailForm(dKey)} title="Abrir cupos">
+                    <button style={styles.availAddBtn} onClick={() => setShowAvailForm(dKey)} title="Abrir horarios">
                       <CalendarPlus size={14} />
                     </button>
                   </div>
@@ -532,16 +530,19 @@ export function AgendaView({
                         }
                         const slot = item.data;
                         return (
-                          <div key={slot.id} style={styles.openSlotCard}>
+                          <div key={`${slot.id}-${slot.start}`} style={styles.openSlotCard}>
                             <div style={styles.openSlotInfo}>
                               <Clock size={12} color="#6E7F5C" />
                               <span>{slot.start}–{slot.end}</span>
-                              <span style={styles.openSlotTag}>{(multiLoc && locationName(slotLocationId(slot, locations))) || "Cupo libre"}</span>
+                              <span style={styles.openSlotTag}>{(multiLoc && locationName(slotLocationId(slot, locations))) || "Libre"}</span>
+                              {slot.serviceIds?.length > 0 && (
+                                <span style={styles.openSlotTag}>Solo {slot.serviceIds.map(id => services.find(sv => sv.id === id)?.name).filter(Boolean).join(", ")}</span>
+                              )}
                             </div>
                             <div style={{ display: "flex", gap: 4 }}>
                               <button
                                 style={slot.allowLastMinute ? styles.slotMiniBtn : styles.slotMiniBtnGhost}
-                                onClick={() => setAvailabilitySlotLastMinute(slot.id, !slot.allowLastMinute).catch(err => alert("No se pudo actualizar el cupo: " + err.message))}
+                                onClick={() => setAvailabilitySlotLastMinute(slot.id, !slot.allowLastMinute).catch(err => alert("No se pudo actualizar el horario: " + err.message))}
                                 title={slot.allowLastMinute ? "Visible en reservas hasta la hora de inicio (tocá para volver a ocultarlo 1 h antes)" : "Mostrar en reservas aunque falte menos de 1 h"}
                               >
                                 <Zap size={12} />
@@ -549,9 +550,11 @@ export function AgendaView({
                               <button style={styles.slotMiniBtn} onClick={() => openNewAppt(d, slot.start, slot.id)} title="Cargar turno acá">
                                 <Plus size={12} />
                               </button>
-                              <button style={styles.slotMiniBtnGhost} onClick={() => onRemoveSlot(slot.id)} title="Quitar cupo">
-                                <X size={12} />
-                              </button>
+                              {slot.canRemove && (
+                                <button style={styles.slotMiniBtnGhost} onClick={() => onRemoveSlot(slot.id)} title="Quitar horario">
+                                  <X size={12} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -593,12 +596,7 @@ export function AgendaView({
         <AvailabilityFormModal
           dateKey={showAvailForm}
           existing={availabilityByDate[showAvailForm] || []}
-          dayAppts={appointments.filter(a => a.dateKey === showAvailForm && a.status !== "cancelado")}
-          bookedSlotIds={new Set(
-            appointments
-              .filter(a => a.dateKey === showAvailForm && a.status !== "cancelado")
-              .flatMap(apptSlotIds)
-          )}
+          services={services}
           locations={locations}
           onClose={() => setShowAvailForm(null)}
           onAdd={(slot) => onAddSlot({ dateKey: showAvailForm, ...slot })}
@@ -609,6 +607,7 @@ export function AgendaView({
 
       {showRecurringForm && (
         <RecurringAvailabilityModal
+          services={services}
           locations={locations}
           onClose={() => setShowRecurringForm(false)}
           onConfirm={onAddSlotsBatch}
@@ -648,119 +647,87 @@ function LocationPicker({ locations, value, onChange, label = "Lugar" }) {
   );
 }
 
-// Horarios cada 30 min entre las 8 y las 22, que alcancen a terminar antes de las 22.
-function halfHourTimes(slotLength) {
-  const times = [];
-  for (let t = 8 * 60; t + slotLength <= 22 * 60; t += 30) times.push(minutesToTime(t));
-  return times;
+// "Solo para": servicios a los que se les ofrece la franja. Sin ninguno elegido, sirve para todos.
+function ServiceOnlyPicker({ services, value, onChange }) {
+  if (services.length < 2) return null;
+  const toggle = (id) => onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+  return (
+    <>
+      <label style={{ ...styles.fieldLabel, marginTop: 10 }}>Solo para (opcional)</label>
+      <div style={{ ...styles.weekdayPicker, flexWrap: "wrap" }}>
+        {services.map(s => (
+          <button
+            type="button"
+            key={s.id}
+            onClick={() => toggle(s.id)}
+            style={{ ...styles.weekdayChip, width: "auto", padding: "0 12px", ...(value.includes(s.id) ? styles.weekdayChipActive : {}) }}
+          >
+            {s.name}
+          </button>
+        ))}
+      </div>
+      <p style={{ fontSize: 11.5, color: "#8A8275", margin: "4px 0 0" }}>
+        {value.length ? "Este horario solo se ofrece para los servicios marcados." : "Sin marcar ninguno, el horario sirve para todos los servicios."}
+      </p>
+    </>
+  );
 }
 
-function DurationPicker({ value, onChange }) {
+function TimeRangeInputs({ start, end, onChange }) {
   return (
-    <div style={{ ...styles.weekdayPicker, alignItems: "center" }}>
-      {[30, 45, 60, 90, 120].map(len => (
-        <button
-          type="button"
-          key={len}
-          onClick={() => onChange(len)}
-          style={{ ...styles.weekdayChip, width: 52, ...(value === len ? styles.weekdayChipActive : {}) }}
-        >
-          {len}
-        </button>
-      ))}
-      <input
-        type="number" min={10} step={5}
-        style={{ ...styles.input, width: 70, margin: 0, height: 38 }}
-        value={value}
-        onChange={e => { const n = Number(e.target.value); if (n >= 10) onChange(n); }}
-      />
-      <span style={{ fontSize: 12.5, color: "#8A8275" }}>min</span>
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <span style={{ fontSize: 12.5, color: "#8A8275" }}>De</span>
+      <input type="time" step={300} style={{ ...styles.input, flex: 1, margin: 0, height: 38 }} value={start} onChange={e => onChange(e.target.value, end)} />
+      <span style={{ fontSize: 12.5, color: "#8A8275" }}>a</span>
+      <input type="time" step={300} style={{ ...styles.input, flex: 1, margin: 0, height: 38 }} value={end} onChange={e => onChange(start, e.target.value)} />
     </div>
   );
 }
 
-function CustomTimeInput({ onAdd }) {
-  const [time, setTime] = useState("");
-  return (
-    <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
-      <span style={{ fontSize: 12.5, color: "#8A8275" }}>Otro horario:</span>
-      <input type="time" style={{ ...styles.input, flex: 1, margin: 0, height: 38 }} value={time} onChange={e => setTime(e.target.value)} />
-      <button
-        type="button"
-        disabled={!time}
-        onClick={() => { onAdd(time); setTime(""); }}
-        style={{ ...styles.weekdayChip, width: 42, opacity: time ? 1 : 0.5 }}
-      >
-        <Plus size={14} />
-      </button>
-    </div>
-  );
-}
+const validRange = (r) => r.start && r.end && timeToMinutes(r.end) > timeToMinutes(r.start);
+const serviceNames = (ids, services) => ids.map(id => services.find(s => s.id === id)?.name).filter(Boolean).join(", ");
 
-function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotIds, locations = [], onClose, onAdd, onRemove, onCloseDay }) {
+function AvailabilityFormModal({ dateKey: dKey, existing, services = [], locations = [], onClose, onAdd, onRemove, onCloseDay }) {
   const [errorMsg, setErrorMsg] = useState(null);
   const [locationId, setLocationId] = useState(
     (existing[0] && slotLocationId(existing[0], locations)) || locations[0]?.id || null
   );
-  const [pending, setPending] = useState(new Set());
-  const [slotLength, setSlotLength] = useState(60);
+  const [range, setRange] = useState({ start: "09:00", end: "13:00" });
+  const [serviceIds, setServiceIds] = useState([]);
+  const [saving, setSaving] = useState(false);
 
-  const overlaps = (s, e, other) => s < timeToMinutes(other.end) && timeToMinutes(other.start) < e;
+  const sorted = existing.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+  const isTaken = (f) => f.booked || f.busy?.length > 0;
+  const removableIds = sorted.filter(f => !isTaken(f)).map(f => f.id);
+  const hasReservedSlots = sorted.some(isTaken);
 
-  const chipTimes = [...new Set([
-    ...halfHourTimes(slotLength),
-    ...existing.map(s => s.start),
-  ])].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
-
-  function chipFor(time) {
-    const slot = existing.find(s => s.start === time);
-    if (slot) return { time, slot, state: bookedSlotIds?.has(slot.id) ? "booked" : "open" };
-    const s = timeToMinutes(time);
-    const e = s + slotLength;
-    const blocked = existing.some(ex => overlaps(s, e, ex)) || dayAppts.some(a => overlaps(s, e, a));
-    return { time, state: blocked ? "blocked" : "free" };
-  }
-  const chips = chipTimes.map(chipFor);
-
-  function addCustomTime(time) {
-    const chip = chipFor(time);
-    if (chip.state === "free") toggleChip(chip);
-    else setErrorMsg(`Las ${time} se superponen con otro cupo o turno.`);
-  }
-
-  async function toggleChip(chip) {
-    if (pending.has(chip.time)) return;
+  async function addFranja() {
+    if (!validRange(range)) { setErrorMsg("La hora de fin tiene que ser después de la de inicio."); return; }
     setErrorMsg(null);
-    setPending(prev => new Set(prev).add(chip.time));
+    setSaving(true);
     try {
-      if (chip.state === "open") await onRemove(chip.slot.id);
-      else if (chip.state === "free") await onAdd({
-        start: chip.time, end: minutesToTime(timeToMinutes(chip.time) + slotLength),
+      await onAdd({
+        start: range.start, end: range.end,
+        ...(serviceIds.length ? { serviceIds } : {}),
         ...(locations.length > 1 && locationId ? { locationId } : {}),
       });
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
-      setPending(prev => { const next = new Set(prev); next.delete(chip.time); return next; });
+      setSaving(false);
     }
   }
 
-  const chipStyle = {
-    open:    { background: "#6E7F5C", borderColor: "#6E7F5C", color: "#fff" },
-    booked:  { background: "#F5EBD6", borderColor: "#B08A3E", color: "#B08A3E", cursor: "default" },
-    blocked: { background: "#F0EDE8", borderColor: "#E2DCD0", color: "#B8AFA0", cursor: "default" },
-    free:    {},
-  };
-
-  const sorted = existing.slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
-  const removableIds = sorted.filter(s => !bookedSlotIds?.has(s.id)).map(s => s.id);
-  const hasReservedSlots = sorted.some(s => bookedSlotIds?.has(s.id));
+  async function removeFranja(id) {
+    setErrorMsg(null);
+    try { await onRemove(id); } catch (err) { setErrorMsg(err.message); }
+  }
 
   function handleCloseDay() {
     if (removableIds.length === 0) return;
     const msg = hasReservedSlots
-      ? "Esto va a quitar los cupos libres de este día. Los turnos ya reservados no se tocan. ¿Confirmás?"
-      : "¿Cerrar este día? Se van a borrar todos los cupos libres que abriste.";
+      ? "Esto va a quitar los horarios sin turnos de este día. Los que tienen turnos no se tocan. ¿Confirmás?"
+      : "¿Cerrar este día? Se van a borrar todos los horarios que abriste.";
     if (window.confirm(msg)) {
       onCloseDay(removableIds);
       onClose();
@@ -771,43 +738,50 @@ function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotId
     <div style={styles.modalOverlay} onClick={onClose}>
       <div style={styles.modal} onClick={e => e.stopPropagation()}>
         <div style={styles.modalHeader}>
-          <h3 style={styles.modalTitle}>Cupos · {formatDateLong(dKey)}</h3>
+          <h3 style={styles.modalTitle}>Horarios · {formatDateLong(dKey)}</h3>
           <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
-        <p style={styles.helperText}>Elegí la duración y tocá un horario para abrir un cupo. Tocalo de nuevo para quitarlo.</p>
-        <LocationPicker locations={locations} value={locationId} onChange={setLocationId} label="Lugar de los cupos nuevos" />
+        <p style={styles.helperText}>Abrí el horario en que atendés. Los turnos se arman solos según lo que dura cada servicio y su descanso.</p>
 
-        <label style={{ ...styles.fieldLabel, marginTop: 10 }}>Duración del cupo</label>
-        <DurationPicker value={slotLength} onChange={setSlotLength} />
+        {sorted.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "10px 0 4px" }}>
+            {sorted.map(f => (
+              <div key={f.id} style={{ ...styles.openSlotCard, alignItems: "flex-start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: 13 }}>
+                  <strong>{f.start}–{f.end}</strong>
+                  {locations.length > 1 && <span style={{ fontSize: 11.5, color: "#8A8275" }}>{locations.find(l => l.id === slotLocationId(f, locations))?.name}</span>}
+                  {f.serviceIds?.length > 0 && <span style={{ fontSize: 11.5, color: "#8A8275" }}>Solo {serviceNames(f.serviceIds, services)}</span>}
+                  {f.booked && <span style={{ fontSize: 11.5, color: "#B08A3E", fontWeight: 600 }}>Reservado</span>}
+                  {f.busy?.length > 0 && (
+                    <span style={{ fontSize: 11.5, color: "#B08A3E", fontWeight: 600 }}>
+                      {f.busy.length} turno{f.busy.length !== 1 ? "s" : ""}: {f.busy.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)).map(b => b.start).join(", ")}
+                    </span>
+                  )}
+                </div>
+                {!isTaken(f) && (
+                  <button type="button" style={styles.slotMiniBtnGhost} onClick={() => removeFranja(f.id)} title="Quitar horario">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, margin: "12px 0 0" }}>
-          {chips.map(chip => (
-            <button
-              type="button"
-              key={chip.time}
-              disabled={chip.state === "booked" || chip.state === "blocked"}
-              onClick={() => toggleChip(chip)}
-              title={chip.state === "booked" ? "Reservado" : chip.state === "blocked" ? "Se superpone con otro cupo o turno" : (chip.slot && locations.length > 1 ? locations.find(l => l.id === slotLocationId(chip.slot, locations))?.name : undefined)}
-              style={{
-                ...styles.weekdayChip, width: "100%", ...chipStyle[chip.state],
-                opacity: pending.has(chip.time) ? 0.5 : 1,
-              }}
-            >
-              {chip.time}
-            </button>
-          ))}
-        </div>
-        <CustomTimeInput onAdd={addCustomTime} />
-        <p style={{ fontSize: 11.5, color: "#8A8275", margin: "10px 0" }}>
-          <span style={{ color: "#6E7F5C", fontWeight: 700 }}>Verde</span>: cupo abierto ·{" "}
-          <span style={{ color: "#B08A3E", fontWeight: 700 }}>dorado</span>: reservado
-        </p>
+        <label style={{ ...styles.fieldLabel, marginTop: 12 }}>Abrir horario</label>
+        <TimeRangeInputs start={range.start} end={range.end} onChange={(start, end) => setRange({ start, end })} />
+        <LocationPicker locations={locations} value={locationId} onChange={setLocationId} />
+        <ServiceOnlyPicker services={services} value={serviceIds} onChange={setServiceIds} />
+        <button type="button" style={{ ...styles.recurringBtn, margin: "12px 0 0" }} onClick={addFranja} disabled={saving}>
+          <Plus size={15} /> {saving ? "Agregando…" : "Agregar horario"}
+        </button>
+
         {errorMsg && (
-          <p style={{ fontSize: 12, color: "#A6483A", margin: "0 0 10px", fontWeight: 600 }}>{errorMsg}</p>
+          <p style={{ fontSize: 12, color: "#A6483A", margin: "10px 0 0", fontWeight: 600 }}>{errorMsg}</p>
         )}
 
         {removableIds.length > 0 && (
-          <button type="button" style={styles.closeDayBtn} onClick={handleCloseDay}>
+          <button type="button" style={{ ...styles.closeDayBtn, marginTop: 12 }} onClick={handleCloseDay}>
             <X size={14} /> Cerrar día completo
           </button>
         )}
@@ -823,12 +797,12 @@ function AvailabilityFormModal({ dateKey: dKey, existing, dayAppts, bookedSlotId
   );
 }
 
-function RecurringAvailabilityModal({ locations = [], onClose, onConfirm }) {
+function RecurringAvailabilityModal({ services = [], locations = [], onClose, onConfirm }) {
   const todayStr = dateKey(new Date());
   const [locationId, setLocationId] = useState(locations[0]?.id || null);
   const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
-  const [slotLength, setSlotLength] = useState(60);
-  const [selectedTimes, setSelectedTimes] = useState(["10:00", "11:00", "12:00", "13:00"]);
+  const [ranges, setRanges] = useState([{ start: "09:00", end: "13:00" }]);
+  const [serviceIds, setServiceIds] = useState([]);
   const [weeks, setWeeks] = useState(4);
   const [saving, setSaving] = useState(false);
   const [fromDate, setFromDate] = useState(todayStr);
@@ -842,49 +816,31 @@ function RecurringAvailabilityModal({ locations = [], onClose, onConfirm }) {
   function toggleDay(day) {
     setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort());
   }
+  const setRange = (i, start, end) => setRanges(prev => prev.map((r, j) => j === i ? { start, end } : r));
 
-  const byTime = (a, b) => timeToMinutes(a) - timeToMinutes(b);
-  const timeOptions = [...new Set([...halfHourTimes(slotLength), ...selectedTimes])].sort(byTime);
-  const clashes = (a, b, len) => Math.abs(timeToMinutes(a) - timeToMinutes(b)) < len;
-  const isBlocked = (time) => !selectedTimes.includes(time) && selectedTimes.some(t => clashes(t, time, slotLength));
-
-  // Al alargar la duración, se descartan los horarios elegidos que pasarían a superponerse.
-  function changeSlotLength(len) {
-    setSlotLength(len);
-    setSelectedTimes(prev => prev.slice().sort(byTime).reduce((kept, t) => {
-      if (kept.length === 0 || !clashes(kept[kept.length - 1], t, len)) kept.push(t);
-      return kept;
-    }, []));
-  }
-
-  function toggleTime(time) {
-    if (selectedTimes.includes(time)) setSelectedTimes(prev => prev.filter(t => t !== time));
-    else if (!isBlocked(time)) setSelectedTimes(prev => [...prev, time]);
-  }
-
-  const daySlots = selectedTimes
-    .slice()
-    .sort((a, b) => timeToMinutes(a) - timeToMinutes(b))
-    .map(t => ({ start: t, end: minutesToTime(timeToMinutes(t) + slotLength) }));
+  const sortedRanges = ranges.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+  const overlapping = sortedRanges.some((r, i) => i > 0 && timeToMinutes(r.start) < timeToMinutes(sortedRanges[i - 1].end));
+  const rangesOk = ranges.length > 0 && ranges.every(validRange) && !overlapping;
   const dateKeys = selectedDays.length > 0 && fromDate
     ? getRecurringDateKeysByRange(selectedDays, fromDate, toDate)
     : [];
-  const totalSlots = dateKeys.length * daySlots.length;
+  const totalSlots = rangesOk ? dateKeys.length * ranges.length : 0;
 
   async function handleConfirm() {
-    if (selectedDays.length === 0 || daySlots.length === 0 || saving) return;
+    if (totalSlots === 0 || saving) return;
     setSaving(true);
     const allSlots = [];
     dateKeys.forEach(dKey => {
-      daySlots.forEach(s => allSlots.push({
-        dateKey: dKey, start: s.start, end: s.end,
+      sortedRanges.forEach(r => allSlots.push({
+        dateKey: dKey, start: r.start, end: r.end,
+        ...(serviceIds.length ? { serviceIds } : {}),
         ...(locations.length > 1 && locationId ? { locationId } : {}),
       }));
     });
     try {
       const created = await onConfirm(allSlots);
       if (created < allSlots.length) {
-        window.alert(`Se crearon ${created} cupos. Se saltaron ${allSlots.length - created} que se superponían con cupos o turnos ya cargados.`);
+        window.alert(`Se abrieron ${created} horarios. Se saltaron ${allSlots.length - created} que se superponían con horarios ya abiertos.`);
       }
       onClose();
     } catch (err) {
@@ -903,7 +859,7 @@ function RecurringAvailabilityModal({ locations = [], onClose, onConfirm }) {
           <button type="button" style={styles.iconBtn} onClick={onClose}><X size={18} /></button>
         </div>
         <p style={styles.helperText}>
-          Elegí los días, tocá los horarios que querés abrir y por cuántas semanas repetirlo.
+          Elegí los días y el horario en que atendés. Los turnos se arman solos según lo que dura cada servicio y su descanso.
         </p>
         <LocationPicker locations={locations} value={locationId} onChange={setLocationId} />
 
@@ -921,28 +877,27 @@ function RecurringAvailabilityModal({ locations = [], onClose, onConfirm }) {
           ))}
         </div>
 
-        <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Duración de cada turno</label>
-        <DurationPicker value={slotLength} onChange={changeSlotLength} />
-
-        <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Horarios</label>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
-          {timeOptions.map(time => (
-            <button
-              type="button"
-              key={time}
-              disabled={isBlocked(time)}
-              onClick={() => toggleTime(time)}
-              style={{
-                ...styles.weekdayChip, width: "100%",
-                ...(selectedTimes.includes(time) ? styles.weekdayChipActive : {}),
-                ...(isBlocked(time) ? { color: "#C9BFA8", borderColor: "#E8E2D8", cursor: "default" } : {}),
-              }}
-            >
-              {time}
-            </button>
+        <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Horario</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {ranges.map((r, i) => (
+            <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <div style={{ flex: 1 }}>
+                <TimeRangeInputs start={r.start} end={r.end} onChange={(start, end) => setRange(i, start, end)} />
+              </div>
+              {ranges.length > 1 && (
+                <button type="button" style={styles.slotMiniBtnGhost} onClick={() => setRanges(prev => prev.filter((_, j) => j !== i))} title="Quitar">
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
-        <CustomTimeInput onAdd={toggleTime} />
+        <button type="button" style={{ ...styles.addMoreBtn, marginTop: 6 }} onClick={() => setRanges(prev => [...prev, { start: "15:00", end: "19:00" }])}>
+          <Plus size={12} /> Agregar otro horario (ej. a la tarde)
+        </button>
+        {overlapping && <p style={{ fontSize: 12, color: "#A6483A", margin: "6px 0 0", fontWeight: 600 }}>Los horarios se superponen.</p>}
+
+        <ServiceOnlyPicker services={services} value={serviceIds} onChange={setServiceIds} />
 
         <label style={{ ...styles.fieldLabel, marginTop: 14 }}>Empieza el</label>
         <input type="date" style={styles.input} value={fromDate} min={todayStr} onChange={e => setFromDate(e.target.value)} />
@@ -963,8 +918,8 @@ function RecurringAvailabilityModal({ locations = [], onClose, onConfirm }) {
 
         <p style={styles.recurringPreview}>
           {totalSlots > 0
-            ? `Se van a crear ${totalSlots} cupos (${daySlots.length} por día, ${dateKeys.length} días, del ${formatDateShort(fromDate)} al ${formatDateShort(toDate)}).`
-            : "Elegí al menos un día, un horario y la fecha de inicio para ver la vista previa."}
+            ? `Se van a abrir ${dateKeys.length} días (del ${formatDateShort(fromDate)} al ${formatDateShort(toDate)}), ${sortedRanges.map(r => `${r.start} a ${r.end}`).join(" y ")}.`
+            : "Elegí al menos un día, un horario válido y la fecha de inicio para ver la vista previa."}
         </p>
 
         <div style={styles.modalActions}>
@@ -1402,10 +1357,8 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, l
       const dKey = dateKey(d);
       const dayAvail = availability.filter(s => s.dateKey === dKey && inLocation(s));
       if (dayAvail.length === 0) continue;
-      const dayAppts = appointments.filter(a => a.dateKey === dKey && a.status !== "cancelado");
-      const bookedSlotIds = new Set(dayAppts.flatMap(apptSlotIds));
       const open = dayAvail
-        .filter(s => !bookedSlotIds.has(s.id) && !s.booked)
+        .flatMap(franja => freeRanges(franja).map(r => ({ ...franja, start: minutesToTime(r.start), end: minutesToTime(r.end) })))
         .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
       if (open.length > 0) result.push({ dKey, d, slots: open });
     }
@@ -1454,7 +1407,7 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, l
     if (openDays.length === 0) {
       ctx.fillStyle = "#8A8275";
       ctx.font = "16px Arial, sans-serif";
-      ctx.fillText("Sin cupos disponibles para este período.", PADDING, y + 30);
+      ctx.fillText("Sin horarios disponibles para este período.", PADDING, y + 30);
     }
 
     for (const { dKey, d, slots } of openDays) {
@@ -1535,7 +1488,7 @@ function ExportDisponibilidadModal({ availability, appointments, businessInfo, l
 
         <div style={{ background: "#fff", borderRadius: 12, padding: "12px 16px", marginBottom: 16, minHeight: 60 }}>
           {openDays.length === 0
-            ? <p style={{ color: "#8A8275", fontSize: 13, margin: 0 }}>Sin cupos disponibles para los próximos {days} días.</p>
+            ? <p style={{ color: "#8A8275", fontSize: 13, margin: 0 }}>Sin horarios disponibles para los próximos {days} días.</p>
             : openDays.map(({ dKey, d, slots }) => (
               <div key={dKey} style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#B5654A", textTransform: "uppercase", marginBottom: 4 }}>

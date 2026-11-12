@@ -13,3 +13,7 @@
 - **Error:** las pruebas del panel pasaban, pero las capturas mostraron una pestaña fuera de la pantalla y "Registrar pago" en negocios exentos, incluido el propio.
 - **Regla:** después de una prueba en verde, abrir las capturas en tamaño celular y buscar acciones que no deberían estar disponibles.
 - **Prueba:** para detectar desbordes en modo celular, medir la posición real del elemento (`getBoundingClientRect`). `scrollWidth` contra `innerWidth` no sirve porque el navegador agranda la pantalla virtual.
+
+## Ante dudas de diseño, frenar y proponer el modelo antes de codear (2026-11-12)
+- **Error:** empecé a programar "cupos por servicio" apenas el usuario dijo "sí", y el usuario me frenó ("esperá, pensemoslo bien"): el problema de fondo era el modelo de cupos fijos, no la falta de un filtro.
+- **Regla:** cuando un pedido es un parche sobre un problema que vuelve a aparecer (cupos que no entran, huecos, ahora por servicio), primero proponer el modelo alternativo con pros y contras y esperar la decisión.

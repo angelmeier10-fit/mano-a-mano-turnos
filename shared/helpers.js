@@ -42,26 +42,74 @@ export function apptSlotIds(appt) {
   return [appt.fromAvailabilityId, ...(appt.extraAvailabilityIds || [])].filter(Boolean);
 }
 
-// Horarios en que entra un servicio: un cupo libre que alcanza solo, o cupos libres
-// seguidos (uno termina cuando empieza el otro) que juntos alcanzan. Cada resultado es el
-// primer cupo con slotIds, los cupos que ocuparía la reserva.
-export function bookableStarts(slots, duration) {
-  const free = slots.filter(s => !s.booked).sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
-  const result = [];
-  free.forEach((first, i) => {
-    const start = timeToMinutes(first.start);
-    const slotIds = [first.id];
-    let end = timeToMinutes(first.end);
-    for (let j = i + 1; end - start < duration && j < free.length && timeToMinutes(free[j].start) === end; j++) {
-      slotIds.push(free[j].id);
-      end = timeToMinutes(free[j].end);
-    }
-    if (end - start >= duration) result.push({ ...first, slotIds });
-  });
-  return result;
+// ---------- Franjas de atención ----------
+// Una franja (doc de `availability`) es un horario abierto: { start, end, serviceIds?, busy? }.
+// `busy` son los turnos tomados dentro de ella (con el descanso del servicio ya sumado).
+// Un cupo viejo con booked:true cuenta como franja ocupada entera.
+
+export function franjaAllowsService(franja, service) {
+  return !franja.serviceIds?.length || franja.serviceIds.includes(service.id);
 }
 
-// Cupos libres que se pisan con un horario: los que ocupa un turno cargado desde la agenda.
+// Tramos libres de la franja, en minutos. `closed`: el tramo termina en un turno tomado,
+// así que el descanso del servicio tiene que entrar antes (al final de la franja no hace falta).
+export function freeRanges(franja) {
+  if (franja.booked) return [];
+  const end = timeToMinutes(franja.end);
+  const busy = (franja.busy || [])
+    .map(b => ({ start: timeToMinutes(b.start), end: timeToMinutes(b.end) }))
+    .sort((a, b) => a.start - b.start);
+  const ranges = [];
+  let cursor = timeToMinutes(franja.start);
+  for (const b of busy) {
+    if (b.start > cursor) ranges.push({ start: cursor, end: Math.min(b.start, end), closed: b.start < end });
+    cursor = Math.max(cursor, b.end);
+    if (cursor >= end) break;
+  }
+  if (cursor < end) ranges.push({ start: cursor, end, closed: false });
+  return ranges.filter(r => r.end > r.start);
+}
+
+function rangeFits(range, start, service) {
+  const needed = service.duration + (range.closed ? service.restMinutes || 0 : 0);
+  return start >= range.start && start + needed <= range.end;
+}
+
+// Horarios que se le ofrecen a un servicio, uno detrás del otro dentro de cada tramo libre.
+// Cada resultado es la franja con start/end del turno.
+export function startTimes(franjas, service) {
+  const step = service.duration + (service.restMinutes || 0);
+  const result = [];
+  franjas.filter(f => franjaAllowsService(f, service)).forEach(franja => {
+    freeRanges(franja).forEach(range => {
+      for (let t = range.start; rangeFits(range, t, service); t += step) {
+        result.push({ ...franja, start: minutesToTime(t), end: minutesToTime(t + service.duration) });
+      }
+    });
+  });
+  return result.sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+}
+
+export function fitsInFranja(franja, start, service) {
+  const t = timeToMinutes(start);
+  return franjaAllowsService(franja, service) && freeRanges(franja).some(r => rangeFits(r, t, service));
+}
+
+// Lo que ocupa un turno dentro de una franja: su horario más el descanso del servicio.
+export function busyEntry(apptId, start, end, service) {
+  return { start, end: minutesToTime(timeToMinutes(end) + (service?.restMinutes || 0)), apptId };
+}
+
+// Cambio que libera un turno de una franja: lo saca de `busy`, o destraba un cupo viejo
+// reservado entero. null si no hay nada que liberar.
+export function releaseFranja(franja, apptId) {
+  if (franja.busy?.some(b => b.apptId === apptId)) return { busy: franja.busy.filter(b => b.apptId !== apptId) };
+  if (franja.booked) return { booked: false };
+  return null;
+}
+
+// Franjas que se pisan con un horario (sin contar cupos viejos reservados enteros):
+// las que ocupa un turno cargado desde la agenda.
 export function slotsCoveringRange(slots, start, end) {
   const s = timeToMinutes(start), e = timeToMinutes(end);
   return slots

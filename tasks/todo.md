@@ -284,3 +284,96 @@ Cobro automático, facturación, varios profesionales, mails automáticos y pág
 - Sin probar en navegador: la tarjeta en la pantalla de compra y guardar el campo Instagram en Negocio.
 - Moño arreglado: html2canvas copia el estilo calculado del svg (position/inset) dentro de la imagen del svg y lo deja fuera de cuadro. La posición pasó a un div contenedor; la prueba mira el color del ala en la imagen descargada (oscuro antes, dorado después).
 - Pendiente: el combo (`ComboRedeemView.jsx`) tiene el mismo moño con el mismo problema.
+
+# Horarios de atención en vez de cupos fijos (plan, 2026-11-12)
+
+## Objetivo
+Que cada negocio abra franjas ("lunes de 9 a 13") y la app ofrezca los horarios según lo que dura
+cada servicio (30, 45, 60, 90…), sin huecos muertos. Opcional: franjas "solo para" ciertos servicios
+y descanso después de cada servicio.
+
+## Decisiones
+- **Se reusa la colección `availability`:** cada doc pasa a ser una franja
+  (`dateKey, start, end, locationId?`) con dos campos nuevos opcionales:
+  `serviceIds` (vacío o ausente = todos los servicios) y `busy: [{ start, end, apptId }]`
+  (los pedazos ocupados). Así no hace falta migrar nada: un cupo viejo es una franja corta.
+- **Compatibilidad:** un doc con `booked: true` cuenta como franja ocupada entera. Los turnos
+  viejos con `extraAvailabilityIds` se siguen liberando bien al cancelar.
+- **Por qué `busy` dentro de la franja:** la app pública no puede leer los turnos (son privados),
+  así que necesita saber qué partes de la franja están ocupadas sin ver datos del cliente.
+  Solo se guarda horario + id del turno. Reservar = transacción sobre ese único doc, así dos
+  clientes no pueden tomar el mismo horario a la vez.
+- **Horarios ofrecidos, uno detrás del otro:** en cada tramo libre se ofrece desde el inicio del
+  tramo, avanzando de a (duración + descanso del servicio). Ej. tramo 9–13, servicio de 45:
+  9:00, 9:45, 10:30, 11:15, 12:00. Si alguien reserva 9:00–9:45, el tramo libre pasa a 9:45–13
+  y los horarios se recalculan pegados a ese turno.
+- **Descanso por servicio:** cada servicio tiene `duration` y `restMinutes` (por defecto 0), se
+  editan en Servicios. El `busy` de un turno guarda su fin + el descanso de su servicio. Un horario
+  nuevo necesita que su descanso entre antes del siguiente turno, pero no antes del fin de la franja.
+- **Un turno siempre cae dentro de una sola franja.** Se deja de juntar cupos seguidos: con
+  franjas largas ya no hace falta. Los cupos de 30 sueltos ya cargados solo sirven para servicios
+  de hasta 30; para lo demás se cargan como franja.
+- **Turno cargado a mano por el dueño:** puede ir dentro o fuera de franjas. Si se pisa con
+  franjas, se agrega a su `busy` (bloquea ese horario para el público).
+- **Compatible con "varios profesionales" (diseño de más arriba):** más adelante la franja suma
+  `staffId` y nada de esto cambia.
+
+## Plan
+
+### 1. Lógica pura + tests (`shared/helpers.js`, `scripts/slots.test.mjs`)
+- [x] `freeRanges(franja)`: la franja menos sus `busy`; `booked:true` = sin tramos libres
+- [x] `startTimes(franjas, service)`: horarios ofrecidos para un servicio (respeta `serviceIds` y lugar)
+- [x] `fitsInFranja(franja, start, service)`: valida un horario antes de reservar
+- [x] Tests: 30/45/60/90 en la misma franja, descanso, franja "solo para", turno en el medio,
+      `booked:true` viejo, servicio que no entra, orden de los docs
+- [x] Reemplazar `bookableStarts`/`slotsCoveringRange` por lo nuevo (borrar lo que quede sin uso)
+
+### 2. Reglas de Firestore + tests en emulador (`firestore.rules`, `scripts/rules.test.mjs`)
+- [x] Público puede actualizar una franja solo tocando `busy`, agregando o sacando un elemento a la vez
+- [x] Se mantiene la regla vieja de `booked` (turnos viejos) hasta limpiar
+- [x] Tests: público no puede cambiar horario, `serviceIds` ni borrar la franja; dueño puede todo
+
+### 3. API (`shared/firestoreApi.js`)
+- [x] Reservar (`bookSlotAtomic`): transacción lee la franja, valida con `fitsInFranja`, agrega a `busy`, crea el turno
+- [x] Cancelar (público y desde agenda): saca el `busy` de ese turno (y libera `booked`/extras si es turno viejo)
+- [x] Reprogramar (público y agenda): en una transacción saca de la franja vieja y agrega a la nueva
+- [x] Crear/editar turno a mano: actualiza `busy` de las franjas que pisa
+- [x] Al crear franjas: no se pueden superponer con otras franjas del mismo lugar
+
+### 4. App de reservas (`ReservarView.jsx`, `MiTurnoView.jsx`)
+- [x] Horarios con `startTimes` según el servicio elegido
+- [x] Fechas: mostrar solo días con al menos un horario para ese servicio (hoy muestra días con cualquier cupo)
+
+### 5. Agenda (`AgendaComponents.jsx`, Configuración)
+- [x] Modal del día: agregar franja "de [hora] a [hora]", "solo para" (servicios, opcional), lugar;
+      lista de franjas con lo ocupado; quitar franja solo si no tiene turnos
+- [x] Horario semanal recurrente: días + una o más franjas + "solo para" + semanas
+- [x] Vista semana: franja como bloque con sus tramos libres
+- [x] Copiar semana: copia franjas sin `busy`
+- [x] Exportar disponibilidad: lista tramos libres ("9:45 a 13:00")
+- [x] Servicios: campo "Descanso después (min)"
+
+### 6. Verificación
+- [x] `npm run test:unit` y `npm run test:rules` en verde
+- [x] Prueba en emulador, en tamaño celular: franja 9–13; reservar corte de 30 y masaje de 60 desde
+      reservas; cancelar; reprogramar; turno a mano en la agenda; franja "solo para"; servicio con 10 min de descanso;
+      cupo viejo de 1 h y turno viejo con extras
+- [x] Revisar capturas de agenda y reservas (lecciones: mirar pantallas, no solo tests)
+
+### 7. Publicación
+- [ ] Publicar reglas primero (`firebase deploy --only firestore:rules`, confirmando antes), después push a `main`
+- [ ] Probar en producción con un negocio de prueba y avisarte
+
+## Fuera de esta etapa
+- Elegir intervalo fijo de inicio (en punto / y media) en vez de "uno detrás del otro"
+- Borrar la regla y el campo `booked` cuando no queden turnos viejos
+
+## Review
+- Pasan 29 tests unitarios (13 de franjas) y 22 de reglas (2 nuevos de `busy`); las dos apps compilan.
+- Emulador, tamaño celular, negocio de prueba con Corte 30, Brushing 45, Tintura 90+10:
+  franja 9–13 ofrece Corte cada 30, Brushing cada 45, Tintura 9:00 y 10:40; reserva pública,
+  turno manual con descanso (11:00–12:40 ocupado), reprogramar dentro de la misma franja,
+  cancelar, intento de pisar un turno (rechazado), editar turno, franja "solo para" encima de
+  un turno existente, carga semanal con dos horarios, descanso de 5 min en Corte, exportar.
+  Cupos viejos de 1 h y turno viejo con `booked` siguen andando.
+- Abrir una franja encima de turnos ya cargados ya no se rechaza: el turno queda ocupado adentro.

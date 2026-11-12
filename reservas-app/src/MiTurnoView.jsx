@@ -3,7 +3,7 @@ import { Clock, Check, MessageCircle, X, ChevronLeft, Search } from "lucide-reac
 import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
-  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, bookableStarts,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, startTimes,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
@@ -85,18 +85,21 @@ export default function MiTurnoView({
   }, [availability]);
 
   const todayKey = dateKey(new Date());
+  const reschedSvc = allServices.find(s => s.id === reschedServiceId);
+  // Horarios que se le ofrecen al servicio en un día, sin los que ya pasaron.
+  const openTimes = (dKey) => reschedSvc
+    ? startTimes(availabilityByDate[dKey] || [], reschedSvc).filter(s => !isPastSlot(dKey, s.start, s.allowLastMinute ? 0 : 60))
+    : [];
   const availableDates = useMemo(() =>
     Object.keys(availabilityByDate)
-      .filter(dKey => dKey >= todayKey && availabilityByDate[dKey].some(s => !s.booked))
+      .filter(dKey => dKey >= todayKey && (!reschedSvc || openTimes(dKey).length > 0))
       .sort()
-  , [availabilityByDate, todayKey]);
+  , [availabilityByDate, todayKey, reschedSvc]);
 
-  const reschedSvc = allServices.find(s => s.id === reschedServiceId);
-  const reschedSlots = useMemo(() => {
-    if (!reschedDate || !reschedSvc) return [];
-    return bookableStarts(availabilityByDate[reschedDate] || [], reschedSvc.duration)
-      .filter(s => !isPastSlot(reschedDate, s.start, s.allowLastMinute ? 0 : 60));
-  }, [reschedDate, reschedSvc, availabilityByDate]);
+  const reschedSlots = useMemo(
+    () => (reschedDate ? openTimes(reschedDate) : []),
+    [reschedDate, reschedSvc, availabilityByDate]
+  );
 
   // ---- Handlers ----
   async function handleSearch(e) {
@@ -151,7 +154,7 @@ export default function MiTurnoView({
       };
       await onCancelAppointment(selected.id, token, selected.fromAvailabilityId, phone, historyData, selected._phoneVariant);
       removeFromLocalStorage(selected.id);
-      setDoneMsg("Tu turno fue cancelado. El cupo quedó libre para que otro cliente pueda reservarlo.");
+      setDoneMsg("Tu turno fue cancelado. El horario quedó libre para que otro cliente pueda reservarlo.");
       setStep("done");
     } catch (e) {
       setWorkError("No pudimos cancelar tu turno. " + (e.message || "Intentá de nuevo."));
@@ -209,7 +212,6 @@ export default function MiTurnoView({
           clientId: selected.clientId || null,
           notes: "",
           fromAvailabilityId: reschedSlot.id,
-          ...(reschedSlot.slotIds.length > 1 ? { extraAvailabilityIds: reschedSlot.slotIds.slice(1) } : {}),
           ...locationSnapshot(reschedLocation),
           ...(reschedSvc.id !== selected.serviceId ? { price: servicePrice(reschedSvc, reschedLocation?.id) } : {}),
         },
@@ -357,11 +359,11 @@ export default function MiTurnoView({
             ) : (
               <div style={styles.slotsGrid}>
                 {reschedSlots.map(s => (
-                  <button key={s.id}
+                  <button key={`${s.id}-${s.start}`}
                     onClick={() => setReschedSlot(s)}
                     style={{
                       ...styles.slotBtn,
-                      ...(reschedSlot?.id === s.id
+                      ...(reschedSlot?.id === s.id && reschedSlot.start === s.start
                         ? { background: "#2A2622", color: "#EFE9DF", borderColor: "#2A2622" }
                         : {}),
                     }}>

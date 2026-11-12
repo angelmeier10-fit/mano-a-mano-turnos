@@ -4,7 +4,7 @@ import {
   dateKey, timeToMinutes, minutesToTime, isPastSlot,
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
   applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS, getReferralAmount,
-  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, servicePaymentLink, bookableStarts,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, servicePaymentLink, startTimes,
 } from "../../shared/helpers";
 import { PayButton } from "./TransferInfo";
 import { getClientDiscountPublic, getCombosByPhone, isExistingClientPublic, getReferralCreditPublic } from "../../shared/firestoreApi";
@@ -74,15 +74,6 @@ export default function ReservarView({ services: allServices, availability: allA
     return map;
   }, [availability]);
 
-  const availableDates = useMemo(() => {
-    const todayK = dateKey(new Date());
-    return Object.keys(availabilityByDate)
-      .filter(dKey => dKey >= todayK && (availabilityByDate[dKey] || []).length > 0)
-      .sort();
-  }, [availabilityByDate]);
-
-  const availableDatesSet = useMemo(() => new Set(availableDates), [availableDates]);
-
   const [selectedDate, setSelectedDate] = useState(null);
   const [serviceId, setServiceId] = useState(preselectedServiceId || initialServiceId || services[0]?.id || "");
   const [clientName, setClientName] = useState("");
@@ -100,6 +91,20 @@ export default function ReservarView({ services: allServices, availability: allA
   const [referredByName, setReferredByName] = useState("");
   const [referralCredit, setReferralCredit] = useState(0);
   const trafficSource = useMemo(() => getTrafficSource(), []);
+
+  // Horarios que se le ofrecen a un servicio en un día, sin los que ya pasaron.
+  const openTimes = (dKey, service) => service
+    ? startTimes(availabilityByDate[dKey] || [], service).filter(s => !isPastSlot(dKey, s.start, s.allowLastMinute ? 0 : 60))
+    : [];
+  const availableDates = useMemo(() => {
+    const todayK = dateKey(new Date());
+    const service = services.find(s => s.id === serviceId);
+    return Object.keys(availabilityByDate)
+      .filter(dKey => dKey >= todayK && openTimes(dKey, service).length > 0)
+      .sort();
+  }, [availabilityByDate, services, serviceId]);
+
+  const availableDatesSet = useMemo(() => new Set(availableDates), [availableDates]);
 
   useEffect(() => {
     if (!preselectedServiceId) writeConfirmed(confirmed);
@@ -136,11 +141,10 @@ export default function ReservarView({ services: allServices, availability: allA
   const { finalPrice: svcFinalPrice, discountAmount: svcDiscountAmount, referralDiscount: svcReferralDiscount } = priceWithDiscounts(svcPrice, serviceId);
   const matchingCombo = myCombos.find(c => c.status === "active" && c.sessionsRemaining > 0 && c.serviceId === serviceId);
 
-  const slotsForSelectedDate = useMemo(() => {
-    if (!selectedDate || !svc) return [];
-    return bookableStarts(availabilityByDate[selectedDate] || [], svc.duration)
-      .filter(s => !isPastSlot(selectedDate, s.start, s.allowLastMinute ? 0 : 60));
-  }, [selectedDate, svc, availabilityByDate]);
+  const slotsForSelectedDate = useMemo(
+    () => (selectedDate ? openTimes(selectedDate, svc) : []),
+    [selectedDate, svc, availabilityByDate]
+  );
 
   // El crédito por recomendar se descuenta recién al pagar, así que no figura en el turno.
   function bookingPaymentLink(appt, service) {
@@ -185,7 +189,6 @@ export default function ReservarView({ services: allServices, availability: allA
       notes: "",
       status: "pendiente",
       fromAvailabilityId: slot.id,
-      ...(slot.slotIds.length > 1 ? { extraAvailabilityIds: slot.slotIds.slice(1) } : {}),
       price: usingCombo ? 0 : svcPrice,
       discount: usingCombo ? 0 : svcDiscountAmount,
       ...locationSnapshot(location),
@@ -533,12 +536,12 @@ export default function ReservarView({ services: allServices, availability: allA
             <div style={styles.slotsGrid}>
               {slotsForSelectedDate.map(s => (
                 <button
-                  key={s.id}
+                  key={`${s.id}-${s.start}`}
                   disabled={booking}
                   style={{
                     ...styles.slotBtn,
                     opacity: booking ? 0.5 : 1,
-                    ...(selectedSlot?.id === s.id ? { background: "#2A2622", color: "#EFE9DF", borderColor: "#2A2622" } : {}),
+                    ...(selectedSlot?.id === s.id && selectedSlot.start === s.start ? { background: "#2A2622", color: "#EFE9DF", borderColor: "#2A2622" } : {}),
                   }}
                   onClick={() => {
                     if (!clientName.trim()) {
@@ -560,7 +563,7 @@ export default function ReservarView({ services: allServices, availability: allA
             </div>
           )}
 
-          {selectedSlot && slotsForSelectedDate.some(s => s.id === selectedSlot.id) && (
+          {selectedSlot && slotsForSelectedDate.some(s => s.id === selectedSlot.id && s.start === selectedSlot.start) && (
             <div style={{ background: "#F5F0E8", borderRadius: 12, padding: "14px 16px", marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
               <div style={{ fontWeight: 700, fontSize: 15, color: "#2A2622" }}>{svc?.name}</div>
               {multiLoc && location && <div style={{ fontSize: 13, color: "#5A5046" }}>{location.name}{location.address ? ` · ${location.address}` : ""}</div>}

@@ -25,7 +25,7 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 import { firebaseConfig } from "./firebaseConfig";
-import { timeToMinutes, publicApptFields, apptSlotIds, slotsCoveringRange } from "./helpers";
+import { timeToMinutes, publicApptFields, apptSlotIds, slotsCoveringRange, fitsInFranja, busyEntry, releaseFranja } from "./helpers";
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -178,28 +178,58 @@ export function listenAvailability(callback, fromDateKey) {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }, (err) => console.error("[listenAvailability] snapshot error:", err));
 }
+// Lo que ocupan los turnos ya cargados (con el descanso de su servicio), para marcarlos
+// dentro de una franja nueva que se abre encima.
+async function busyOfAppts(appts) {
+  if (!appts.length) return [];
+  const svcSnap = await getDocs(bcol("services"));
+  const services = new Map(svcSnap.docs.map(d => [d.id, { id: d.id, ...d.data() }]));
+  return appts.map(a => busyEntry(a.id, a.start, a.end, services.get(a.serviceId)));
+}
+const busyInside = (busy, slot) => busy.filter(b => rangesOverlap(slot.start, slot.end, b.start, b.end));
+
 export async function addAvailabilitySlot(slot) {
-  // slot: { dateKey, start, end }
-  const apptSnap = await getDocs(query(bcol("appointments"), where("dateKey", "==", slot.dateKey)));
-  const overlapsAppt = apptSnap.docs.some(d => {
-    const data = d.data();
-    return data.status !== "cancelado" && rangesOverlap(slot.start, slot.end, data.start, data.end);
-  });
-  if (overlapsAppt) {
-    throw new Error(`Ese horario se superpone con un turno ya tomado el ${slot.dateKey}.`);
-  }
+  // slot: { dateKey, start, end, locationId?, serviceIds? }
   const slotSnap = await getDocs(query(bcol("availability"), where("dateKey", "==", slot.dateKey)));
   const overlapsSlot = slotSnap.docs.some(d => rangesOverlap(slot.start, slot.end, d.data().start, d.data().end));
   if (overlapsSlot) {
-    throw new Error(`Ya existe un cupo que se superpone con ese horario el ${slot.dateKey}.`);
+    throw new Error(`Ya existe un horario abierto que se superpone con ese el ${slot.dateKey}.`);
   }
-  return addDoc(bcol("availability"), slot);
+  // Los turnos que ya están en ese horario quedan ocupados dentro de la franja,
+  // y la franja queda anotada en el turno para liberarla si se cancela.
+  const apptSnap = await getDocs(query(bcol("appointments"), where("dateKey", "==", slot.dateKey)));
+  const appts = apptSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.status !== "cancelado");
+  const busy = busyInside(await busyOfAppts(appts), slot);
+  const ref = await addDoc(bcol("availability"), { ...slot, ...(busy.length ? { busy } : {}) });
+  await Promise.all(busy.map(b => updateDoc(bdoc("appointments", b.apptId), { extraAvailabilityIds: arrayUnion(ref.id) })));
+  return ref;
 }
 export async function removeAvailabilitySlot(id) {
   return deleteDoc(bdoc("availability", id));
 }
-export async function freeAvailabilitySlot(id) {
-  return updateDoc(bdoc("availability", id), { booked: false });
+// Saca un turno de las franjas que ocupa (y destraba cupos viejos reservados enteros).
+// Cada franja va en su transacción para no pisar otra reserva que entre al mismo tiempo.
+export async function releaseAppointmentFranjas(apptId, slotIds) {
+  for (const id of slotIds) {
+    try {
+      const ref = bdoc("availability", id);
+      await runTransaction(db, async (t) => {
+        const snap = await t.get(ref);
+        const update = snap.exists() ? releaseFranja(snap.data(), apptId) : null;
+        if (update) t.update(ref, update);
+      });
+    } catch (e) {
+      console.error("[availability] No se pudo liberar la franja:", e);
+    }
+  }
+}
+// El servicio del turno (duración y descanso). Si no se encuentra, se usa la duración del turno.
+async function apptService(appt) {
+  if (appt.serviceId) {
+    const snap = await getDoc(bdoc("services", appt.serviceId));
+    if (snap.exists()) return { id: snap.id, ...snap.data() };
+  }
+  return { id: appt.serviceId || null, duration: timeToMinutes(appt.end) - timeToMinutes(appt.start), restMinutes: 0 };
 }
 // Permite que el cupo se vea en reservas aunque falte menos de 1 hora.
 export async function setAvailabilitySlotLastMinute(id, allowLastMinute) {
@@ -259,7 +289,7 @@ export async function updateBookingRef(clientPhone, apptId, { dateKey, start, en
     console.error("[phoneIndex/bookings] No se pudo actualizar la referencia:", e, { phoneDigits, apptId });
   }
 }
-// Crea muchos cupos de una sola vez (ej: "todos los lunes de 10 a 14, por 8 semanas")
+// Crea muchas franjas de una sola vez (ej: "todos los lunes de 10 a 14, por 8 semanas")
 // Firestore permite hasta 500 escrituras por batch; si hay más, las dividimos.
 // Descarta duplicados: no inserta cupos que ya existan con el mismo dateKey+start+end.
 // Devuelve la cantidad de cupos efectivamente creados.
@@ -279,29 +309,32 @@ export async function addAvailabilitySlotsBatch(slots) {
     const apptSnap = await getDocs(query(bcol("appointments"), where("dateKey", "in", chunk)));
     apptSnap.forEach(d => {
       const data = d.data();
-      if (data.status !== "cancelado") existingAppts.push(data);
+      if (data.status !== "cancelado") existingAppts.push({ id: d.id, ...data });
     });
   }
 
-  // Se descartan los cupos que se superpondrían con un cupo ya existente, con un turno
-  // ya tomado, o con otro cupo nuevo del mismo lote (evita horarios duplicados/solapados).
+  // Se descartan las franjas que se superpondrían con una ya existente o con otra nueva del
+  // mismo lote. Los turnos ya cargados quedan ocupados dentro de la franja nueva.
   const accepted = [];
   const newSlots = slots.filter(s => {
     if (existingSlots.some(e => e.dateKey === s.dateKey && rangesOverlap(s.start, s.end, e.start, e.end))) return false;
-    if (existingAppts.some(a => a.dateKey === s.dateKey && rangesOverlap(s.start, s.end, a.start, a.end))) return false;
     if (accepted.some(a => a.dateKey === s.dateKey && rangesOverlap(s.start, s.end, a.start, a.end))) return false;
     accepted.push(s);
     return true;
   });
   if (newSlots.length === 0) return 0;
 
+  const allBusy = await busyOfAppts(existingAppts);
+  const apptDateKey = new Map(existingAppts.map(a => [a.id, a.dateKey]));
   const chunks = [];
-  for (let i = 0; i < newSlots.length; i += 450) chunks.push(newSlots.slice(i, i + 450));
+  for (let i = 0; i < newSlots.length; i += 200) chunks.push(newSlots.slice(i, i + 200));
   for (const chunk of chunks) {
     const batch = writeBatch(db);
     chunk.forEach(slot => {
       const ref = doc(bcol("availability"));
-      batch.set(ref, slot);
+      const busy = busyInside(allBusy.filter(b => apptDateKey.get(b.apptId) === slot.dateKey), slot);
+      batch.set(ref, { ...slot, ...(busy.length ? { busy } : {}) });
+      busy.forEach(b => batch.update(bdoc("appointments", b.apptId), { extraAvailabilityIds: arrayUnion(ref.id) }));
     });
     await batch.commit();
   }
@@ -364,16 +397,17 @@ export async function bookSlotAtomic(appt) {
     return { apptId: ref.id, cancelToken };
   }
 
-  const slotRefs = apptSlotIds(appt).map(id => bdoc("availability", id));
+  const service = await apptService(appt);
+  const slotRef = bdoc("availability", slotId);
   let apptId;
   await runTransaction(db, async (transaction) => {
-    const slotSnaps = await Promise.all(slotRefs.map(ref => transaction.get(ref)));
-    if (slotSnaps.some(snap => !snap.exists() || snap.data().booked)) {
+    const slotSnap = await transaction.get(slotRef);
+    if (!slotSnap.exists() || !fitsInFranja(slotSnap.data(), appt.start, service)) {
       throw new Error("Este horario ya fue reservado. Por favor elegí otro.");
     }
-    slotRefs.forEach(ref => transaction.update(ref, { booked: true }));
     const apptRef = doc(bcol("appointments"));
     apptId = apptRef.id;
+    transaction.update(slotRef, { busy: [...(slotSnap.data().busy || []), busyEntry(apptId, appt.start, appt.end, service)] });
     transaction.set(apptRef, apptData);
   });
 
@@ -475,13 +509,7 @@ export async function cancelAppointmentPublic(apptId, cancelToken, availabilityS
     status: "cancelado",
     cancelProof,
   });
-  for (const slotId of apptSlotIds({ fromAvailabilityId: availabilitySlotId, extraAvailabilityIds: appt.extraAvailabilityIds })) {
-    try {
-      await updateDoc(bdoc("availability", slotId), { booked: false });
-    } catch (e) {
-      console.error("[availability] No se pudo liberar el cupo:", e);
-    }
-  }
+  await releaseAppointmentFranjas(apptId, apptSlotIds({ fromAvailabilityId: availabilitySlotId, extraAvailabilityIds: appt.extraAvailabilityIds }));
   if (normalizePhone(phone)) {
     try {
       await Promise.allSettled(
@@ -550,20 +578,23 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
     status: "confirmado",
     createdAt: Date.now(),
   };
-  const newSlotRefs = apptSlotIds(newAppt).map(id => bdoc("availability", id));
+  const service = await apptService(newAppt);
+  const newSlotRef = bdoc("availability", newAppt.fromAvailabilityId);
   const newApptRef = doc(bcol("appointments"));
   const newApptId = newApptRef.id;
 
   await runTransaction(db, async (t) => {
-    const newSlotSnaps = await Promise.all(newSlotRefs.map(ref => t.get(ref)));
-    if (newSlotSnaps.some(snap => !snap.exists() || snap.data().booked)) {
+    const newSlotSnap = await t.get(newSlotRef);
+    const franja = newSlotSnap.exists() ? newSlotSnap.data() : null;
+    // El turno viejo no le quita lugar al nuevo si están en la misma franja.
+    const withoutOld = franja && { ...franja, busy: (franja.busy || []).filter(b => b.apptId !== oldApptId) };
+    if (!franja || !fitsInFranja(withoutOld, newAppt.start, service)) {
       throw new Error("Este horario ya fue tomado. Por favor elegí otro.");
     }
-    // No incluimos el cupo viejo en la transacción: su regla exige booked:true,
-    // y si ya estuviera en false (estado inconsistente) haría fallar toda la transacción.
-    // Se libera best-effort después de que lo crítico ya se confirmó.
+    // La franja vieja se libera después, aparte: las reglas dejan agregar o sacar
+    // un turno por escritura, y puede ser la misma franja que la nueva.
     t.update(oldApptRef, { status: "cancelado", cancelProof: oldCancelProof });
-    newSlotRefs.forEach(ref => t.update(ref, { booked: true }));
+    t.update(newSlotRef, { busy: [...(franja.busy || []), busyEntry(newApptId, newAppt.start, newAppt.end, service)] });
     t.set(newApptRef, newApptData);
   });
 
@@ -582,14 +613,7 @@ export async function rescheduleAppointmentPublic({ oldApptId, oldCancelToken, o
     }
   }
 
-  // Liberar cupos viejos fuera de la transacción (best-effort)
-  for (const slotId of apptSlotIds({ fromAvailabilityId: oldSlotId, extraAvailabilityIds: oldAppt.extraAvailabilityIds })) {
-    try {
-      await updateDoc(bdoc("availability", slotId), { booked: false });
-    } catch (e) {
-      console.error("[reschedule] No se pudo liberar el cupo anterior:", e);
-    }
-  }
+  await releaseAppointmentFranjas(oldApptId, apptSlotIds({ fromAvailabilityId: oldSlotId, extraAvailabilityIds: oldAppt.extraAvailabilityIds }));
 
   const phoneDigits = normalizePhone(phone);
   if (phoneDigits) {
@@ -683,28 +707,30 @@ export async function createAppointment(appt) {
     throw new Error(`Ya existe un turno que se superpone con ${appt.start}-${appt.end} el ${appt.dateKey}.`);
   }
 
-  // El turno ocupa los cupos libres que se pisan con su horario (varios si dura más que un cupo).
-  // Si se cargó desde un cupo, ese queda como principal. Todo en una transacción para que un
-  // cliente no reserve el mismo horario a la vez.
-  const covering = slotsCoveringRange(await getDaySlots(appt.dateKey), appt.start, appt.end).map(s => s.id);
-  const slotId = appt.fromAvailabilityId || covering[0] || null;
+  // El turno (con el descanso de su servicio) ocupa las franjas que se pisan con su horario.
+  // Si se cargó desde una franja, esa queda como principal. Todo en una transacción para que
+  // un cliente no reserve el mismo horario a la vez.
+  const apptRef = doc(bcol("appointments"));
+  const entry = busyEntry(apptRef.id, appt.start, appt.end, await apptService(appt));
+  const { fromAvailabilityId: _from, ...apptFields } = appt;
+  const covering = slotsCoveringRange(await getDaySlots(appt.dateKey), entry.start, entry.end).map(s => s.id);
+  const slotId = covering.includes(appt.fromAvailabilityId) ? appt.fromAvailabilityId : covering[0] || null;
   const slotIds = slotId ? [slotId, ...covering.filter(id => id !== slotId)] : [];
   const extraIds = slotIds.slice(1);
   const apptData = {
-    ...appt,
+    ...apptFields,
     ...(slotId ? { fromAvailabilityId: slotId } : {}),
     ...(extraIds.length ? { extraAvailabilityIds: extraIds } : {}),
     createdAt: Date.now(),
   };
-  const apptRef = doc(bcol("appointments"));
   if (slotIds.length) {
     const slotRefs = slotIds.map(id => bdoc("availability", id));
     await runTransaction(db, async (t) => {
       const slotSnaps = await Promise.all(slotRefs.map(ref => t.get(ref)));
       if (slotSnaps.some(snap => !snap.exists() || snap.data().booked)) {
-        throw new Error("Este cupo ya fue reservado.");
+        throw new Error("Este horario ya fue reservado.");
       }
-      slotRefs.forEach(ref => t.update(ref, { booked: true }));
+      slotSnaps.forEach((snap, i) => t.update(slotRefs[i], { busy: [...(snap.data().busy || []), entry] }));
       t.set(apptRef, apptData);
     });
   } else {
@@ -760,21 +786,32 @@ export async function updateAppointmentWithSlotSwap(apptId, oldSlotIds, newData)
     throw new Error(`Ya existe un turno que se superpone con ${newData.start}-${newData.end} el ${newData.dateKey}.`);
   }
 
-  // Los cupos que ya ocupa este turno cuentan como libres para el nuevo horario.
+  // Las franjas que ya ocupa este turno cuentan como libres para el nuevo horario.
+  const entry = busyEntry(apptId, newData.start, newData.end, await apptService(newData));
   const daySlots = (await getDaySlots(newData.dateKey)).map(s => oldSlotIds.includes(s.id) ? { ...s, booked: false } : s);
-  const newSlotIds = slotsCoveringRange(daySlots, newData.start, newData.end).map(s => s.id);
-  const toFree = oldSlotIds.filter(id => !newSlotIds.includes(id)).map(id => bdoc("availability", id));
-  const toBook = newSlotIds.filter(id => !oldSlotIds.includes(id)).map(id => bdoc("availability", id));
+  const newSlotIds = slotsCoveringRange(daySlots, entry.start, entry.end).map(s => s.id);
+  const allIds = [...new Set([...oldSlotIds, ...newSlotIds])];
   const apptRef = bdoc("appointments", apptId);
 
   await runTransaction(db, async (t) => {
     // Firestore exige todos los reads antes de cualquier write en la transacción
-    const bookSnaps = await Promise.all([...toFree, ...toBook].map(ref => t.get(ref))).then(s => s.slice(toFree.length));
-    if (bookSnaps.some(snap => !snap.exists() || snap.data().booked)) {
-      throw new Error("Uno de los cupos de ese horario ya fue reservado.");
-    }
-    toFree.forEach(ref => t.update(ref, { booked: false }));
-    toBook.forEach(ref => t.update(ref, { booked: true }));
+    const snaps = await Promise.all(allIds.map(id => t.get(bdoc("availability", id))));
+    const writes = [];
+    snaps.forEach((snap, i) => {
+      const id = allIds[i];
+      const isNew = newSlotIds.includes(id);
+      if (!snap.exists()) {
+        if (isNew) throw new Error("Uno de los horarios ya no existe.");
+        return;
+      }
+      const data = snap.data();
+      const wasOldBooked = oldSlotIds.includes(id) && data.booked;
+      if (isNew && data.booked && !wasOldBooked) throw new Error("Ese horario ya fue reservado.");
+      const busy = (data.busy || []).filter(b => b.apptId !== apptId);
+      if (isNew) busy.push(entry);
+      writes.push([snap.ref, { busy, ...(wasOldBooked ? { booked: false } : {}) }]);
+    });
+    writes.forEach(([ref, data]) => t.update(ref, data));
     t.update(apptRef, { ...newData, fromAvailabilityId: newSlotIds[0] || null, extraAvailabilityIds: newSlotIds.slice(1) });
   });
 

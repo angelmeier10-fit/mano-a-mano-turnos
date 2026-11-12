@@ -347,3 +347,30 @@ test("consultas livianas: el público lee solo cupos futuros y el dueño solo tu
   const appts = await assertSucceeds(getDocs(query(collection(ownerA(), "businesses/a/appointments"), where("createdAt", ">", 1000))));
   assert.deepEqual(appts.docs.map(d => d.id), ["nuevo"]);
 });
+
+test("franjas: el público solo agrega o saca un turno de `busy`", async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "businesses/a/availability/f1"),
+      { dateKey: "2099-01-01", start: "09:00", end: "13:00", serviceIds: ["s1"], busy: [{ start: "09:00", end: "09:30", apptId: "x" }] });
+  });
+  const ref = doc(anon(), "businesses/a/availability/f1");
+  const uno = { start: "09:00", end: "09:30", apptId: "x" };
+  const dos = { start: "10:00", end: "11:00", apptId: "y" };
+  const tres = { start: "11:00", end: "12:00", apptId: "z" };
+  await assertSucceeds(updateDoc(ref, { busy: [uno, dos] }));
+  await assertFails(updateDoc(ref, { busy: [uno, dos, tres, { start: "12:00", end: "12:30", apptId: "w" }] }));
+  await assertFails(updateDoc(ref, { busy: [] }));
+  await assertSucceeds(updateDoc(ref, { busy: [dos] }));
+  await assertFails(updateDoc(ref, { busy: [tres] }));
+  await assertFails(updateDoc(ref, { busy: [dos, tres], end: "20:00" }));
+  await assertFails(updateDoc(ref, { serviceIds: [] }));
+  await assertFails(updateDoc(ref, { busy: "x" }));
+  await assertSucceeds(updateDoc(doc(ownerA(), "businesses/a/availability/f1"), { end: "14:00", busy: [] }));
+});
+
+test("franjas: el público puede ocupar una franja sin `busy` todavía", async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "businesses/a/availability/f2"), { dateKey: "2099-01-01", start: "09:00", end: "13:00" });
+  });
+  await assertSucceeds(updateDoc(doc(anon(), "businesses/a/availability/f2"), { busy: [{ start: "09:00", end: "10:00", apptId: "a" }] }));
+});

@@ -14,7 +14,7 @@ import {
   listenAvailability, addAvailabilitySlot, removeAvailabilitySlot, addAvailabilitySlotsBatch, removeAvailabilitySlotsByIds,
   listenAppointments, listenIncomingPendingAppointments, createAppointment, updateAppointment, deleteAppointment,
   listenClients, upsertClientByName, updateClient, deleteClient,
-  listenBusinessInfo, setBusinessInfo, freeAvailabilitySlot,
+  listenBusinessInfo, setBusinessInfo,
   listenGiftCards, listenCombos,
   listenIncomingPendingGiftCards, listenIncomingPendingCombos,
   listenLocations, addLocation, updateLocation, deleteLocation,
@@ -279,7 +279,6 @@ export default function App() {
             onRemoveSlot={removeAvailabilitySlot}
             onCloseDay={removeAvailabilitySlotsByIds}
             onAddSlotsBatch={addAvailabilitySlotsBatch}
-            onFreeSlot={freeAvailabilitySlot}
             upsertClientByName={upsertClientByName}
             pendingGiftCards={giftCards.filter(g => g.status === "pending").length}
             onGoGiftCards={() => setView("giftcards")}
