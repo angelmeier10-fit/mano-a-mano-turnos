@@ -444,7 +444,7 @@ export default function ReservarView({ services: allServices, availability: allA
             >
               <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
               <span style={{ opacity: 0.85, fontSize: 12, fontWeight: 500 }}>
-                {s.duration} min · incluido en gift card
+                {s.duration} min · incluido en {combo ? "tu combo" : "gift card"}
               </span>
             </div>
           ))}
