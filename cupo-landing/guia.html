@@ -155,6 +155,7 @@
           <h3>Cargá tus servicios</h3>
           <p>En <span class="tab">Servicios</span> tocá <b>Agregar servicio</b> y completá nombre, duración en minutos y precio.</p>
           <ul>
+            <li><b>Descanso después</b>: los minutos libres que quedan después de cada turno de ese servicio, antes del siguiente. Con 0, los turnos van uno detrás del otro.</li>
             <li><b>Combo x2 / x3</b>: el precio de 2 o 3 sesiones juntas. Si lo dejás en 0, ese combo no se ofrece.</li>
             <li><b>Lugares donde se ofrece</b>: destildá los lugares donde no lo hacés. Si en algún lugar cobrás distinto, escribí ese precio al lado; vacío usa el precio base.</li>
           </ul>
@@ -177,11 +178,16 @@
         <div class="text">
           <span class="num"></span>
           <h3>Abrí tus horarios disponibles</h3>
-          <p>En <span class="tab">Agenda</span>, en cada día tocá el ícono del calendario. Elegí el <b>lugar</b>, la <b>duración</b> y tocá los horarios en que podés atender. Verde es cupo abierto; tocalo de nuevo para quitarlo.</p>
+          <p>En <span class="tab">Agenda</span>, en cada día tocá el ícono del calendario y elegí el <b>lugar</b>. Hay dos formas de abrir horarios:</p>
+          <ul>
+            <li><b>De corrido</b>: ponés desde qué hora hasta qué hora atendés (por ejemplo, de 9 a 13) y tocás <b>Agregar horario</b>. Tus clientes ven los turnos uno detrás del otro, según lo que dura cada servicio y su descanso.</li>
+            <li><b>Turnos sueltos</b>: elegís la duración de cada horario y tocás las horas en que podés atender. En cada uno entran los turnos que quepan.</li>
+          </ul>
+          <p>Si tenés más de un servicio, con <b>Solo para</b> un horario se ofrece únicamente para los servicios que marques. Para quitar un horario tocá la <b>X</b> (si ya tiene turnos, primero cancelalos).</p>
           <p>Solo esos horarios les aparecen a tus clientes.</p>
-          <p class="tip">Para no cargar día por día: <b>Cargar horario semanal recurrente</b> repite tus horarios durante 1 a 8 semanas, y <b>Copiar cupos de esta semana a la siguiente</b> copia lo que ya cargaste.</p>
+          <p class="tip">Para no cargar día por día: <b>Cargar horario semanal recurrente</b> repite tus horarios durante varias semanas, y <b>Copiar horarios de esta semana a la siguiente</b> copia lo que ya cargaste.</p>
         </div>
-        <figure><div class="phone"><img src="img/06-cupos.png" alt="Selector de cupos con lugar, duración y grilla de horarios" loading="lazy"></div></figure>
+        <figure><div class="phone"><img src="img/06-cupos.png" alt="Pantalla para abrir los horarios de un día" loading="lazy"></div></figure>
       </li>
 
       <li class="item">
@@ -227,7 +233,7 @@
           <dt class="s-nov">No vino</dt><dd>Queda contado como inasistencia en la ficha del cliente.</dd>
         </dl>
         <p>Desde ahí también podés cambiar fecha, hora, lugar o servicio, aplicar un descuento o recargo, y tocar <b>Enviar confirmación por WhatsApp</b>.</p>
-        <p class="tip">Para cargar un turno vos (por ejemplo, alguien que te escribió): <b>Agregar turno</b> al pie de cada día, o el <b>+</b> de un cupo libre. Podés marcarlo para que se repita todas las semanas.</p>
+        <p class="tip">Para cargar un turno vos (por ejemplo, alguien que te escribió): <b>Agregar turno</b> al pie de cada día, o el <b>+</b> de un horario abierto. Podés marcarlo para que se repita todas las semanas.</p>
       </div>
       <figure><div class="phone"><img src="img/11-turno.png" alt="Turno abierto con los botones de estado" loading="lazy"></div></figure>
     </div>
@@ -263,7 +269,7 @@
       <div class="text">
         <h3>Combos</h3>
         <p>Un combo son 2 o 3 sesiones pagas por adelantado al precio que pusiste en el servicio. Tu cliente lo pide desde tu página (para él o para regalar) y queda <b>pendiente de pago</b>. Puede transferirte o pagarte en efectivo en la primera sesión.</p>
-        <p>En <span class="tab">Combos</span> tocá <b>Confirmar pago</b> cuando te pague. Desde ese momento tiene <b>60 días</b> para usar las sesiones. Cuando reserva con su teléfono, le aparece "Usar una sesión de este combo" y el turno le sale gratis.</p>
+        <p>En <span class="tab">Combos</span> tocá <b>Confirmar pago</b> cuando te pague. Desde ese momento tiene <b>60 días</b> para usar las sesiones. Cuando reserva con su teléfono, le aparece "Usar una sesión de este combo" y el turno le sale gratis. También puede entrar con el link del combo y tocar <b>Reservar turno con este combo</b>.</p>
         <p class="tip">El numerito en la pestaña Combos te avisa los pendientes y los que vencen en menos de una semana.</p>
       </div>
     </div>
@@ -308,7 +314,7 @@
         <h3>Reservar un turno</h3>
         <p>Eligen el lugar, ponen su nombre y WhatsApp, eligen el servicio, el día y el horario, y tocan <b>Confirmar turno</b>.</p>
         <p>Les queda <b>pendiente de confirmación</b> y se les abre WhatsApp con un mensaje para vos. El turno te aparece en la agenda como Pendiente.</p>
-        <p class="tip">Un horario deja de mostrarse cuando falta menos de 1 hora. Si querés ofrecerlo igual, tocá el rayito del cupo en tu agenda.</p>
+        <p class="tip">Un horario deja de mostrarse cuando falta menos de 1 hora. Si querés ofrecerlo igual, tocá el rayito de ese horario en tu agenda.</p>
       </div>
       <figure><div class="phone"><img src="img/18-reservar.png" alt="Página de reservas con lugar, datos, servicio y horarios" loading="lazy"></div></figure>
     </div>
@@ -337,7 +343,7 @@
       <h2>Para tener a mano</h2>
     </div>
     <div class="faq">
-      <div><b>Un cliente no ve un horario</b><p>Revisá que el cupo esté abierto en ese lugar, que dure al menos lo que dura el servicio y que falte más de 1 hora.</p></div>
+      <div><b>Un cliente no ve un horario</b><p>Revisá que el horario esté abierto en ese lugar, que le quede tiempo libre para lo que dura el servicio, que no esté marcado "Solo para" otros servicios y que falte más de 1 hora.</p></div>
       <div><b>No me llegó el aviso de una reserva</b><p>Los avisos llegan con la agenda abierta y las notificaciones activadas. Igual, todo turno nuevo queda en la campanita de pendientes.</p></div>
       <div><b>Quiero dejar de ofrecer un servicio</b><p>Borralo en Servicios, o destildá los lugares donde ya no lo hacés.</p></div>
       <div><b>No quiero usar referidos</b><p>Poné 0 en "Descuento por referidos" en Negocio: desaparece el link y nadie recibe el descuento.</p></div>
