@@ -5,6 +5,7 @@ import {
   formatPrice, formatDateLong, formatDateShort, DAY_NAMES, formatPhoneForWhatsapp,
   applyClientDiscount, getTrafficSource, HOW_FOUND_OPTIONS, getReferralAmount,
   slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, servicePaymentLink, startTimes,
+  groupServicesByCategory,
 } from "../../shared/helpers";
 import { PayButton } from "./TransferInfo";
 import { getClientDiscountPublic, getCombosByPhone, isExistingClientPublic, getReferralCreditPublic } from "../../shared/firestoreApi";
@@ -450,23 +451,28 @@ export default function ReservarView({ services: allServices, availability: allA
           ))}
         </div>
       ) : (
-        <div style={styles.serviceChips}>
-          {services.map(s => (
-            <button
-              key={s.id}
-              onClick={() => setServiceId(s.id)}
-              style={{
-                ...styles.serviceChip,
-                ...(serviceId === s.id ? { background: s.color, color: "#EFE9DF", borderColor: s.color } : {}),
-              }}
-            >
-              <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
-              <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
-                {s.duration} min{servicePrice(s, locationId) ? ` · ${formatPrice(priceWithDiscounts(servicePrice(s, locationId), s.id).finalPrice)}` : ""}
-              </span>
-            </button>
-          ))}
-        </div>
+        groupServicesByCategory(services).map(group => (
+          <div key={group.title || "_"}>
+            {group.title && <div style={{ fontSize: 13, fontWeight: 700, color: "#5A5248", margin: "10px 0 6px" }}>{group.title}</div>}
+            <div style={styles.serviceChips}>
+              {group.services.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setServiceId(s.id)}
+                  style={{
+                    ...styles.serviceChip,
+                    ...(serviceId === s.id ? { background: s.color, color: "#EFE9DF", borderColor: s.color } : {}),
+                  }}
+                >
+                  <span style={{ display: "block", fontWeight: 700 }}>{s.name}</span>
+                  <span style={{ opacity: 0.8, fontSize: 12, fontWeight: 500 }}>
+                    {s.duration} min{servicePrice(s, locationId) ? ` · ${formatPrice(priceWithDiscounts(servicePrice(s, locationId), s.id).finalPrice)}` : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))
       )}
 
       {matchingCombo && !preselectedServiceId && (

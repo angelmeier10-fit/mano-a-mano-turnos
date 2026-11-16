@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp, X } from "lucide-react";
-import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong, clientHistory, clientStats, isHttpsUrl } from "../../shared/helpers";
+import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong, clientHistory, clientStats, isHttpsUrl, groupServicesByCategory } from "../../shared/helpers";
 import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession, createCombo, deleteCombo, activateCombo, updateCombo } from "../../shared/firestoreApi";
 import { Package } from "lucide-react";
 import styles from "../../shared/styles";
@@ -382,6 +382,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [savingClient, setSavingClient] = useState(false);
   const canImportContact = typeof navigator !== "undefined" && !!navigator.contacts?.select;
   const [editingClient, setEditingClient] = useState(false);
   const [editName, setEditName] = useState("");
@@ -428,12 +429,16 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
 
   async function addClient(e) {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (savingClient) return;
+    if (!newName.trim()) { window.alert("Escribí el nombre del cliente."); return; }
+    setSavingClient(true);
     try {
       await onAddClient(newName.trim(), newPhone.trim());
       setNewName(""); setNewPhone(""); setShowAddForm(false);
     } catch (err) {
       window.alert(err.message || "No se pudo guardar el contacto.");
+    } finally {
+      setSavingClient(false);
     }
   }
 
@@ -724,12 +729,14 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
             </button>
           )}
           <label style={styles.fieldLabel}>Nombre</label>
-          <input style={styles.input} value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nombre y apellido" autoFocus />
+          <input style={styles.input} value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nombre y apellido" autoFocus
+            enterKeyHint="next"
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.form.elements.newPhone.focus(); } }} />
           <label style={styles.fieldLabel}>Teléfono</label>
-          <input style={styles.input} value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Ej: 11 2345 6789" />
+          <input style={styles.input} name="newPhone" type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Ej: 11 2345 6789" enterKeyHint="done" />
           <div style={styles.modalActions}>
             <button type="button" style={styles.cancelBtn} onClick={() => { setShowAddForm(false); setNewName(""); setNewPhone(""); }}>Cancelar</button>
-            <button type="submit" style={styles.saveBtn}><Check size={16} /> Guardar</button>
+            <button type="submit" disabled={savingClient} style={{ ...styles.saveBtn, opacity: savingClient ? 0.6 : 1 }}><Check size={16} /> {savingClient ? "Guardando…" : "Guardar"}</button>
           </div>
         </form>
       )}
@@ -935,6 +942,18 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   const [price2, setPrice2] = useState(0);
   const [price3, setPrice3] = useState(0);
   const [color, setColor] = useState("#B5654A");
+  const [category, setCategory] = useState("");
+  const existingCategories = [...new Set(services.map(s => (s.category || "").trim()).filter(Boolean))];
+  const categoryField = (
+    <>
+      <label style={styles.fieldLabel}>Título (opcional)</label>
+      <input style={styles.input} value={category} onChange={e => setCategory(e.target.value)} placeholder="Ej: Masajes, Faciales, Depilación" list="service-categories" />
+      <datalist id="service-categories">
+        {existingCategories.map(c => <option key={c} value={c} />)}
+      </datalist>
+      <p style={{ fontSize: 11.5, color: "#8A8275", margin: "4px 0 10px" }}>Los servicios con el mismo título se muestran juntos en reservas.</p>
+    </>
+  );
   const [locationIds, setLocationIds] = useState([]);
   const [priceByLocation, setPriceByLocation] = useState({});
   const locationFields = (
@@ -970,7 +989,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   const palette = ["#B5654A", "#6E7F5C", "#8B4226", "#4A5A6B", "#7A5C3E", "#5C4A6B"];
 
   function resetForm() {
-    setName(""); setDuration(60); setRestMinutes(0); setPrice(20000); setPrice2(0); setPrice3(0); setColor("#B5654A");
+    setName(""); setDuration(60); setRestMinutes(0); setPrice(20000); setPrice2(0); setPrice3(0); setColor("#B5654A"); setCategory("");
     setLocationIds([]); setPriceByLocation({});
     setPaymentLink(""); setPaymentLink2(""); setPaymentLink3("");
   }
@@ -978,14 +997,14 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   function addService(e) {
     e.preventDefault();
     if (!name.trim() || !paymentLinksValid()) return;
-    onAddService({ name: name.trim(), duration: Number(duration), restMinutes: Math.max(0, Number(restMinutes) || 0), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData(), ...paymentData() });
+    onAddService({ name: name.trim(), duration: Number(duration), restMinutes: Math.max(0, Number(restMinutes) || 0), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, category: category.trim(), ...locationData(), ...paymentData() });
     resetForm();
     setShowForm(false);
   }
 
   function startEdit(s) {
     setEditingService(s);
-    setName(s.name); setDuration(s.duration); setRestMinutes(s.restMinutes || 0); setPrice(s.price || 0); setPrice2(s.price2 || 0); setPrice3(s.price3 || 0); setColor(s.color);
+    setName(s.name); setDuration(s.duration); setRestMinutes(s.restMinutes || 0); setPrice(s.price || 0); setPrice2(s.price2 || 0); setPrice3(s.price3 || 0); setColor(s.color); setCategory(s.category || "");
     setLocationIds(s.locationIds || []); setPriceByLocation(s.priceByLocation || {});
     setPaymentLink(s.paymentLink || ""); setPaymentLink2(s.paymentLink2 || ""); setPaymentLink3(s.paymentLink3 || "");
     setShowForm(false);
@@ -994,7 +1013,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
   function saveEdit(e) {
     e.preventDefault();
     if (!name.trim() || !paymentLinksValid()) return;
-    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), restMinutes: Math.max(0, Number(restMinutes) || 0), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, ...locationData(), ...paymentData() });
+    onUpdateService(editingService.id, { name: name.trim(), duration: Number(duration), restMinutes: Math.max(0, Number(restMinutes) || 0), color, price: Number(price) || 0, price2: Number(price2) || 0, price3: Number(price3) || 0, category: category.trim(), ...locationData(), ...paymentData() });
     setEditingService(null);
     resetForm();
   }
@@ -1003,7 +1022,10 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
     <div style={styles.viewWrap}>
       <h2 style={styles.sectionTitle}>Servicios</h2>
       <div style={styles.serviceList}>
-        {services.map(s => (
+        {groupServicesByCategory(services).map(group => (
+          <React.Fragment key={group.title || "_"}>
+          {group.title && <div style={{ fontSize: 12, fontWeight: 700, color: "#8A7E70", textTransform: "uppercase", letterSpacing: "0.05em", margin: "8px 0 2px" }}>{group.title}</div>}
+        {group.services.map(s => (
           <div key={s.id}>
             <div style={styles.serviceRow}>
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
@@ -1057,6 +1079,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
               <form style={{ ...styles.newServiceForm, marginTop: 4 }} onSubmit={saveEdit}>
                 <label style={styles.fieldLabel}>Nombre</label>
                 <input style={styles.input} value={name} onChange={e => setName(e.target.value)} autoFocus />
+                {categoryField}
                 <div style={styles.fieldRow}>
                   <div style={{ flex: 1 }}>
                     <label style={styles.fieldLabel}>Duración (min)</label>
@@ -1096,6 +1119,8 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
             )}
           </div>
         ))}
+          </React.Fragment>
+        ))}
       </div>
 
       {!showForm ? (
@@ -1106,6 +1131,7 @@ export function ServiciosView({ services, onAddService, onUpdateService, onDelet
         <form style={styles.newServiceForm} onSubmit={addService}>
           <label style={styles.fieldLabel}>Nombre</label>
           <input style={styles.input} value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Drenaje linfático" autoFocus />
+          {categoryField}
           <div style={styles.fieldRow}>
             <div style={{ flex: 1 }}>
               <label style={styles.fieldLabel}>Duración (min)</label>

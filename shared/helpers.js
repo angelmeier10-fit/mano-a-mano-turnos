@@ -143,6 +143,23 @@ export function slotLocationId(slot, locations) {
 export function serviceAtLocation(service, locationId) {
   return !locationId || !service.locationIds?.length || service.locationIds.includes(locationId);
 }
+// Agrupa los servicios por su título (category). Sin ningún título: un único grupo con title "".
+// Con títulos: grupos en el orden en que aparecen y los sin título al final, como "Otros".
+export function groupServicesByCategory(services) {
+  const groups = new Map();
+  const loose = [];
+  for (const s of services) {
+    const title = (s.category || "").trim();
+    if (!title) { loose.push(s); continue; }
+    const key = title.toLowerCase();
+    if (!groups.has(key)) groups.set(key, { title, services: [] });
+    groups.get(key).services.push(s);
+  }
+  if (!groups.size) return loose.length ? [{ title: "", services: loose }] : [];
+  const result = [...groups.values()];
+  if (loose.length) result.push({ title: "Otros", services: loose });
+  return result;
+}
 export function servicePrice(service, locationId) {
   const p = locationId ? service?.priceByLocation?.[locationId] : undefined;
   return p > 0 ? p : (service?.price || 0);
