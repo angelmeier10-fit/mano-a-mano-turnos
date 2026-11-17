@@ -418,12 +418,16 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
 
   async function importContact() {
     try {
-      const [contact] = await navigator.contacts.select(["name", "tel"], { multiple: false });
-      if (!contact) return;
+      const result = await navigator.contacts.select(["name", "tel"], { multiple: false });
+      const contact = result?.[0];
+      if (!contact?.name?.[0] && !contact?.tel?.[0]) {
+        window.alert(`El teléfono no devolvió datos del contacto. Respuesta: ${JSON.stringify(result)}`);
+        return;
+      }
       if (contact.name?.[0]) setNewName(contact.name[0]);
       if (contact.tel?.[0]) setNewPhone(contact.tel[0]);
-    } catch {
-      // el usuario canceló el picker o no hay permiso; no hacemos nada
+    } catch (e) {
+      window.alert(`No se pudo importar el contacto (${e?.name}: ${e?.message})`);
     }
   }
 

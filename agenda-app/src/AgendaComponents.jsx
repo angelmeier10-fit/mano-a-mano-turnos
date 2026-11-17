@@ -1292,13 +1292,18 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
 
   async function pickContact() {
     try {
-      const [contact] = await navigator.contacts.select(["name", "tel"], { multiple: false });
-      if (!contact) return;
+      const result = await navigator.contacts.select(["name", "tel"], { multiple: false });
+      const contact = result?.[0];
+      if (!contact?.name?.[0] && !contact?.tel?.[0]) {
+        window.alert(`El teléfono no devolvió datos del contacto. Respuesta: ${JSON.stringify(result)}`);
+        return;
+      }
       if (contact.name?.[0]) setClientName(contact.name[0]);
       if (contact.tel?.[0]) setClientPhone(contact.tel[0]);
       setShowClientList(false);
     } catch (e) {
       console.error("[pickContact] falló:", e);
+      window.alert(`No se pudo importar el contacto (${e?.name}: ${e?.message})`);
     }
   }
 
