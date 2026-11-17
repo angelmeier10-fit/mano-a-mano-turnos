@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp, X } from "lucide-react";
 import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong, clientHistory, clientStats, isHttpsUrl, groupServicesByCategory } from "../../shared/helpers";
 import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession, createCombo, deleteCombo, activateCombo, updateCombo } from "../../shared/firestoreApi";
@@ -384,6 +384,7 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   const [newPhone, setNewPhone] = useState("");
   const [savingClient, setSavingClient] = useState(false);
   const canImportContact = typeof navigator !== "undefined" && !!navigator.contacts?.select;
+  const importingContactRef = useRef(false);
   const [editingClient, setEditingClient] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -417,6 +418,9 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   }
 
   async function importContact() {
+    // El toque en "Listo" del selector de Android puede llegar a este botón al volver y reabrirlo.
+    if (importingContactRef.current) return;
+    importingContactRef.current = true;
     try {
       const result = await navigator.contacts.select(["name", "tel"], { multiple: false });
       const contact = result?.[0];
@@ -428,6 +432,8 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
       if (contact.tel?.[0]) setNewPhone(contact.tel[0]);
     } catch (e) {
       window.alert(`No se pudo importar el contacto (${e?.name}: ${e?.message})`);
+    } finally {
+      setTimeout(() => { importingContactRef.current = false; }, 1000);
     }
   }
 

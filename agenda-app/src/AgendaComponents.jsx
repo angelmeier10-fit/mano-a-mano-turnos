@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp, Contact, User, Zap } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
@@ -1290,7 +1290,13 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
   const waLink = whatsappLink();
   const supportsContactPicker = typeof navigator !== "undefined" && "contacts" in navigator && "ContactsManager" in window;
 
+  const pickingContactRef = useRef(false);
+
   async function pickContact() {
+    // Al tocar "Listo" en el selector de Android, ese mismo toque puede llegar al botón
+    // de contactos al volver a la app y abrir el selector de nuevo, perdiendo la elección.
+    if (pickingContactRef.current) return;
+    pickingContactRef.current = true;
     try {
       const result = await navigator.contacts.select(["name", "tel"], { multiple: false });
       const contact = result?.[0];
@@ -1304,6 +1310,8 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
     } catch (e) {
       console.error("[pickContact] falló:", e);
       window.alert(`No se pudo importar el contacto (${e?.name}: ${e?.message})`);
+    } finally {
+      setTimeout(() => { pickingContactRef.current = false; }, 1000);
     }
   }
 
