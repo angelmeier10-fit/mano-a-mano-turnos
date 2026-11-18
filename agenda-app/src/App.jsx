@@ -19,7 +19,7 @@ import {
   listenIncomingPendingGiftCards, listenIncomingPendingCombos,
   listenLocations, addLocation, updateLocation, deleteLocation,
 } from "../../shared/firestoreApi";
-import { DEFAULT_BUSINESS_INFO, GoogleFontsHref, sortLocations, subscriptionStatus } from "../../shared/helpers";
+import { DEFAULT_BUSINESS_INFO, GoogleFontsHref, sortLocations, subscriptionStatus, parseSharedContact } from "../../shared/helpers";
 import styles from "../../shared/styles";
 
 function GoogleFontsLoader() {
@@ -55,6 +55,12 @@ export default function App() {
   const [apptNotifs, setApptNotifs] = useState([]); // [{ id, clientName, dateKey, start }]
   const [purchaseNotifs, setPurchaseNotifs] = useState([]); // [{ id, kind: "giftcard"|"combo", label }]
   const [openApptId, setOpenApptId] = useState(null);
+  const [sharedContact, setSharedContact] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const contact = parseSharedContact(params.get("title"), params.get("text"));
+    if (params.has("text") || params.has("title")) window.history.replaceState(null, "", window.location.pathname);
+    return contact;
+  });
 
   useEffect(() => {
     const unsub = watchAuthState((u) => {
@@ -284,6 +290,8 @@ export default function App() {
             onGoGiftCards={() => setView("giftcards")}
             openApptId={openApptId}
             onOpenApptHandled={() => setOpenApptId(null)}
+            sharedContact={sharedContact}
+            onSharedContactHandled={() => setSharedContact(null)}
           />
         )}
         {view === "clientes" && (

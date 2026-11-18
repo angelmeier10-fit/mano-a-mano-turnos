@@ -16,7 +16,7 @@ export function AgendaView({
   onCreateAppt, onUpdateAppt, onDeleteAppt,
   onAddSlot, onRemoveSlot, onCloseDay, onAddSlotsBatch,
   upsertClientByName, pendingGiftCards = 0, onGoGiftCards,
-  openApptId, onOpenApptHandled,
+  openApptId, onOpenApptHandled, sharedContact, onSharedContactHandled,
 }) {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [calendarView, setCalendarView] = useState("week");
@@ -112,6 +112,14 @@ export function AgendaView({
       onOpenApptHandled?.();
     }
   }, [openApptId]);
+
+  useEffect(() => {
+    if (!sharedContact) return;
+    setPrefillSlot({ dateKey: dateKey(new Date()), start: "10:00", clientName: sharedContact.name, clientPhone: sharedContact.phone });
+    setEditingAppt(null);
+    setShowApptForm(true);
+    onSharedContactHandled?.();
+  }, [sharedContact]);
 
   function openNewAppt(slotDate, slotTime, fromSlotId) {
     const slot = fromSlotId ? availability.find(s => s.id === fromSlotId) : null;

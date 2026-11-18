@@ -33,6 +33,18 @@ export function instagramHandle(value) {
   return path.split(/[/?#]/)[0].replace(/^@/, "");
 }
 
+// Contacto compartido a la agenda desde la libreta del celular (texto plano o vCard).
+const PHONE_RE = /\+?\d[\d\s().-]{5,}\d/;
+export function parseSharedContact(title, text) {
+  const raw = `${title || ""}\n${text || ""}`;
+  const fn = raw.match(/^FN[^:]*:(.+)$/m)?.[1]?.trim();
+  const tel = raw.match(/^TEL[^:]*:(.+)$/m)?.[1]?.trim();
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const phone = tel || lines.map(l => l.match(PHONE_RE)?.[0]).find(Boolean) || "";
+  const name = fn || lines.find(l => /\p{L}/u.test(l) && !PHONE_RE.test(l)) || "";
+  return name || phone ? { name, phone: phone.trim() } : null;
+}
+
 export function pad(n) { return n.toString().padStart(2, "0"); }
 export function dateKey(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 export function timeToMinutes(t) { const [h,m] = t.split(":").map(Number); return h*60+m; }

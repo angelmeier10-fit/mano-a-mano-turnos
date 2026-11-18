@@ -16,6 +16,12 @@ export default defineConfig({
         start_url: "/mano-a-mano-turnos/mano-a-mano-agenda/",
         scope: "/mano-a-mano-turnos/mano-a-mano-agenda/",
         display: "standalone",
+        // Aparece en "Compartir" del celular: un contacto compartido abre "Nuevo turno" cargado.
+        share_target: {
+          action: "/mano-a-mano-turnos/mano-a-mano-agenda/",
+          method: "GET",
+          params: { title: "title", text: "text" },
+        },
         background_color: "#EFE9DF",
         theme_color: "#B5654A",
         icons: [
