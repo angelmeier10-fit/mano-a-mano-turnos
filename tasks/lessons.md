@@ -21,3 +21,8 @@
 ## Buscar la función, no solo el texto literal (2026-11-12)
 - **Error:** dije que la agenda no mostraba el link de reservas porque busqué la URL literal (`?b=`); el link está en Negocio, armado por `reservasUrl()`.
 - **Regla:** antes de afirmar que algo falta, buscar también por la función o el texto visible ("Link de reservas"), no solo por cómo se escribe en una parte del código.
+
+## 2026-11-17 — Selector de contactos en Android (Samsung)
+- Error: supuse un "toque fantasma" que reabría el selector y agregué un bloqueo sin evidencia.
+- Causa real: en Samsung se elige en la libreta y después Chrome muestra "Compartir un contacto", donde hay que volver a marcar el contacto; si no, `select()` devuelve `[]`.
+- Regla: ante bugs de APIs del celular que no puedo reproducir, primero mostrar en pantalla lo que devuelve la API (cartel de diagnóstico) y recién después tocar lógica.

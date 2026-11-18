@@ -23,9 +23,10 @@ import {
   runTransaction,
   serverTimestamp,
   arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { firebaseConfig } from "./firebaseConfig";
-import { timeToMinutes, publicApptFields, apptSlotIds, slotsCoveringRange, fitsInFranja, busyEntry, releaseFranja } from "./helpers";
+import { timeToMinutes, minutesToTime, publicApptFields, apptSlotIds, slotsCoveringRange, fitsInFranja, busyEntry, releaseFranja, freeRanges, cutFreeRange } from "./helpers";
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
@@ -206,6 +207,21 @@ export async function addAvailabilitySlot(slot) {
 }
 export async function removeAvailabilitySlot(id) {
   return deleteDoc(bdoc("availability", id));
+}
+// Quita un tramo libre de una franja que ya tiene turnos, sin tocar los turnos.
+export async function removeFreeRange(id, start, end) {
+  const ref = bdoc("availability", id);
+  await runTransaction(db, async (t) => {
+    const snap = await t.get(ref);
+    if (!snap.exists()) return;
+    const franja = snap.data();
+    const stillFree = freeRanges(franja).some(r => minutesToTime(r.start) === start && minutesToTime(r.end) === end);
+    if (!stillFree) throw new Error("Ese horario cambió (puede que alguien haya reservado). Probá de nuevo.");
+    t.update(ref, cutFreeRange(franja, start, end));
+  });
+}
+export async function restoreFreeRange(id, removedRange) {
+  return updateDoc(bdoc("availability", id), { removed: arrayRemove(removedRange) });
 }
 // Saca un turno de las franjas que ocupa (y destraba cupos viejos reservados enteros).
 // Cada franja va en su transacción para no pisar otra reserva que entre al mismo tiempo.

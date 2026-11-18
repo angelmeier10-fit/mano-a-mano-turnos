@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startTimes, fitsInFranja, freeRanges, busyEntry, releaseFranja, apptSlotIds } from "../shared/helpers.js";
+import { startTimes, fitsInFranja, freeRanges, busyEntry, releaseFranja, apptSlotIds, cutFreeRange } from "../shared/helpers.js";
 
 const franja = (id, start, end, extra = {}) => ({ id, dateKey: "2026-11-20", start, end, ...extra });
 const svc = (id, duration, restMinutes = 0) => ({ id, duration, restMinutes });
@@ -90,4 +90,23 @@ test("releaseFranja saca el turno de la franja, o libera el cupo viejo", () => {
   assert.equal(releaseFranja(f, "z"), null);
   assert.deepEqual(releaseFranja(franja("v", "09:00", "10:00", { booked: true }), "a"), { booked: false });
   assert.equal(releaseFranja(franja("v", "09:00", "10:00"), "a"), null);
+});
+
+test("cutFreeRange achica la franja si el tramo libre está en una punta", () => {
+  const f = franja("f", "09:00", "13:00", { busy: [{ start: "10:00", end: "11:00", apptId: "a" }] });
+  assert.deepEqual(cutFreeRange(f, "11:00", "13:00"), { end: "11:00" });
+  assert.deepEqual(cutFreeRange(f, "09:00", "10:00"), { start: "10:00" });
+});
+
+test("cutFreeRange guarda como quitado un tramo libre del medio", () => {
+  const f = franja("f", "09:00", "13:00", { busy: [{ start: "09:00", end: "10:00", apptId: "a" }, { start: "12:00", end: "13:00", apptId: "b" }] });
+  const cut = cutFreeRange(f, "10:00", "12:00");
+  assert.deepEqual(cut, { removed: [{ start: "10:00", end: "12:00" }] });
+  assert.deepEqual(freeRanges({ ...f, ...cut }), []);
+});
+
+test("un tramo quitado no ofrece horarios y no pide descanso antes", () => {
+  const f = franja("f", "09:00", "13:00", { removed: [{ start: "11:00", end: "12:00" }] });
+  assert.deepEqual(freeRanges(f), [{ start: 540, end: 660, closed: false }, { start: 720, end: 780, closed: false }]);
+  assert.deepEqual(times(startTimes([f], svc("m60d", 60, 10))), ["09:00-10:00", "12:00-13:00"]);
 });

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Calendar, Plus, X, Check, Clock, ChevronLeft, ChevronRight, Trash2, MessageCircle, DollarSign, CalendarPlus, Copy, Share2, ChevronDown, ChevronUp, Contact, User, Zap } from "lucide-react";
 import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
@@ -8,8 +8,8 @@ import {
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
-import { ANAMNESIS_FIELDS, ClientQuickViewModal } from "./ClientesServiciosViews";
-import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, releaseAppointmentFranjas, addAppointmentHistory, redeemComboSession, restoreComboSession, restoreGiftCard, setAvailabilitySlotLastMinute, setReferralCredit, updateAppointment } from "../../shared/firestoreApi";
+import { ANAMNESIS_FIELDS, ClientQuickViewModal, CONTACT_NOT_MARKED_MSG } from "./ClientesServiciosViews";
+import { markBookingRefCancelled, markBookingRefConfirmed, deleteBookingRef, updateBookingRef, updateAppointmentWithSlotSwap, releaseAppointmentFranjas, addAppointmentHistory, redeemComboSession, restoreComboSession, restoreGiftCard, setAvailabilitySlotLastMinute, setReferralCredit, updateAppointment, removeFreeRange, restoreFreeRange } from "../../shared/firestoreApi";
 
 export function AgendaView({
   services, appointments, availability, clients, businessInfo, locations = [], combos = [], giftCards = [],
@@ -472,8 +472,13 @@ export function AgendaView({
               const dayAppts = apptsForDay(d);
               const dayAvail = (availabilityByDate[dKey] || []).slice().sort((a,b) => timeToMinutes(a.start)-timeToMinutes(b.start));
               const openSlots = dayAvail.flatMap(franja => freeRanges(franja).map(r => ({
-                ...franja, start: minutesToTime(r.start), end: minutesToTime(r.end), canRemove: !franja.busy?.length,
+                ...franja, start: minutesToTime(r.start), end: minutesToTime(r.end),
               })));
+              // Sin turnos se borra el horario entero; con turnos, solo ese tramo libre.
+              const removeOpenSlot = (slot) => (slot.busy?.length
+                ? removeFreeRange(slot.id, slot.start, slot.end)
+                : onRemoveSlot(slot.id)
+              ).catch(err => alert("No se pudo quitar el horario: " + err.message));
 
               return (
                 <div key={i} style={{ ...styles.dayCol, ...(isToday ? styles.dayColToday : {}) }}>
@@ -550,11 +555,9 @@ export function AgendaView({
                               <button style={styles.slotMiniBtn} onClick={() => openNewAppt(d, slot.start, slot.id)} title="Cargar turno acá">
                                 <Plus size={12} />
                               </button>
-                              {slot.canRemove && (
-                                <button style={styles.slotMiniBtnGhost} onClick={() => onRemoveSlot(slot.id)} title="Quitar horario">
-                                  <X size={12} />
-                                </button>
-                              )}
+                              <button style={styles.slotMiniBtnGhost} onClick={() => removeOpenSlot(slot)} title="Quitar horario">
+                                <X size={12} />
+                              </button>
                             </div>
                           </div>
                         );
@@ -794,6 +797,16 @@ function AvailabilityFormModal({ dateKey: dKey, existing, services = [], locatio
     try { await onRemove(id); } catch (err) { setErrorMsg(err.message); }
   }
 
+  async function removeTramo(id, start, end) {
+    setErrorMsg(null);
+    try { await removeFreeRange(id, start, end); } catch (err) { setErrorMsg(err.message); }
+  }
+
+  async function reopenTramo(id, removedRange) {
+    setErrorMsg(null);
+    try { await restoreFreeRange(id, removedRange); } catch (err) { setErrorMsg(err.message); }
+  }
+
   // Turnos sueltos: cada hora tocada abre un horario de la duración elegida.
   const overlaps = (s, e, other) => s < timeToMinutes(other.end) && timeToMinutes(other.start) < e;
   const chipTimes = [...new Set([...halfHourTimes(slotLength), ...existing.map(f => f.start)])]
@@ -871,6 +884,25 @@ function AvailabilityFormModal({ dateKey: dKey, existing, services = [], locatio
                           {f.busy.length} turno{f.busy.length !== 1 ? "s" : ""}: {f.busy.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)).map(b => b.start).join(", ")}
                         </span>
                       )}
+                      {f.busy?.length > 0 && freeRanges(f).map(r => {
+                        const start = minutesToTime(r.start), end = minutesToTime(r.end);
+                        return (
+                          <span key={start} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#6E7F5C" }}>
+                            Libre {start}–{end}
+                            <button type="button" style={styles.slotMiniBtnGhost} onClick={() => removeTramo(f.id, start, end)} title="Quitar este tramo libre">
+                              <X size={12} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                      {f.removed?.map(r => (
+                        <span key={`removed-${r.start}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#8A8275" }}>
+                          Quitado {r.start}–{r.end}
+                          <button type="button" style={styles.slotMiniBtnGhost} onClick={() => reopenTramo(f.id, r)} title="Volver a abrir este tramo">
+                            <Plus size={12} />
+                          </button>
+                        </span>
+                      ))}
                     </div>
                     {!franjaTaken(f) && (
                       <button type="button" style={styles.slotMiniBtnGhost} onClick={() => removeFranja(f.id)} title="Quitar horario">
@@ -1290,28 +1322,17 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
   const waLink = whatsappLink();
   const supportsContactPicker = typeof navigator !== "undefined" && "contacts" in navigator && "ContactsManager" in window;
 
-  const pickingContactRef = useRef(false);
-
   async function pickContact() {
-    // Al tocar "Listo" en el selector de Android, ese mismo toque puede llegar al botón
-    // de contactos al volver a la app y abrir el selector de nuevo, perdiendo la elección.
-    if (pickingContactRef.current) return;
-    pickingContactRef.current = true;
     try {
-      const result = await navigator.contacts.select(["name", "tel"], { multiple: false });
-      const contact = result?.[0];
-      if (!contact?.name?.[0] && !contact?.tel?.[0]) {
-        window.alert(`El teléfono no devolvió datos del contacto. Respuesta: ${JSON.stringify(result)}`);
-        return;
-      }
+      // Modo múltiple a propósito: en algunos Samsung el modo de a uno no deja marcar el contacto.
+      const [contact] = await navigator.contacts.select(["name", "tel"], { multiple: true });
+      if (!contact) { window.alert(CONTACT_NOT_MARKED_MSG); return; }
       if (contact.name?.[0]) setClientName(contact.name[0]);
       if (contact.tel?.[0]) setClientPhone(contact.tel[0]);
       setShowClientList(false);
     } catch (e) {
       console.error("[pickContact] falló:", e);
-      window.alert(`No se pudo importar el contacto (${e?.name}: ${e?.message})`);
-    } finally {
-      setTimeout(() => { pickingContactRef.current = false; }, 1000);
+      window.alert(`No se pudo importar el contacto (${e?.message})`);
     }
   }
 

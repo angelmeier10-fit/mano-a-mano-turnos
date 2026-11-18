@@ -53,21 +53,30 @@ export function franjaAllowsService(franja, service) {
 
 // Tramos libres de la franja, en minutos. `closed`: el tramo termina en un turno tomado,
 // así que el descanso del servicio tiene que entrar antes (al final de la franja no hace falta).
+// `removed` son tramos libres que el profesional quitó (no piden descanso antes).
 export function freeRanges(franja) {
   if (franja.booked) return [];
   const end = timeToMinutes(franja.end);
-  const busy = (franja.busy || [])
-    .map(b => ({ start: timeToMinutes(b.start), end: timeToMinutes(b.end) }))
+  const toMin = (r, isBusy) => ({ start: timeToMinutes(r.start), end: timeToMinutes(r.end), isBusy });
+  const busy = [...(franja.busy || []).map(b => toMin(b, true)), ...(franja.removed || []).map(r => toMin(r, false))]
     .sort((a, b) => a.start - b.start);
   const ranges = [];
   let cursor = timeToMinutes(franja.start);
   for (const b of busy) {
-    if (b.start > cursor) ranges.push({ start: cursor, end: Math.min(b.start, end), closed: b.start < end });
+    if (b.start > cursor) ranges.push({ start: cursor, end: Math.min(b.start, end), closed: b.isBusy && b.start < end });
     cursor = Math.max(cursor, b.end);
     if (cursor >= end) break;
   }
   if (cursor < end) ranges.push({ start: cursor, end, closed: false });
   return ranges.filter(r => r.end > r.start);
+}
+
+// Cambio para quitar un tramo libre de una franja que tiene turnos: si está en una punta
+// se achica la franja; si está entre dos turnos se anota en `removed`.
+export function cutFreeRange(franja, start, end) {
+  if (start === franja.start) return { start: end };
+  if (end === franja.end) return { end: start };
+  return { removed: [...(franja.removed || []), { start, end }] };
 }
 
 function rangeFits(range, start, service) {

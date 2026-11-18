@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { ChevronLeft, Trash2, User, FileText, Star, MessageCircle, Plus, Check, Pencil, UserPlus, ChevronDown, ChevronUp, X } from "lucide-react";
 import { formatPrice, getAppointmentPrice, STATUS, formatPhoneForWhatsapp, formatDateLong, clientHistory, clientStats, isHttpsUrl, groupServicesByCategory } from "../../shared/helpers";
 import { getAppointmentHistory, subscribeClientSessions, addClientSession, updateClientSession, deleteClientSession, createCombo, deleteCombo, activateCombo, updateCombo } from "../../shared/firestoreApi";
@@ -167,6 +167,10 @@ function SessionesSection({ client, history }) {
     </div>
   );
 }
+
+// En Android, después de elegir en la libreta aparece "Compartir un contacto" de Chrome,
+// donde hay que volver a marcar el contacto; si no, llega una lista vacía.
+export const CONTACT_NOT_MARKED_MSG = "No llegó ningún contacto. En la pantalla \"Compartir un contacto\", tocá el nombre hasta que aparezca el tilde y después tocá \"Listo\".";
 
 export const ANAMNESIS_FIELDS = [
   { key: "birthDate",          label: "Fecha de nacimiento",     type: "input"    },
@@ -384,7 +388,6 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   const [newPhone, setNewPhone] = useState("");
   const [savingClient, setSavingClient] = useState(false);
   const canImportContact = typeof navigator !== "undefined" && !!navigator.contacts?.select;
-  const importingContactRef = useRef(false);
   const [editingClient, setEditingClient] = useState(false);
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -418,22 +421,14 @@ export function ClientesView({ clients, onUpdateClient, onDeleteClient, onAddCli
   }
 
   async function importContact() {
-    // El toque en "Listo" del selector de Android puede llegar a este botón al volver y reabrirlo.
-    if (importingContactRef.current) return;
-    importingContactRef.current = true;
     try {
-      const result = await navigator.contacts.select(["name", "tel"], { multiple: false });
-      const contact = result?.[0];
-      if (!contact?.name?.[0] && !contact?.tel?.[0]) {
-        window.alert(`El teléfono no devolvió datos del contacto. Respuesta: ${JSON.stringify(result)}`);
-        return;
-      }
+      // Modo múltiple a propósito: en algunos Samsung el modo de a uno no deja marcar el contacto.
+      const [contact] = await navigator.contacts.select(["name", "tel"], { multiple: true });
+      if (!contact) { window.alert(CONTACT_NOT_MARKED_MSG); return; }
       if (contact.name?.[0]) setNewName(contact.name[0]);
       if (contact.tel?.[0]) setNewPhone(contact.tel[0]);
     } catch (e) {
-      window.alert(`No se pudo importar el contacto (${e?.name}: ${e?.message})`);
-    } finally {
-      setTimeout(() => { importingContactRef.current = false; }, 1000);
+      window.alert(`No se pudo importar el contacto (${e?.message})`);
     }
   }
 
