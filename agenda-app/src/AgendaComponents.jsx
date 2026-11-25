@@ -4,7 +4,7 @@ import {
   dateKey, timeToMinutes, minutesToTime, addDays, startOfWeek,
   formatPrice, getAppointmentPrice, formatDateLong, formatDateShort, pad, DAY_NAMES, MONTH_NAMES, STATUS, getRecurringDateKeys, getRecurringDateKeysByRange,
   formatPhoneForWhatsapp, parseDateKeyAsLocal, getReferralAmount,
-  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, appointmentAddress, apptSlotIds, freeRanges,
+  slotLocationId, serviceAtLocation, servicePrice, locationSnapshot, appointmentAddress, apptSlotIds, freeRanges, applyClientDiscount,
 } from "../../shared/helpers";
 import styles from "../../shared/styles";
 import { MonthView, MiniCalendar } from "./CalendarViews";
@@ -1291,6 +1291,14 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
     return c.name.trim().toLowerCase() === clientName.trim().toLowerCase();
   });
 
+  // Solo en turnos nuevos: al editar uno existente se respeta el descuento ya guardado.
+  const vipDiscount = !initial && matchedClient
+    ? applyClientDiscount(svcPrice, matchedClient.discounts, serviceId).discountAmount
+    : 0;
+  useEffect(() => {
+    if (!initial) setDiscount(vipDiscount);
+  }, [vipDiscount]);
+
   const clientSearchDigits = clientName.replace(/[^\d]/g, "");
   const filteredClients = clients.filter(c => {
     if (!clientName.length) return false;
@@ -1509,6 +1517,7 @@ function ApptFormModal({ services, clients, appointments = [], combos = [], init
             {Number(discount) !== 0
               ? ` ${Number(discount) > 0 ? "−" : "+"} ${formatPrice(Math.abs(Number(discount)))} = ${formatPrice(getAppointmentPrice({ price: svcPrice, discount }, svc))}`
               : ""}
+            {vipDiscount > 0 && Number(discount) === vipDiscount ? " (descuento VIP)" : ""}
           </div>
         )}
 
