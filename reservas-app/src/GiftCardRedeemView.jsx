@@ -2,47 +2,35 @@ import React, { useState, useEffect, useRef } from "react";
 import { Download, Check, Gift } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { getGiftCard, reservasUrl } from "../../shared/firestoreApi";
-import { formatPrice, formatDateLong, dateKey, instagramHandle } from "../../shared/helpers";
+import { formatPrice, formatDateLong, dateKey, instagramHandle, giftCardDesignId } from "../../shared/helpers";
+import { GIFT_CARD_THEMES } from "./giftCardThemes";
 import styles from "../../shared/styles";
 import ReservarView from "./ReservarView";
 
 
 export function GiftCardVisual({ gc, canvasRef, businessInfo }) {
   const instagram = instagramHandle(businessInfo.instagram);
+  const t = GIFT_CARD_THEMES[giftCardDesignId(gc.design)];
+  const { Header, Divider } = t;
+  const isClassic = t === GIFT_CARD_THEMES.classic;
   return (
-    <div ref={canvasRef} style={{ ...styles.giftCardVisual, display: "flex", flexDirection: "column", padding: 0 }}>
-      <div style={{ position: "relative", height: 110, overflow: "hidden", flexShrink: 0 }}>
-        <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: 1.5, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #F0D060 50%, #C9A84C 80%, transparent)" }} />
-        <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 1.5, background: "linear-gradient(180deg, transparent, #C9A84C 20%, #F0D060 50%, #C9A84C 80%, transparent)" }} />
-        <div style={{ position: "absolute", top: 8, left: 8, width: 60, height: 60, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.15) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", top: 20, right: 25, width: 40, height: 40, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.1) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", bottom: 10, right: 12, width: 55, height: 55, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%)" }} />
-        <div style={{ position: "absolute", top: 5, right: 80, width: 25, height: 25, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)" }} />
-        {/* La posición va en un contenedor: html2canvas copia el estilo del svg adentro de la imagen y lo dejaría fuera de cuadro. */}
-        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", lineHeight: 0 }}>
-        <svg width="72" height="60" viewBox="0 0 72 60" fill="none">
-          <path d="M36 30 C24 18, 2 12, 5 26 C7 38, 26 34, 36 30Z" fill="#C9A84C"/>
-          <path d="M36 30 C48 18, 70 12, 67 26 C65 38, 46 34, 36 30Z" fill="#C9A84C"/>
-          <path d="M36 30 C24 42, 2 48, 5 34 C7 22, 26 26, 36 30Z" fill="#A87E2A"/>
-          <path d="M36 30 C48 42, 70 48, 67 34 C65 22, 46 26, 36 30Z" fill="#A87E2A"/>
-          <ellipse cx="36" cy="30" rx="5.5" ry="5" fill="#D4AF37"/>
-          <ellipse cx="36" cy="30" rx="3" ry="2.8" fill="#F0D060"/>
-        </svg>
-        </div>
+    <div ref={canvasRef} style={{ ...styles.giftCardVisual, background: t.card, display: "flex", flexDirection: "column", padding: 0 }}>
+      <div style={{ position: "relative", height: 110, overflow: "hidden", flexShrink: 0, background: t.header }}>
+        <Header />
       </div>
-      <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #C9A84C 20%, #D4AF37 50%, #C9A84C 80%, transparent)", flexShrink: 0 }} />
+      <Divider />
       <div style={{ padding: "18px 22px 20px", flex: 1 }}>
-        <div style={styles.giftCardVisualLogo}>{businessInfo.name}</div>
-        <div style={styles.giftCardVisualService}>{gc.serviceName}</div>
-        <div style={styles.giftCardVisualTo}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
-        {gc.message && <div style={styles.giftCardVisualMessage}>"{gc.message}"</div>}
-        <div style={styles.giftCardVisualCode}>Código: {gc.code}</div>
+        <div style={{ ...styles.giftCardVisualLogo, color: t.title }}>{businessInfo.name}</div>
+        <div style={{ ...styles.giftCardVisualService, color: t.service, ...(isClassic ? {} : { textShadow: "none" }) }}>{gc.serviceName}</div>
+        <div style={{ ...styles.giftCardVisualTo, color: t.text }}>Para <strong>{gc.toName}</strong> · de parte de {gc.fromName}</div>
+        {gc.message && <div style={{ ...styles.giftCardVisualMessage, color: t.text }}>"{gc.message}"</div>}
+        <div style={{ ...styles.giftCardVisualCode, color: t.title, borderTop: `1px solid ${t.line}` }}>Código: {gc.code}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 12 }}>
           <div style={{ background: "#fff", padding: 6, borderRadius: 8, lineHeight: 0, flexShrink: 0 }}>
             <QRCodeCanvas value={reservasUrl({ giftcard: gc.code })} size={120} marginSize={2} />
           </div>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, lineHeight: 1.6, color: "rgba(239,233,223,0.85)", minWidth: 0, overflowWrap: "anywhere" }}>
-            <div style={{ fontWeight: 600, color: "#C9A84C", marginBottom: 4 }}>Escaneá para pedir tu turno</div>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11.5, lineHeight: 1.6, color: t.text, minWidth: 0, overflowWrap: "anywhere" }}>
+            <div style={{ fontWeight: 600, color: t.title, marginBottom: 4 }}>Escaneá para pedir tu turno</div>
             {instagram && <div>Instagram @{instagram}</div>}
             {businessInfo.whatsapp && <div>WhatsApp {businessInfo.whatsapp}</div>}
           </div>

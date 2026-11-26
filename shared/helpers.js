@@ -417,3 +417,25 @@ export function getMonthGrid(d) {
   }
   return weeks;
 }
+
+// ---------- Diseños de gift card ----------
+export const GIFT_CARD_DESIGNS = [
+  { id: "classic", name: "Clásico" },
+  { id: "hearts", name: "Corazones" },
+  { id: "gifts", name: "Regalos" },
+  { id: "holidays", name: "Fiestas 2027" },
+  { id: "flowers", name: "Flores" },
+  { id: "birthday", name: "Cumpleaños" },
+  { id: "relax", name: "Relax" },
+];
+const DEFAULT_GIFT_CARD_DESIGNS = GIFT_CARD_DESIGNS.map(d => d.id).filter(id => id !== "holidays");
+
+export function giftCardDesignId(id) {
+  return GIFT_CARD_DESIGNS.some(d => d.id === id) ? id : "classic";
+}
+
+// El clásico siempre está, así nunca queda la lista vacía.
+export function enabledGiftCardDesigns(businessInfo) {
+  const on = businessInfo?.giftCardDesigns || DEFAULT_GIFT_CARD_DESIGNS;
+  return GIFT_CARD_DESIGNS.filter(d => d.id === "classic" || on.includes(d.id));
+}

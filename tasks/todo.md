@@ -1,3 +1,32 @@
+# Diseños de gift card (2026-11-26)
+
+## Objetivo
+Que quien compra una gift card elija entre 7 diseños (Clásico, Corazones, Regalos, Fiestas 2027,
+Flores, Cumpleaños, Relax) y que el profesional prenda/apague cada uno desde la agenda.
+Maqueta aprobada: https://claude.ai/artifact/6StFzyoPxSGWojDseCCpJq (en la app se mantiene el nombre del negocio).
+
+## Decisiones
+- La gift card guarda `design` (id). Sin `design` o con un id desconocido → Clásico (las viejas no cambian).
+- El negocio guarda `giftCardDesigns` (ids prendidos). Sin el campo → todos menos Fiestas 2027.
+- Clásico siempre disponible (no se puede apagar), así nunca queda la lista vacía.
+- Si hay un solo diseño prendido, no se muestra el selector.
+- Una gift card ya comprada conserva su diseño aunque después se apague.
+- Sin cambios en `firestore.rules`: el dueño ya puede escribir campos nuevos en su negocio y el
+  create de giftCards no limita campos. Se agrega un test de reglas que lo confirma.
+
+## Plan
+- [x] `shared/helpers.js`: `GIFT_CARD_DESIGNS` (id + nombre), `enabledGiftCardDesigns(businessInfo)`,
+      `giftCardDesignId(id)` (fallback a clásico)
+- [x] Test unitario `scripts/giftcard-designs.test.mjs` (primero, en rojo) y sumarlo a `test:unit`
+- [x] `reservas-app/src/giftCardThemes.jsx`: colores y dibujo de cabecera (SVG) de cada diseño
+- [x] `GiftCardVisual`: usar el tema según `gc.design`
+- [x] `GiftCardView`: selector de diseño con miniaturas; guardar `design`
+- [x] Agenda (`NegocioView`): sección "Diseños de gift card" con un interruptor por diseño
+- [x] Test de reglas: crear gift card con `design` y guardar `giftCardDesigns` como dueño
+- [x] Verificar: `npm run test:unit`, `npm run test:rules`, build de ambas apps, ver las 7 tarjetas en el navegador (incluida la descarga como imagen)
+
+---
+
 # Multi-negocio + varios lugares de atención (prueba con una colega)
 
 ## Objetivo

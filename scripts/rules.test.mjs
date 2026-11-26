@@ -374,3 +374,10 @@ test("franjas: el público puede ocupar una franja sin `busy` todavía", async (
   });
   await assertSucceeds(updateDoc(doc(anon(), "businesses/a/availability/f2"), { busy: [{ start: "09:00", end: "10:00", apptId: "a" }] }));
 });
+
+test("diseños de gift card: el dueño elige cuáles ofrece y el público compra con un diseño", async () => {
+  await assertSucceeds(updateDoc(doc(ownerA(), "businesses/a"), { giftCardDesigns: ["classic", "holidays"] }));
+  await assertFails(updateDoc(doc(ownerB(), "businesses/a"), { giftCardDesigns: [] }));
+  await assertFails(updateDoc(doc(anon(), "businesses/a"), { giftCardDesigns: [] }));
+  await assertSucceeds(setDoc(doc(anon(), "businesses/a/giftCards/GCDESIGN"), { ...gift, design: "holidays" }));
+});

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Gift, ChevronLeft, Copy } from "lucide-react";
-import { formatPrice, formatDateLong, dateKey, addDays, generateCode, servicePaymentLink } from "../../shared/helpers";
+import { formatPrice, formatDateLong, dateKey, addDays, generateCode, servicePaymentLink, enabledGiftCardDesigns } from "../../shared/helpers";
+import { GIFT_CARD_THEMES } from "./giftCardThemes";
 import { createGiftCard, reservasUrl } from "../../shared/firestoreApi";
 import styles from "../../shared/styles";
 import TransferInfo from "./TransferInfo";
@@ -16,6 +17,8 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
   const [toName, setToName] = useState("");
   const [message, setMessage] = useState("");
   const [deliveryDate, setDeliveryDate] = useState(todayStr);
+  const designs = enabledGiftCardDesigns(businessInfo);
+  const [design, setDesign] = useState("classic");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -38,6 +41,7 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
         fromName: fromName.trim(),
         toName: toName.trim(),
         message: message.trim(),
+        design,
         deliveryDate,
         expiresAt,
         status: "pending",
@@ -163,6 +167,38 @@ export default function GiftCardView({ services, businessInfo, onBack }) {
             </button>
           ))}
         </div>
+
+        {designs.length > 1 && (
+          <>
+            <label style={styles.fieldLabel}>Diseño</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+              {designs.map(d => {
+                const t = GIFT_CARD_THEMES[d.id];
+                const selected = design === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setDesign(d.id)}
+                    aria-pressed={selected}
+                    style={{
+                      width: 104, padding: 0, borderRadius: 10, overflow: "hidden", cursor: "pointer",
+                      border: "2px solid", borderColor: selected ? "#2A2622" : "#D0C5B4",
+                      background: "#fff", display: "flex", flexDirection: "column",
+                    }}
+                  >
+                    <div style={{ width: 100, height: 34, overflow: "hidden", position: "relative", background: t.card }}>
+                      <div style={{ position: "absolute", top: 0, left: 0, width: 340, height: 110, transform: "scale(0.294)", transformOrigin: "top left", background: t.header }}>
+                        <t.Header />
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: selected ? 700 : 500, color: "#2A2622", padding: "6px 4px" }}>{d.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         <div style={styles.fieldRow}>
           <div style={{ flex: 1 }}>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Check, Download, Copy, Share2, Pencil, Trash2, Plus, MapPin } from "lucide-react";
 import styles from "../../shared/styles";
-import { STATUS, formatPrice, getAppointmentPrice, dateKey, getReferralAmount } from "../../shared/helpers";
+import { STATUS, formatPrice, getAppointmentPrice, dateKey, getReferralAmount, GIFT_CARD_DESIGNS, enabledGiftCardDesigns } from "../../shared/helpers";
 import { reservasUrl } from "../../shared/firestoreApi";
 
 function ShareLinkCard({ label, url, shareTitle }) {
@@ -32,6 +32,33 @@ function ShareLinkCard({ label, url, shareTitle }) {
         )}
       </div>
     </div>
+  );
+}
+
+function GiftCardDesignsSection({ businessInfo, onSave }) {
+  const enabled = enabledGiftCardDesigns(businessInfo).map(d => d.id);
+
+  function toggle(id) {
+    const next = enabled.includes(id) ? enabled.filter(x => x !== id) : [...enabled, id];
+    onSave({ giftCardDesigns: next });
+  }
+
+  return (
+    <>
+      <h2 style={{ ...styles.sectionTitle, marginTop: 4 }}>Diseños de gift card</h2>
+      <p style={styles.helperText}>Quien compra una gift card elige entre los diseños prendidos. El Clásico está siempre.</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 24 }}>
+        {GIFT_CARD_DESIGNS.map(d => {
+          const always = d.id === "classic";
+          return (
+            <label key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#F5F0E8", borderRadius: 10, fontSize: 14, cursor: always ? "default" : "pointer" }}>
+              <input type="checkbox" checked={enabled.includes(d.id)} disabled={always} onChange={() => toggle(d.id)} style={{ width: 18, height: 18, accentColor: "#6E7F5C" }} />
+              {d.name}
+            </label>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -345,6 +372,8 @@ export default function NegocioView({ businessInfo, onSave, appointments = [], c
       <IncomesPanel appointments={appointments} services={services} />
 
       <LocationsSection locations={locations} onAdd={onAddLocation} onUpdate={onUpdateLocation} onDelete={onDeleteLocation} />
+
+      <GiftCardDesignsSection businessInfo={businessInfo} onSave={onSave} />
 
       <p style={styles.helperText}>Esta info aparece en la app de reservas para tus clientes.</p>
 
